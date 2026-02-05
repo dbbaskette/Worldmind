@@ -3,6 +3,7 @@ package com.worldmind.core.graph;
 import com.worldmind.core.llm.LlmService;
 import com.worldmind.core.model.Classification;
 import com.worldmind.core.model.InteractionMode;
+import com.worldmind.core.model.MissionPlan;
 import com.worldmind.core.model.MissionStatus;
 import com.worldmind.core.model.ProjectContext;
 import com.worldmind.core.nodes.ClassifyRequestNode;
@@ -38,6 +39,17 @@ class GraphTest {
         when(mockLlm.structuredCall(anyString(), anyString(), eq(Classification.class)))
                 .thenReturn(new Classification("feature", 3, List.of("api"), "sequential"));
 
+        // Mock LlmService to return a fixed MissionPlan for the PlanMissionNode
+        when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class)))
+                .thenReturn(new MissionPlan(
+                        "Implement feature",
+                        "sequential",
+                        List.of(
+                                new MissionPlan.DirectivePlan("FORGE", "Implement feature", "", "Feature works", List.of()),
+                                new MissionPlan.DirectivePlan("VIGIL", "Review code", "", "Code quality ok", List.of("DIR-001"))
+                        )
+                ));
+
         // Create a mock ProjectScanner that returns a fixed ProjectContext
         ProjectScanner mockScanner = mock(ProjectScanner.class);
         when(mockScanner.scan(any(Path.class))).thenReturn(new ProjectContext(
@@ -48,7 +60,7 @@ class GraphTest {
         worldmindGraph = new WorldmindGraph(
                 new ClassifyRequestNode(mockLlm),
                 new UploadContextNode(mockScanner),
-                new PlanMissionNode()
+                new PlanMissionNode(mockLlm)
         );
     }
 
