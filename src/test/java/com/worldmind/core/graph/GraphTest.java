@@ -1,5 +1,7 @@
 package com.worldmind.core.graph;
 
+import com.worldmind.core.llm.LlmService;
+import com.worldmind.core.model.Classification;
 import com.worldmind.core.model.InteractionMode;
 import com.worldmind.core.model.MissionStatus;
 import com.worldmind.core.nodes.ClassifyRequestNode;
@@ -11,10 +13,13 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 /**
  * Tests for the LangGraph4j StateGraph skeleton.
@@ -25,16 +30,21 @@ class GraphTest {
 
     @BeforeEach
     void setUp() throws Exception {
+        // Create a mock LlmService that returns a fixed Classification
+        LlmService mockLlm = mock(LlmService.class);
+        when(mockLlm.structuredCall(anyString(), anyString(), eq(Classification.class)))
+                .thenReturn(new Classification("feature", 3, List.of("api"), "sequential"));
+
         worldmindGraph = new WorldmindGraph(
-                new ClassifyRequestNode(),
+                new ClassifyRequestNode(mockLlm),
                 new UploadContextNode(),
                 new PlanMissionNode()
         );
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // ===================================================================
     //  Compilation
-    // ═══════════════════════════════════════════════════════════════════
+    // ===================================================================
 
     @Test
     @DisplayName("Graph compiles without errors")
@@ -43,9 +53,9 @@ class GraphTest {
                 "Compiled graph should not be null");
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // ===================================================================
     //  Full run with APPROVE_PLAN (default) -- hits await_approval
-    // ═══════════════════════════════════════════════════════════════════
+    // ===================================================================
 
     @Test
     @DisplayName("Running graph with APPROVE_PLAN produces AWAITING_APPROVAL status")
@@ -72,9 +82,9 @@ class GraphTest {
         assertEquals("DIR-001", finalState.directives().get(0).id());
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // ===================================================================
     //  Full run with FULL_AUTO -- skips await_approval
-    // ═══════════════════════════════════════════════════════════════════
+    // ===================================================================
 
     @Test
     @DisplayName("Running graph with FULL_AUTO skips approval and ends directly")
@@ -98,9 +108,9 @@ class GraphTest {
         assertFalse(finalState.directives().isEmpty());
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // ===================================================================
     //  Conditional routing logic
-    // ═══════════════════════════════════════════════════════════════════
+    // ===================================================================
 
     @Test
     @DisplayName("routeAfterPlan returns 'end' for FULL_AUTO")
@@ -129,9 +139,9 @@ class GraphTest {
         assertEquals("await_approval", worldmindGraph.routeAfterPlan(state));
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // ===================================================================
     //  State progression through nodes
-    // ═══════════════════════════════════════════════════════════════════
+    // ===================================================================
 
     @Test
     @DisplayName("Classification is populated with expected values")
