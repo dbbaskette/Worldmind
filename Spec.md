@@ -2,9 +2,9 @@
 
 ### Agentic Code Assistant — System Architecture Specification
 
-**The Hybrid Architecture: LangGraph Control Plane + Goose Worker Nodes**
+**The Hybrid Architecture: LangGraph4j Control Plane + Goose Worker Nodes**
 
-Version 1.0 · February 2026 · Draft
+Version 2.0 · February 2026 · Draft
 
 *Inspired by the Xandarian Worldmind — the sentient supercomputer of the Nova Corps*
 
@@ -14,11 +14,11 @@ Version 1.0 · February 2026 · Draft
 
 1. [Executive Summary](#1-executive-summary)
 1. [Architectural Overview](#2-architectural-overview)
-1. [Control Plane: Worldmind Core (LangGraph)](#3-control-plane-worldmind-core-langgraph)
+1. [Control Plane: Worldmind Core (LangGraph4j)](#3-control-plane-worldmind-core-langgraph4j)
 1. [Worker Plane: Goose Centurions](#4-worker-plane-goose-centurions)
 1. [Tool Layer: Nova Force (MCP Servers)](#5-tool-layer-nova-force-mcp-servers)
 1. [Infrastructure Layer: Stargates](#6-infrastructure-layer-stargates)
-1. [Interface Layer: Helm](#7-interface-layer-helm)
+1. [Interface Layer: Dispatch](#7-interface-layer-dispatch)
 1. [Execution Patterns](#8-execution-patterns)
 1. [Observability and Metrics](#9-observability-and-metrics)
 1. [Performance Requirements](#10-performance-requirements)
@@ -31,15 +31,15 @@ Version 1.0 · February 2026 · Draft
 
 ## 1. Executive Summary
 
-Worldmind is a server-based agentic code assistant that accepts natural language development requests and autonomously plans, implements, tests, and reviews code. It employs a hybrid architecture that combines the deterministic orchestration capabilities of **LangGraph** with the autonomous coding power of **Goose** worker agents.
+Worldmind is a server-based agentic code assistant that accepts natural language development requests and autonomously plans, implements, tests, and reviews code. It employs a hybrid architecture that combines the deterministic orchestration capabilities of **LangGraph4j** (the Java port of LangGraph) with the autonomous coding power of **Goose** worker agents, all built on a **Spring Boot** foundation with **Spring AI** for LLM integration.
 
-The system is designed around a clear separation of concerns: the **Worldmind control plane** (built on LangGraph) manages state, planning, routing, persistence, and the software development lifecycle, while **Goose instances** (deployed as Centurion workers inside containerized Stargates) perform the actual code generation, file manipulation, and command execution through their native MCP integration.
+The system is designed around a clear separation of concerns: the **Worldmind control plane** (built on LangGraph4j + Spring Boot) manages state, planning, routing, persistence, and the software development lifecycle, while **Goose instances** (deployed as Centurion workers inside containerized Stargates) perform the actual code generation, file manipulation, and command execution through their native MCP integration.
 
-This architecture resolves the central tension identified in framework comparison research: LangGraph provides the engineering rigor required for production-grade orchestration (cyclic graphs, per-step checkpointing, the Send API for dynamic fan-out) while Goose provides the developer-centric autonomy required for effective code generation (native filesystem interaction, self-correcting build loops, MCP-native tool access).
+This architecture resolves the central tension identified in framework comparison research: LangGraph4j provides the engineering rigor required for production-grade orchestration (cyclic graphs, per-step checkpointing, conditional edges for dynamic routing) while Goose provides the developer-centric autonomy required for effective code generation (native filesystem interaction, self-correcting build loops, MCP-native tool access). Spring Boot provides the enterprise-grade application framework, dependency injection, and REST API infrastructure that ties it all together.
 
 > **The Hybrid Principle**
-> 
-> Worldmind is the nervous system. Goose is the hands. LangGraph decides *what* to do and in *what order*. Goose *does it*. Neither is sufficient alone: LangGraph without Goose lacks developer autonomy; Goose without LangGraph lacks state persistence, deterministic routing, and scalable orchestration.
+>
+> Worldmind is the nervous system. Goose is the hands. LangGraph4j decides *what* to do and in *what order*. Goose *does it*. Neither is sufficient alone: LangGraph4j without Goose lacks developer autonomy; Goose without LangGraph4j lacks state persistence, deterministic routing, and scalable orchestration.
 
 -----
 
@@ -49,175 +49,176 @@ The system is organized into five layers, each with distinct responsibilities an
 
 ### 2.1 Layer Architecture
 
-|Layer             |Worldmind Name|Technology           |Responsibility                                                                                                                                                                                                                          |
-|------------------|--------------|---------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-|**Interface**     |Helm          |FastAPI + CLI (Typer)|Accepts operator requests via REST API or CLI. Streams mission progress events via SSE/WebSocket. Provides mission management (submit, status, cancel, history).                                                                        |
-|**Orchestration** |Worldmind Core|LangGraph StateGraph |The control plane. Houses Centurion Prime (planner), the mission state machine, conditional routing logic, the Send API fan-out for parallel directives, and the Postgres-backed checkpointer for state persistence.                    |
-|**Agent**         |Centurions    |Goose (headless mode)|The worker layer. Each Centurion is a Goose instance running in a containerized Stargate, connected to the Worldmind via a thin bridge that translates LangGraph state into Goose instructions and Goose output back into state updates.|
-|**Tool**          |Nova Force    |MCP Servers          |Provides capabilities to Centurions: filesystem access, git operations, shell execution, database queries, code search. Each MCP server is a Force channel. Goose connects to these natively as an MCP client.                          |
-|**Infrastructure**|Stargates     |Docker / Kubernetes / cf  |Container lifecycle management. Spins up isolated environments for each Centurion deployment. Manages resource limits, volume mounts, network isolation, and cleanup.                                                                   |
+|Layer             |Worldmind Name|Technology                       |Responsibility                                                                                                                                                                                                                                  |
+|------------------|--------------|--------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+|**Interface**     |Dispatch      |Spring Boot REST + CLI (picocli)|Accepts operator requests via REST API or CLI. Streams mission progress events via SSE. Provides mission management (submit, status, cancel, history).                                                                                           |
+|**Orchestration** |Worldmind Core|LangGraph4j StateGraph          |The control plane. Houses Centurion Prime (planner), the mission state machine, conditional routing logic, parallel fan-out for directives, and the Postgres-backed checkpointer for state persistence.                                         |
+|**Agent**         |Centurions    |Goose (headless mode)           |The worker layer. Each Centurion is a Goose instance running in a containerized Stargate, connected to the Worldmind via a thin bridge that translates LangGraph4j state into Goose instructions and Goose output back into state updates.      |
+|**Tool**          |Nova Force    |MCP Servers                     |Provides capabilities to Centurions: filesystem access, git operations, shell execution, database queries, code search. Each MCP server is a Force channel. Goose connects to these natively as an MCP client.                                  |
+|**Infrastructure**|Stargates     |Docker / Kubernetes / cf        |Container lifecycle management. Spins up isolated environments for each Centurion deployment. Manages resource limits, volume mounts, network isolation, and cleanup.                                                                           |
 
 ### 2.2 System Flow Overview
 
 The end-to-end flow for a typical mission proceeds through these stages:
 
-1. **Request Intake:** The operator submits a natural language request via the Helm CLI or API. Example: *“Add a REST endpoint for user profiles with validation and tests.”*
+1. **Request Intake:** The operator submits a natural language request via the Dispatch CLI or API. Example: *"Add a REST endpoint for user profiles with validation and tests."*
 1. **Upload (Context Gathering):** Worldmind Core invokes Centurion Pulse (research agent) to scan the project via Force::Terrain and Force::Chronicle MCP servers. Project structure, conventions, dependencies, and relevant source files are assembled into the Xandarian Archive (shared state).
 1. **Mission Planning:** Centurion Prime analyzes the request against the gathered context and produces a Mission: an ordered set of Directives with agent assignments, dependencies, quality gates, and failure strategies.
-1. **Approval:** In Interactive mode, the Mission is presented to the operator via Helm for review and approval. In Supervised mode, it auto-approves and proceeds. The operator can edit, reorder, or reject directives.
+1. **Approval:** In Interactive mode, the Mission is presented to the operator via Dispatch for review and approval. In Supervised mode, it auto-approves and proceeds. The operator can edit, reorder, or reject directives.
 1. **Centurion Deployment:** For each eligible Directive, Worldmind opens a Stargate (spins up a Docker container), provisions it with the project volume and appropriate Force channels, and deploys a Goose instance configured for the specific task.
 1. **Execution:** The Goose Centurion executes its Directive autonomously within the Stargate, using MCP tools to read files, write code, run commands, and self-correct. Its output is captured and written back to the Xandarian Archive.
 1. **Quality Gate (Seal of Approval):** After each Directive completes, the Worldmind evaluates the quality gate. For code generation, this typically means routing to Centurion Vigil (reviewer) or Centurion Gauntlet (tester). If the Seal is denied, the Worldmind routes feedback back to the originating Centurion for revision.
-1. **Convergence:** When all Directives are fulfilled and all Seals granted, Worldmind marks the Mission complete, commits the changes via Force::Chronicle, and reports results to the operator via Helm.
+1. **Convergence:** When all Directives are fulfilled and all Seals granted, Worldmind marks the Mission complete, commits the changes via Force::Chronicle, and reports results to the operator via Dispatch.
 
 ### 2.3 Architecture Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                         HELM (Interface Layer)                      │
-│                    CLI (Typer) + REST API (FastAPI)                  │
-│                         SSE Event Stream                            │
+│                      DISPATCH (Interface Layer)                      │
+│              CLI (picocli) + REST API (Spring Boot MVC)              │
+│                         SSE Event Stream                             │
 └──────────────────────────────┬──────────────────────────────────────┘
                                │
                                ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                   WORLDMIND CORE (Control Plane)                    │
-│                       LangGraph StateGraph                          │
-│                                                                     │
-│  ┌──────────┐   ┌──────────┐   ┌───────────────────┐              │
-│  │ Classify  │──▶│ Upload   │──▶│ Centurion Prime   │              │
-│  │ Request   │   │ Context  │   │ (Plan Mission)    │              │
-│  └──────────┘   └──────────┘   └─────────┬─────────┘              │
-│                                           │                         │
-│                                    ┌──────▼──────┐                  │
-│                                    │  Execute     │                  │
-│                                    │  Directives  │  ◀── Send API   │
-│                                    │  (Fan-Out)   │      Fan-Out    │
-│                                    └──┬───┬───┬──┘                  │
-│                                       │   │   │                     │
-│  ┌─────────────┐  ┌─────────────┐  ┌─┴───┴───┴──────────────┐     │
-│  │  Evaluate   │◀─│  Dispatch   │◀─│  Parallel Branches      │     │
-│  │  Seal       │  │  Centurion  │  │  (1 per Directive)      │     │
-│  └──────┬──────┘  └─────────────┘  └────────────────────────┘     │
-│         │                                                           │
-│    ┌────┴────┐                                                      │
-│    │Converge │──▶ Mission Complete / Failed                         │
-│    │Results  │                                                      │
-│    └─────────┘                                                      │
-│                                                                     │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │            Xandarian Archive (Shared State)                  │   │
-│  │         PostgreSQL-backed LangGraph Checkpointer             │   │
-│  └─────────────────────────────────────────────────────────────┘   │
+│                   WORLDMIND CORE (Control Plane)                     │
+│                    LangGraph4j StateGraph (Java 21)                  │
+│                    Spring AI (Anthropic Claude)                      │
+│                                                                      │
+│  ┌──────────┐   ┌──────────┐   ┌───────────────────┐               │
+│  │ Classify  │──▶│ Upload   │──▶│ Centurion Prime   │               │
+│  │ Request   │   │ Context  │   │ (Plan Mission)    │               │
+│  └──────────┘   └──────────┘   └─────────┬─────────┘               │
+│                                           │                          │
+│                                    ┌──────▼──────┐                   │
+│                                    │  Execute     │                   │
+│                                    │  Directives  │  ◀── Parallel    │
+│                                    │  (Fan-Out)   │      Fan-Out     │
+│                                    └──┬───┬───┬──┘                   │
+│                                       │   │   │                      │
+│  ┌─────────────┐  ┌─────────────┐  ┌─┴───┴───┴──────────────┐      │
+│  │  Evaluate   │◀─│  Dispatch   │◀─│  Parallel Branches      │      │
+│  │  Seal       │  │  Centurion  │  │  (1 per Directive)      │      │
+│  └──────┬──────┘  └─────────────┘  └────────────────────────┘      │
+│         │                                                            │
+│    ┌────┴────┐                                                       │
+│    │Converge │──▶ Mission Complete / Failed                          │
+│    │Results  │                                                       │
+│    └─────────┘                                                       │
+│                                                                      │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │            Xandarian Archive (Shared State)                  │    │
+│  │       PostgreSQL-backed LangGraph4j Checkpointer             │    │
+│  └─────────────────────────────────────────────────────────────┘    │
 └──────────────────────────────┬──────────────────────────────────────┘
                                │
                                ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                     STARGATES (Infrastructure)                      │
-│                   Docker (dev) / Kubernetes (prod)                   │
-│                                                                     │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                │
-│  │  Stargate A  │  │  Stargate B  │  │  Stargate C  │               │
-│  │ ┌─────────┐ │  │ ┌─────────┐ │  │ ┌─────────┐ │               │
-│  │ │  Goose  │ │  │ │  Goose  │ │  │ │  Goose  │ │               │
-│  │ │ (Forge) │ │  │ │ (Vigil) │ │  │ │(Gauntlet)│ │               │
-│  │ └────┬────┘ │  │ └────┬────┘ │  │ └────┬────┘ │               │
-│  │      │      │  │      │      │  │      │      │               │
-│  │  MCP Client │  │  MCP Client │  │  MCP Client │               │
-│  └──────┼──────┘  └──────┼──────┘  └──────┼──────┘               │
+│                     STARGATES (Infrastructure)                       │
+│                   Docker (dev) / Kubernetes (prod)                    │
+│                                                                      │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                 │
+│  │  Stargate A  │  │  Stargate B  │  │  Stargate C  │                │
+│  │ ┌─────────┐ │  │ ┌─────────┐ │  │ ┌─────────┐ │                │
+│  │ │  Goose  │ │  │ │  Goose  │ │  │ │  Goose  │ │                │
+│  │ │ (Forge) │ │  │ │ (Vigil) │ │  │ │(Gauntlet)│ │                │
+│  │ └────┬────┘ │  │ └────┬────┘ │  │ └────┬────┘ │                │
+│  │      │      │  │      │      │  │      │      │                │
+│  │  MCP Client │  │  MCP Client │  │  MCP Client │                │
+│  └──────┼──────┘  └──────┼──────┘  └──────┼──────┘                │
 └─────────┼────────────────┼────────────────┼────────────────────────┘
           │                │                │
           ▼                ▼                ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    NOVA FORCE (MCP Tool Layer)                      │
-│                                                                     │
-│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐               │
-│  │Force::Terrain│ │Force::Chronc.│ │ Force::Spark │               │
-│  │ (Filesystem) │ │    (Git)     │ │   (Shell)    │               │
-│  └──────────────┘ └──────────────┘ └──────────────┘               │
-│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐               │
-│  │Force::Archive│ │Force::Signal │ │Force::Lattice│               │
-│  │  (Database)  │ │ (RAG/Search) │ │ (Lang Server)│               │
-│  └──────────────┘ └──────────────┘ └──────────────┘               │
+│                    NOVA FORCE (MCP Tool Layer)                       │
+│                                                                      │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐                │
+│  │Force::Terrain│ │Force::Chronc.│ │ Force::Spark │                │
+│  │ (Filesystem) │ │    (Git)     │ │   (Shell)    │                │
+│  └──────────────┘ └──────────────┘ └──────────────┘                │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐                │
+│  │Force::Archive│ │Force::Signal │ │Force::Lattice│                │
+│  │  (Database)  │ │ (RAG/Search) │ │ (Lang Server)│                │
+│  └──────────────┘ └──────────────┘ └──────────────┘                │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
 -----
 
-## 3. Control Plane: Worldmind Core (LangGraph)
+## 3. Control Plane: Worldmind Core (LangGraph4j)
 
-The control plane is the LangGraph StateGraph that defines the Worldmind’s behavior. It is the single source of truth for mission state and the deterministic backbone that ensures reliable execution.
+The control plane is the LangGraph4j StateGraph that defines the Worldmind's behavior. It is the single source of truth for mission state and the deterministic backbone that ensures reliable execution. LangGraph4j is the Java port of LangGraph, providing identical graph semantics in a JVM-native implementation.
 
-### 3.1 Why LangGraph
+### 3.1 Why LangGraph4j + Spring AI
 
-Framework comparison research identified several properties that make LangGraph the right choice for the control plane:
+Framework comparison research identified several properties that make LangGraph4j the right choice for the control plane:
 
-- **Cyclic graph architecture:** Unlike DAG-based workflow engines, LangGraph supports cycles natively. This is essential for the build-test-fix loop where a Coding Node passes to a Testing Node which, on failure, routes back to the Coding Node. This self-correcting cycle is the core pattern of autonomous software engineering.
-- **Send API for dynamic fan-out:** When Centurion Prime plans a Mission with multiple parallel Directives, the Send API allows the graph to dynamically spawn N worker branches at runtime, where N is determined by the LLM’s planning output. Each branch carries its own localized state while sharing the global Xandarian Archive.
-- **Per-step checkpointing:** LangGraph persists state after every super-step via its Checkpointer (Postgres-backed). If Worldmind crashes or redeploys during a long-running build, it resumes exactly where it left off. No other framework provides this granularity without custom engineering.
-- **Native server architecture:** LangGraph Server provides a standardized REST API for creating threads and runs, native async task queues for long-running jobs, and structured event streaming. This eliminates the need to build a custom FastAPI wrapper around the orchestration logic.
-- **Time-travel debugging:** The checkpointing system enables replay of any execution from any prior state, which is invaluable for debugging failed Missions and understanding why a Centurion produced incorrect output.
+- **Cyclic graph architecture:** Unlike DAG-based workflow engines, LangGraph4j supports cycles natively. This is essential for the build-test-fix loop where a Coding Node passes to a Testing Node which, on failure, routes back to the Coding Node. This self-correcting cycle is the core pattern of autonomous software engineering.
+- **Conditional edges for dynamic routing:** The `addConditionalEdges()` API allows graph routing to be determined at runtime by inspecting the current state. Combined with Spring AI's structured output capabilities, this enables LLM-driven routing decisions with deterministic execution paths.
+- **Per-step checkpointing:** LangGraph4j persists state after every super-step via its CheckpointSaver (Postgres-backed via `PostgresSaver`). If Worldmind crashes or redeploys during a long-running build, it resumes exactly where it left off.
+- **Spring AI integration:** LangGraph4j integrates with Spring AI's ChatClient, providing access to Anthropic Claude with structured output (via `BeanOutputConverter` to Java records), tool calling (via `@Tool` annotation), and MCP client/server support.
+- **Java 21 virtual threads:** Parallel Directive execution leverages Java 21 virtual threads for efficient I/O-bound concurrency when managing multiple Goose Stargates simultaneously.
+- **Time-travel debugging:** The checkpointing system enables replay of any execution from any prior state, which is invaluable for debugging failed Missions.
 
 ### 3.2 State Schema: The Xandarian Archive
 
-The Xandarian Archive is the typed Pydantic model that serves as LangGraph’s shared state. Every node in the graph reads from and writes to this schema.
+The Xandarian Archive is the `AgentState` subclass that serves as LangGraph4j's shared state. Every node in the graph reads from and writes to this schema. At the API boundary, state is projected into Java records for type-safe access.
 
-|Field               |Type                     |Description                                                                                                               |
-|--------------------|-------------------------|--------------------------------------------------------------------------------------------------------------------------|
-|`mission_id`        |`str`                    |Unique identifier. Format: `WMND-YYYY-NNNN`.                                                                              |
-|`request`           |`str`                    |Original operator request, verbatim.                                                                                      |
-|`classification`    |`Classification`         |Request category, complexity (1–5), affected components, planning strategy.                                               |
-|`context`           |`ProjectContext`         |Gathered project metadata: file tree, conventions, dependencies, relevant source excerpts, git state.                     |
-|`mission`           |`Mission`                |The execution plan: ordered Directives with agent assignments, I/O specs, dependencies, quality gates, failure strategies.|
-|`directives`        |`list[Directive]`        |Flattened list of all Directives with their current status, results, and iteration counts.                                |
-|`active_stargates`  |`dict[str, StargateInfo]`|Registry of currently running containers: Stargate ID, Centurion type, Directive ID, resource usage.                      |
-|`files_created`     |`list[FileRecord]`       |All files created or modified during the Mission, with paths, content hashes, and originating Directive.                  |
-|`test_results`      |`list[TestResult]`       |Aggregated test execution results across all Directives.                                                                  |
-|`review_feedback`   |`list[ReviewFeedback]`   |Accumulated review feedback from Centurion Vigil, keyed by Directive and iteration.                                       |
-|`execution_strategy`|`enum`                   |`linear` | `parallel` | `iterative`. Determines how the LangGraph routes Directives.                                      |
-|`interaction_mode`  |`enum`                   |`interactive` | `supervised` | `autonomous`. Controls operator involvement.                                               |
-|`status`            |`enum`                   |`uploading` | `planning` | `awaiting_approval` | `executing` | `replanning` | `completed` | `failed` | `cancelled`.       |
-|`metrics`           |`MissionMetrics`         |Token usage, elapsed time per Directive, retry counts, quality gate pass rates.                                           |
-|`created_at`        |`datetime`               |Mission creation timestamp (ISO 8601).                                                                                    |
-|`updated_at`        |`datetime`               |Last state modification timestamp.                                                                                        |
+|Field               |Type                            |Description                                                                                                               |
+|--------------------|--------------------------------|--------------------------------------------------------------------------------------------------------------------------|
+|`mission_id`        |`String`                        |Unique identifier. Format: `WMND-YYYY-NNNN`.                                                                              |
+|`request`           |`String`                        |Original operator request, verbatim.                                                                                      |
+|`classification`    |`Classification` (record)       |Request category, complexity (1–5), affected components, planning strategy.                                               |
+|`context`           |`ProjectContext` (record)       |Gathered project metadata: file tree, conventions, dependencies, relevant source excerpts, git state.                     |
+|`directives`        |`List<Directive>` (record list) |Ordered list of all Directives with their current status, results, and iteration counts.                                  |
+|`active_stargates`  |`Map<String, StargateInfo>`     |Registry of currently running containers: Stargate ID, Centurion type, Directive ID, resource usage.                      |
+|`files_created`     |`List<FileRecord>` (record list)|All files created or modified during the Mission, with paths, content hashes, and originating Directive.                  |
+|`test_results`      |`List<TestResult>` (record list)|Aggregated test execution results across all Directives.                                                                  |
+|`review_feedback`   |`List<ReviewFeedback>`          |Accumulated review feedback from Centurion Vigil, keyed by Directive and iteration.                                       |
+|`execution_strategy`|`ExecutionStrategy` (enum)      |`LINEAR` | `PARALLEL` | `ITERATIVE`. Determines how the graph routes Directives.                                          |
+|`interaction_mode`  |`InteractionMode` (enum)        |`INTERACTIVE` | `SUPERVISED` | `AUTONOMOUS`. Controls operator involvement.                                                   |
+|`status`            |`MissionStatus` (enum)          |`UPLOADING` | `PLANNING` | `AWAITING_APPROVAL` | `EXECUTING` | `REPLANNING` | `COMPLETED` | `FAILED` | `CANCELLED`.       |
+|`metrics`           |`MissionMetrics` (record)       |Token usage, elapsed time per Directive, retry counts, quality gate pass rates.                                           |
+|`created_at`        |`Instant`                       |Mission creation timestamp (ISO 8601).                                                                                    |
+|`updated_at`        |`Instant`                       |Last state modification timestamp.                                                                                        |
 
 ### 3.3 Graph Topology
 
-The LangGraph StateGraph defines the following node topology. Each node is a Python function that receives the Xandarian Archive, performs work, and returns a state update.
+The LangGraph4j StateGraph defines the following node topology. Each node is a Java method (or lambda implementing `NodeAction<WorldmindState>`) that receives the Xandarian Archive, performs work, and returns a partial state update as `Map<String, Object>`.
 
-1. **`classify_request`** — Receives the raw request. Uses an LLM call to produce a Classification object (category, complexity, affected components). Routes to `upload_context`.
-1. **`upload_context`** — Invokes Centurion Pulse via a Goose Stargate to scan the project. Pulse connects to Force::Terrain and Force::Chronicle to gather structure, conventions, and relevant source files. Writes ProjectContext to the Archive. Routes to `plan_mission`.
-1. **`plan_mission`** — Centurion Prime node. Uses the Classification and ProjectContext to generate a Mission with ordered Directives. This is the most complex LLM call in the system. Routes to `await_approval` (Interactive) or `execute_directives` (Supervised/Autonomous).
-1. **`await_approval`** — Pauses execution and emits the Mission to the Helm interface. Waits for operator input (approve, edit, reject). On approval, routes to `execute_directives`. On edit, routes back to `plan_mission` with modifications. On reject, routes to `mission_cancelled`.
-1. **`execute_directives`** — The fan-out node. Uses the LangGraph Send API to dynamically spawn one execution branch per eligible Directive (respecting dependency ordering). Each branch targets the `dispatch_centurion` node with the Directive’s localized state.
-1. **`dispatch_centurion`** — Opens a Stargate for the Directive’s assigned Centurion type. Translates the Directive’s input spec into a Goose instruction set. Launches the Goose instance and waits for completion. Captures output and writes results to the Archive.
-1. **`evaluate_seal`** — Quality gate evaluation. Checks the Directive’s completion criteria (tests pass, lint clean, review approved). If the Seal is granted, marks the Directive as fulfilled. If denied, applies the Directive’s `on_failure` strategy (retry, replan, escalate, skip).
+1. **`classify_request`** — Receives the raw request. Uses Spring AI's ChatClient with `BeanOutputConverter` to produce a `Classification` record (category, complexity, affected components). Routes to `upload_context`.
+1. **`upload_context`** — Invokes Centurion Pulse via a Goose Stargate to scan the project. Pulse connects to Force::Terrain and Force::Chronicle to gather structure, conventions, and relevant source files. Writes `ProjectContext` to the Archive. Routes to `plan_mission`.
+1. **`plan_mission`** — Centurion Prime node. Uses the Classification and ProjectContext with Spring AI structured output to generate a Mission with ordered Directives. This is the most complex LLM call in the system. Routes to `await_approval` (Interactive) or `execute_directives` (Supervised/Autonomous).
+1. **`await_approval`** — Pauses execution and emits the Mission to the Dispatch interface. Waits for operator input (approve, edit, reject). On approval, routes to `execute_directives`. On edit, routes back to `plan_mission` with modifications. On reject, routes to `mission_cancelled`.
+1. **`execute_directives`** — The fan-out node. Spawns one execution branch per eligible Directive (respecting dependency ordering). Each branch targets the `dispatch_centurion` node with the Directive's localized state.
+1. **`dispatch_centurion`** — Opens a Stargate for the Directive's assigned Centurion type. Translates the Directive's input spec into a Goose instruction set. Launches the Goose instance and waits for completion. Captures output and writes results to the Archive.
+1. **`evaluate_seal`** — Quality gate evaluation. Checks the Directive's completion criteria (tests pass, lint clean, review approved). If the Seal is granted, marks the Directive as fulfilled. If denied, applies the Directive's `on_failure` strategy (retry, replan, escalate, skip).
 1. **`converge_results`** — Aggregation node. Runs after all Directive branches complete. Merges file changes, test results, and review feedback. Performs final validation. Routes to `mission_complete` or `mission_failed`.
 1. **`replan`** — Triggered when `evaluate_seal` determines a replan is needed. Centurion Prime re-evaluates remaining Directives in light of the failure and generates a revised Mission segment. Routes back to `execute_directives`.
 
 ### 3.4 Conditional Routing Logic
 
-The graph’s conditional edges encode the decision logic that makes the system deterministic rather than relying on LLM judgment for routing:
+The graph's conditional edges encode the decision logic that makes the system deterministic rather than relying on LLM judgment for routing:
 
 |From Node         |To Node             |Condition                                                         |
 |------------------|--------------------|------------------------------------------------------------------|
-|`plan_mission`    |`await_approval`    |`interaction_mode == interactive`                                 |
-|`plan_mission`    |`execute_directives`|`interaction_mode in [supervised, autonomous]`                    |
-|`evaluate_seal`   |`dispatch_centurion`|`seal == denied AND on_failure == retry AND retries < max_retries`|
-|`evaluate_seal`   |`replan`            |`seal == denied AND on_failure == replan`                         |
-|`evaluate_seal`   |`await_approval`    |`seal == denied AND on_failure == escalate`                       |
-|`evaluate_seal`   |`converge_results`  |`seal == denied AND on_failure == skip`                           |
-|`evaluate_seal`   |`converge_results`  |`seal == granted AND all_directives_resolved`                     |
-|`evaluate_seal`   |*(wait)*            |`seal == granted AND pending_directives_exist`                    |
+|`plan_mission`    |`await_approval`    |`interaction_mode == INTERACTIVE`                                 |
+|`plan_mission`    |`execute_directives`|`interaction_mode in [SUPERVISED, AUTONOMOUS]`                    |
+|`evaluate_seal`   |`dispatch_centurion`|`seal == DENIED AND on_failure == RETRY AND retries < max_retries`|
+|`evaluate_seal`   |`replan`            |`seal == DENIED AND on_failure == REPLAN`                         |
+|`evaluate_seal`   |`await_approval`    |`seal == DENIED AND on_failure == ESCALATE`                       |
+|`evaluate_seal`   |`converge_results`  |`seal == DENIED AND on_failure == SKIP`                           |
+|`evaluate_seal`   |`converge_results`  |`seal == GRANTED AND all_directives_resolved`                     |
+|`evaluate_seal`   |*(wait)*            |`seal == GRANTED AND pending_directives_exist`                    |
 |`converge_results`|`mission_complete`  |All quality gates passed                                          |
 |`converge_results`|`replan`            |Integration failures detected                                     |
 
 ### 3.5 Persistence and Recovery
 
-The Worldmind uses LangGraph’s Postgres-backed Checkpointer to persist the Xandarian Archive after every graph node execution:
+The Worldmind uses LangGraph4j's `PostgresSaver` to persist the Xandarian Archive after every graph node execution:
 
 - **Crash recovery:** If the Worldmind server crashes or restarts during a Mission, the graph resumes from the last checkpointed state. Completed Directives are not re-executed. In-progress Stargates are detected and either re-attached or re-provisioned.
-- **Time-travel debugging:** Operators can inspect the Archive at any prior checkpoint, replaying the decision path that led to a failure. This is exposed via the Helm API as a mission timeline view.
+- **Time-travel debugging:** Operators can inspect the Archive at any prior checkpoint, replaying the decision path that led to a failure. This is exposed via the Dispatch API as a mission timeline view.
 - **Long-running mission support:** Complex Missions may run for hours. The checkpointing system ensures that progress is never lost, even across server deployments or scaling events.
 
 -----
@@ -228,42 +229,42 @@ Each Centurion is a Goose instance running in headless mode inside a containeriz
 
 ### 4.1 Why Goose
 
-Framework comparison research identified Goose’s strengths and limitations clearly. Its strengths align perfectly with the worker role:
+Framework comparison research identified Goose's strengths and limitations clearly. Its strengths align perfectly with the worker role:
 
 - **MCP-native:** Goose is built as an MCP super-client. It connects natively to MCP servers for filesystem, git, shell, database, and search operations. Centurions inherit the full Nova Force capability set without any adapter code.
-- **Developer-centric autonomy:** Unlike tool-calling agents that invoke Python functions, Goose behaves like a developer at a terminal. It reads files, writes code, runs builds, reads error output, and self-corrects. This internal reasoning loop is exactly what a Centurion needs to execute a Directive autonomously.
-- **Self-correcting build loops:** When a command fails (e.g., a build error or test failure), Goose reads the error output, reasons about the fix, and retries. This happens inside the Goose instance’s own context, before the result ever reaches the Worldmind’s quality gate. This reduces the number of outer-loop retries significantly.
+- **Developer-centric autonomy:** Goose behaves like a developer at a terminal. It reads files, writes code, runs builds, reads error output, and self-corrects. This internal reasoning loop is exactly what a Centurion needs to execute a Directive autonomously.
+- **Self-correcting build loops:** When a command fails (e.g., a build error or test failure), Goose reads the error output, reasons about the fix, and retries. This happens inside the Goose instance's own context, before the result ever reaches the Worldmind's quality gate. This reduces the number of outer-loop retries significantly.
 - **Sandboxed execution:** Running Goose inside a Docker container (Stargate) provides natural isolation. Each Centurion operates on a mounted project volume with controlled network access and resource limits.
 
 Its known limitations are mitigated by the hybrid architecture:
 
-- **No native API** *(mitigated)*: Goose is CLI-first. The Stargate Bridge wraps the Goose CLI process, translating LangGraph state into Goose instructions and capturing structured output.
-- **No recursion** *(mitigated)*: Goose subagents cannot spawn their own subagents. This is irrelevant because all task decomposition happens in the LangGraph control plane. Goose instances are workers, not orchestrators.
-- **Session-based state** *(mitigated)*: Goose does not persist state across sessions. Each Centurion deployment handles a single Directive. All persistent state lives in the Xandarian Archive, managed by LangGraph.
+- **No native API** *(mitigated)*: Goose is CLI-first. The Stargate Bridge wraps the Goose CLI process, translating LangGraph4j state into Goose instructions and capturing structured output.
+- **No recursion** *(mitigated)*: Goose subagents cannot spawn their own subagents. This is irrelevant because all task decomposition happens in the LangGraph4j control plane. Goose instances are workers, not orchestrators.
+- **Session-based state** *(mitigated)*: Goose does not persist state across sessions. Each Centurion deployment handles a single Directive. All persistent state lives in the Xandarian Archive, managed by LangGraph4j.
 
 ### 4.2 Centurion Roster
 
-|Centurion             |Rank      |Goose Config                               |Force Channels                  |Behavioral Profile                                                                                                                                       |
-|----------------------|----------|-------------------------------------------|--------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|
-|**Centurion Prime**   |Nova Prime|Planner mode (runs in LangGraph, not Goose)|Terrain (read), Chronicle (read)|Request classification, context analysis, mission planning, execution management. Operates within the control plane, not in a Stargate.                  |
-|**Centurion Pulse**   |Millennian|Research mode                              |Terrain, Chronicle, Signal      |Read-only. Scans project structure, reads source files, searches documentation. Produces structured context summaries. Never writes files.               |
-|**Centurion Forge**   |Centurion |Code-gen mode                              |Terrain, Chronicle, Spark       |Read-write. Generates new code, creates files, modifies existing files. Runs build commands to validate. Uses self-correction loops on build failures.   |
-|**Centurion Vigil**   |Centurion |Review mode                                |Terrain, Chronicle, Signal      |Read-only. Analyzes code for quality, security, consistency, and correctness. Produces structured review feedback. Grants or denies the Seal of Approval.|
-|**Centurion Gauntlet**|Centurion |Test mode                                  |Terrain, Spark                  |Read-write (test files only). Generates tests following project conventions. Executes test suites. Reports pass/fail with coverage metrics.              |
-|**Centurion Prism**   |Centurion |Refactor mode                              |Terrain, Chronicle, Spark       |Read-write. Restructures code without changing behavior. Runs existing tests before and after to verify behavioral equivalence.                          |
+|Centurion             |Rank      |Goose Config                                  |Force Channels                  |Behavioral Profile                                                                                                                                            |
+|----------------------|----------|----------------------------------------------|--------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|
+|**Centurion Prime**   |Nova Prime|Planner mode (runs in LangGraph4j, not Goose) |Terrain (read), Chronicle (read)|Request classification, context analysis, mission planning, execution management. Operates within the control plane, not in a Stargate.                       |
+|**Centurion Pulse**   |Millennian|Research mode                                 |Terrain, Chronicle, Signal      |Read-only. Scans project structure, reads source files, searches documentation. Produces structured context summaries. Never writes files.                    |
+|**Centurion Forge**   |Centurion |Code-gen mode                                 |Terrain, Chronicle, Spark       |Read-write. Generates new code, creates files, modifies existing files. Runs build commands to validate. Uses self-correction loops on build failures.        |
+|**Centurion Vigil**   |Centurion |Review mode                                   |Terrain, Chronicle, Signal      |Read-only. Analyzes code for quality, security, consistency, and correctness. Produces structured review feedback. Grants or denies the Seal of Approval.     |
+|**Centurion Gauntlet**|Centurion |Test mode                                     |Terrain, Spark                  |Read-write (test files only). Generates tests following project conventions. Executes test suites. Reports pass/fail with coverage metrics.                   |
+|**Centurion Prism**   |Centurion |Refactor mode                                 |Terrain, Chronicle, Spark       |Read-write. Restructures code without changing behavior. Runs existing tests before and after to verify behavioral equivalence.                               |
 
 ### 4.3 The Stargate Bridge
 
-The Stargate Bridge is the critical integration layer between LangGraph and Goose. It translates between the two systems:
+The Stargate Bridge is the critical integration layer between LangGraph4j and Goose. It translates between the two systems:
 
-1. **Directive → Goose instruction:** The bridge takes a Directive object from the Xandarian Archive and constructs a Goose instruction file. This file includes the task description, relevant context (file excerpts, conventions, constraints), specific instructions (“use pytest, not unittest”), and success criteria. The instruction is written to a file inside the Stargate volume.
+1. **Directive → Goose instruction:** The bridge takes a `Directive` record from the Xandarian Archive and constructs a Goose instruction file. This file includes the task description, relevant context (file excerpts, conventions, constraints), specific instructions, and success criteria. The instruction is written to a file inside the Stargate volume.
 1. **Goose launch:** The bridge executes `goose run --instructions directive.md` inside the Stargate container. The Goose process runs headlessly, connecting to the pre-configured MCP servers (Force channels) available inside the container.
 1. **Output capture:** The bridge monitors the Goose process via stdout (JSON-structured output mode). It captures: files created/modified, commands executed and their exit codes, errors encountered and self-corrections applied, and the final completion status.
-1. **Result → Archive:** The bridge translates the captured output into a `DirectiveResult` object and writes it back to the Xandarian Archive. This includes file records (paths + content hashes), command logs, and a success/failure determination.
+1. **Result → Archive:** The bridge translates the captured output into a `DirectiveResult` record and writes it back to the Xandarian Archive. This includes file records (paths + content hashes), command logs, and a success/failure determination.
 
 > **Bridge Design Principle**
-> 
-> The Stargate Bridge should be *thin*. It translates between LangGraph state and Goose instructions, and between Goose output and LangGraph state. It should not contain business logic, routing decisions, or quality evaluation. Those responsibilities belong to the control plane.
+>
+> The Stargate Bridge should be *thin*. It translates between LangGraph4j state and Goose instructions, and between Goose output and LangGraph4j state. It should not contain business logic, routing decisions, or quality evaluation. Those responsibilities belong to the control plane.
 
 ### 4.4 MCP Permission Matrix
 
@@ -282,7 +283,7 @@ Each Centurion type receives a tailored MCP server configuration inside its Star
 
 ## 5. Tool Layer: Nova Force (MCP Servers)
 
-The Nova Force is the collection of MCP servers that provide capabilities to the Centurion agents. Each MCP server runs as an independent process (or container) and exposes tools via the Model Context Protocol. Goose connects to these natively as an MCP client.
+The Nova Force is the collection of MCP servers that provide capabilities to the Centurion agents. Each MCP server runs as an independent process (or container) and exposes tools via the Model Context Protocol. Goose connects to these natively as an MCP client. The Worldmind itself can also leverage Spring AI's MCP client support for control-plane operations.
 
 ### 5.1 Force Channel Specifications
 
@@ -300,7 +301,7 @@ The Nova Force is the collection of MCP servers that provide capabilities to the
 The Nova Force security model follows the principle of least privilege at multiple levels:
 
 - **Centurion-level restrictions:** Each Centurion type has a defined set of Force channels and permission levels (read-only, read-write, restricted-write). These are enforced in the Goose MCP configuration injected by the Stargate Bridge.
-- **Stargate-level isolation:** Each Stargate container has its own network namespace, filesystem mount, and resource limits. Centurions cannot access other Centurions’ Stargates or the host system.
+- **Stargate-level isolation:** Each Stargate container has its own network namespace, filesystem mount, and resource limits. Centurions cannot access other Centurions' Stargates or the host system.
 - **Force channel authentication:** MCP servers require authentication tokens issued by the Worldmind. Tokens are scoped to the specific Mission and Directive, with expiration times matching the expected Directive duration.
 - **Command allowlisting:** Force::Spark (shell execution) uses an allowlist model. Only approved commands (build tools, test runners, linters) are permitted. The allowlist is configurable per project and per Centurion type.
 - **Write path restrictions:** Force::Terrain (filesystem) enforces path-based write restrictions. Centurion Gauntlet can only write to test directories. Centurion Vigil cannot write at all. These restrictions are enforced at the MCP server level, not just in the Goose configuration.
@@ -313,7 +314,7 @@ Stargates are the containerized execution environments in which Centurions opera
 
 ### 6.1 Stargate Lifecycle
 
-1. **Provision:** When the Worldmind dispatches a Directive, the Stargate manager selects the appropriate container image (based on Centurion type and project language), provisions it with the project volume mount, injects the MCP server configuration, and starts the container.
+1. **Provision:** When the Worldmind dispatches a Directive, the Stargate manager (a Spring-managed `@Service`) selects the appropriate container image (based on Centurion type and project language), provisions it with the project volume mount, injects the MCP server configuration, and starts the container via the Docker Java client.
 1. **Configure:** The Stargate Bridge writes the Goose instruction file and MCP configuration to the container volume. Environment variables are set for the Goose process: model selection, token limits, and connection strings for the Force channel MCP servers.
 1. **Execute:** The Goose process runs inside the container. The Bridge monitors it via stdout and process health checks. Resource usage (CPU, memory, disk) is tracked and reported to the Xandarian Archive.
 1. **Capture:** On Goose process completion, the Bridge captures the final state: files modified on the volume, exit code, structured output logs, and any error information.
@@ -332,9 +333,9 @@ Stargate container images are purpose-built for each Centurion type and project 
 In production, Stargates run as Kubernetes Jobs:
 
 - **Job per Directive:** Each Directive dispatches a K8s Job with the appropriate container image, resource requests/limits, and volume claims.
-- **Project volumes:** The project codebase is mounted via a PersistentVolumeClaim (PVC) shared across all Stargates in a Mission. This ensures all Centurions see each other’s file modifications. Concurrent write conflicts are managed by the Worldmind’s dependency ordering (parallel Directives operate on non-overlapping files).
+- **Project volumes:** The project codebase is mounted via a PersistentVolumeClaim (PVC) shared across all Stargates in a Mission. This ensures all Centurions see each other's file modifications. Concurrent write conflicts are managed by the Worldmind's dependency ordering (parallel Directives operate on non-overlapping files).
 - **Resource scaling:** Complex Missions with many parallel Directives can scale horizontally across K8s nodes. The Stargate manager respects resource quotas and can queue Directives when capacity is constrained.
-- **Observability:** Container logs are forwarded to the Worldmind’s event stream. K8s metrics (CPU, memory, disk I/O) are collected per Stargate and surfaced in the Helm mission dashboard.
+- **Observability:** Container logs are forwarded to the Worldmind's event stream. K8s metrics (CPU, memory, disk I/O) are collected per Stargate and surfaced in the Dispatch mission dashboard.
 
 ### 6.4 Development Mode (Docker)
 
@@ -357,13 +358,13 @@ docker run -d \
 
 -----
 
-## 7. Interface Layer: Helm
+## 7. Interface Layer: Dispatch
 
-The Helm is the operator’s interface to the Worldmind. It provides both a CLI for interactive use and a REST API for programmatic integration.
+Dispatch is the operator's interface to the Worldmind. It provides both a CLI for interactive use and a REST API for programmatic integration.
 
-### 7.1 Helm CLI
+### 7.1 Dispatch CLI
 
-The CLI is the primary interface for v1. Built with Typer (Python), it communicates with the Worldmind Core via the LangGraph Server API.
+The CLI is the primary interface for v1. Built with picocli (Java), it communicates with the Worldmind Core via the Dispatch REST API.
 
 #### Key Commands
 
@@ -419,7 +420,7 @@ Mission WMND-2026-0042 complete.
 Changes committed to branch: worldmind/WMND-2026-0042
 ```
 
-### 7.2 Helm REST API
+### 7.2 Dispatch REST API
 
 |Method|Endpoint                                |Description                                                      |
 |------|----------------------------------------|-----------------------------------------------------------------|
@@ -485,9 +486,9 @@ Directives execute sequentially, each waiting for the prior to complete. Used fo
 
 **Example:** A bug fix where the fix depends on research, the test depends on the fix, and the review depends on both.
 
-### 8.2 Parallel Fan-Out (Send API)
+### 8.2 Parallel Fan-Out
 
-Multiple Directives execute concurrently when they share no dependencies. This is the primary pattern for feature implementation where multiple files can be generated independently.
+Multiple Directives execute concurrently when they share no dependencies. This is the primary pattern for feature implementation where multiple files can be generated independently. Fan-out uses LangGraph4j's parallel branch execution with `CompletableFuture` and Java 21 virtual threads.
 
 ```
                   ┌──▶ [Forge: Controller] ──┐
@@ -497,7 +498,7 @@ Multiple Directives execute concurrently when they share no dependencies. This i
                   └──▶ [Forge: Repository] ──┘
 ```
 
-The Send API is the mechanism that enables true dynamic spawning: if Centurion Prime plans 3 parallel Directives, the graph fans out to 3 concurrent Goose Stargates. If it plans 8, it fans to 8. The topology is determined at runtime by the planner’s output, not by the graph definition.
+The fan-out mechanism enables true dynamic spawning: if Centurion Prime plans 3 parallel Directives, the graph fans out to 3 concurrent Goose Stargates. If it plans 8, it fans to 8. The topology is determined at runtime by the planner's output, not by the graph definition.
 
 ### 8.3 Iterative Cycles (Build-Test-Fix Loop)
 
@@ -528,20 +529,20 @@ Key controls for iterative cycles:
 
 ### 9.1 Structured Event Stream
 
-The Worldmind emits structured events at every significant state transition. These events power the Helm CLI progress display, the API’s SSE stream, and operational monitoring.
+The Worldmind emits structured events at every significant state transition. These events power the Dispatch CLI progress display, the API's SSE stream, and operational monitoring.
 
-|Event                |Payload                                                  |Consumer                         |
-|---------------------|---------------------------------------------------------|---------------------------------|
-|`mission.created`    |Full Mission plan, operator request, classification      |Helm (display plan), audit log   |
-|`mission.approved`   |Mission ID, approval source (operator/auto)              |Helm, audit log                  |
-|`stargate.opened`    |Stargate ID, Centurion type, Directive ID, container info|Helm (progress), resource monitor|
-|`directive.started`  |Directive ID, Centurion name, input summary              |Helm (progress updates)          |
-|`directive.progress` |Intermediate output: files created, commands run         |Helm (live feed), debugging      |
-|`directive.fulfilled`|Result summary, files modified, quality gate outcome     |Helm, metrics                    |
-|`seal.denied`        |Directive ID, failure details, `on_failure` action       |Helm (alert), audit log          |
-|`mission.replanned`  |Revised Directive list, reason for replan                |Helm, audit log                  |
-|`mission.completed`  |Final summary, all results, total metrics                |Helm, metrics, audit log         |
-|`mission.escalated`  |Reason, context, operator options                        |Helm (notification)              |
+|Event                |Payload                                                  |Consumer                            |
+|---------------------|---------------------------------------------------------|------------------------------------|
+|`mission.created`    |Full Mission plan, operator request, classification      |Dispatch (display plan), audit log  |
+|`mission.approved`   |Mission ID, approval source (operator/auto)              |Dispatch, audit log                 |
+|`stargate.opened`    |Stargate ID, Centurion type, Directive ID, container info|Dispatch (progress), resource monitor|
+|`directive.started`  |Directive ID, Centurion name, input summary              |Dispatch (progress updates)         |
+|`directive.progress` |Intermediate output: files created, commands run         |Dispatch (live feed), debugging     |
+|`directive.fulfilled`|Result summary, files modified, quality gate outcome     |Dispatch, metrics                   |
+|`seal.denied`        |Directive ID, failure details, `on_failure` action       |Dispatch (alert), audit log         |
+|`mission.replanned`  |Revised Directive list, reason for replan                |Dispatch, audit log                 |
+|`mission.completed`  |Final summary, all results, total metrics                |Dispatch, metrics, audit log        |
+|`mission.escalated`  |Reason, context, operator options                        |Dispatch (notification)             |
 
 ### 9.2 Log Format
 
@@ -551,7 +552,7 @@ All system logs use the Worldmind vocabulary consistently:
 [WORLDMIND]        Initializing Xandarian Archive...
 [WORLDMIND]        Nova Force channels online: Terrain, Chronicle, Spark
 [WORLDMIND]        Centurion roster loaded: Prime, Forge, Vigil, Gauntlet, Prism, Pulse
-[HELM]             Mission request received: "Add user profile endpoint"
+[DISPATCH]         Mission request received: "Add user profile endpoint"
 [WORLDMIND]        Uploading project context... 47 files indexed.
 [CENTURION PRIME]  Mission planned: 5 directives, 3 centurions assigned.
 [STARGATE]         Opening for Centurion Forge...
@@ -564,7 +565,7 @@ All system logs use the Worldmind vocabulary consistently:
 
 ### 9.3 Metrics
 
-The following metrics are collected per Mission and aggregated for system-wide monitoring:
+The following metrics are collected per Mission and aggregated for system-wide monitoring, exposed via Spring Boot Actuator and Micrometer:
 
 - **Planning latency:** Time from request intake to Mission plan approval.
 - **Execution time:** Total wall-clock time and per-Directive breakdown.
@@ -587,7 +588,7 @@ The following metrics are collected per Mission and aggregated for system-wide m
 |Directive execution (complex multi-file) |< 3 min |Multiple files with build verification.                                        |
 |Full Mission (complexity 3, 5 Directives)|< 10 min|End-to-end including planning, execution, and review cycles.                   |
 |Checkpoint write latency                 |< 100ms |Postgres write per super-step. Must not bottleneck graph execution.            |
-|Event stream latency                     |< 500ms |From state transition to Helm UI update.                                       |
+|Event stream latency                     |< 500ms |From state transition to Dispatch UI update.                                   |
 |Concurrent Missions per instance         |5 (v1)  |Scaling horizontally via K8s replicas for higher throughput.                   |
 |Max parallel Stargates per Mission       |10 (v1) |Configurable. Limited by K8s resource quotas.                                  |
 
@@ -595,17 +596,21 @@ The following metrics are collected per Mission and aggregated for system-wide m
 
 ## 11. Technology Stack
 
-|Component            |Technology                             |Rationale                                                                                                                         |
-|---------------------|---------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|
-|**Control Plane**    |LangGraph (Python)                     |Cyclic graphs, Send API, per-step checkpointing, native server. No other framework matches this combination.                      |
-|**Worker Engine**    |Goose (headless CLI)                   |MCP-native, developer-centric autonomy, self-correcting build loops. Strongest filesystem/code interaction of any agent framework.|
-|**State Persistence**|PostgreSQL (via LangGraph Checkpointer)|Battle-tested, supports the checkpoint schema natively, enables time-travel queries.                                              |
-|**Container Runtime**|Docker (dev) / Kubernetes (prod)       |Standard container orchestration. K8s Jobs map perfectly to the Stargate lifecycle.                                               |
-|**CLI Interface**    |Typer (Python)                         |Modern Python CLI framework. Rich terminal output for Mission progress display.                                                   |
-|**API Framework**    |FastAPI                                |Wraps LangGraph Server API with Worldmind-specific endpoints. Native async, SSE support.                                          |
-|**MCP Servers**      |Per-channel (see Force specs)          |Standard MCP protocol. Mix of community servers and custom implementations (gp-mcp-server).                                       |
-|**LLM Provider**     |Anthropic Claude (configurable)        |Centurion Prime uses Claude Sonnet 4.5 for planning. Workers use configurable models.                                             |
-|**Observability**    |Structured logging + Prometheus        |Events emitted as structured JSON. Prometheus metrics for dashboarding.                                                           |
+|Component            |Technology                                  |Rationale                                                                                                                         |
+|---------------------|--------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|
+|**Language**         |Java 21                                     |Virtual threads for concurrent I/O, records for data modeling, pattern matching. LTS release with modern features.                |
+|**Application Frame**|Spring Boot 3.4                             |Enterprise-grade DI, REST API, actuator metrics, JPA, security. The standard for production Java applications.                   |
+|**AI Integration**   |Spring AI 1.1                               |Anthropic Claude integration, structured output via BeanOutputConverter, @Tool annotation, MCP client/server support.             |
+|**Control Plane**    |LangGraph4j 1.8                             |Java port of LangGraph. Cyclic graphs, conditional edges, per-step checkpointing, parallel execution. 1:1 feature parity.        |
+|**Worker Engine**    |Goose (headless CLI)                        |MCP-native, developer-centric autonomy, self-correcting build loops. Strongest filesystem/code interaction of any agent framework.|
+|**State Persistence**|PostgreSQL (via LangGraph4j PostgresSaver)  |Battle-tested, supports the checkpoint schema natively, enables time-travel queries.                                              |
+|**Container Runtime**|Docker (dev) / Kubernetes (prod)            |Standard container orchestration. K8s Jobs map perfectly to the Stargate lifecycle.                                               |
+|**Docker Client**    |Docker Java (com.github.docker-java)        |Mature Java client for Docker Engine API. Stargate lifecycle management.                                                          |
+|**CLI Interface**    |picocli                                     |Modern Java CLI framework. ANSI color support, subcommands, tab completion. Fast startup with GraalVM native image.               |
+|**Build Tool**       |Maven                                       |Standard Java build tool. BOM support for Spring AI and LangGraph4j dependency management.                                        |
+|**MCP Servers**      |Per-channel (see Force specs)               |Standard MCP protocol. Mix of community servers and custom implementations.                                                       |
+|**LLM Provider**     |Anthropic Claude (via Spring AI)            |Centurion Prime uses Claude Sonnet 4.5 for planning. Workers use configurable models via Goose.                                   |
+|**Observability**    |Micrometer + Spring Boot Actuator           |Events emitted as structured JSON. Prometheus-compatible metrics via Actuator endpoints.                                          |
 
 -----
 
@@ -613,13 +618,13 @@ The following metrics are collected per Mission and aggregated for system-wide m
 
 ### Phase 1: Foundation (Weeks 1–4)
 
-- [ ] LangGraph StateGraph with `classify_request`, `plan_mission`, and `execute_directives` nodes
-- [ ] Xandarian Archive schema (Pydantic models for Mission, Directive, state fields)
-- [ ] Postgres Checkpointer integration for state persistence
+- [ ] Spring Boot project with LangGraph4j StateGraph: `classify_request`, `plan_mission`, `execute_directives` nodes
+- [ ] Xandarian Archive schema (Java records for Mission, Directive, state fields; AgentState for graph)
+- [ ] PostgresSaver integration for state persistence
 - [ ] Single Centurion type: Centurion Forge (code generator) running Goose in Docker
 - [ ] Stargate Bridge: Directive-to-Goose-instruction translation, output capture
 - [ ] Force::Terrain (Filesystem MCP) server configured for Goose
-- [ ] Basic Helm CLI: `worldmind mission`, `worldmind status`
+- [ ] Basic Dispatch CLI: `worldmind mission`, `worldmind status`
 
 ### Phase 2: The Loop (Weeks 5–8)
 
@@ -632,12 +637,12 @@ The following metrics are collected per Mission and aggregated for system-wide m
 
 ### Phase 3: Scale (Weeks 9–12)
 
-- [ ] Parallel Directive execution via Send API fan-out
+- [ ] Parallel Directive execution via fan-out with virtual threads
 - [ ] Add Centurion Pulse (research) and Centurion Prism (refactorer)
 - [ ] Kubernetes deployment with K8s Jobs for Stargates
-- [ ] Full Helm CLI with `--watch` mode, `timeline`, and `inspect` commands
-- [ ] Helm REST API with SSE event streaming
-- [ ] Observability: structured events, Prometheus metrics
+- [ ] Full Dispatch CLI with `--watch` mode, `timeline`, and `inspect` commands
+- [ ] Dispatch REST API with SSE event streaming
+- [ ] Observability: structured events, Micrometer metrics
 
 ### Phase 4: Polish (Weeks 13–16)
 
@@ -654,35 +659,35 @@ The following metrics are collected per Mission and aggregated for system-wide m
 
 - **Dynamic Centurion registration:** Allow new Centurion types to be registered at runtime via a capability manifest. Centurion Prime would discover available Centurions and incorporate them into planning without code changes.
 - **Multi-project Missions:** Support Missions that span multiple repositories or services, with cross-project dependency tracking and coordinated commits.
-- **Learning from outcomes:** Track which planning strategies succeed for which request types. Use this history to improve Centurion Prime’s planning over time.
-- **Web UI:** A browser-based Helm dashboard for Mission visualization, real-time Centurion monitoring, and interactive plan editing. Built as a separate frontend consuming the Helm REST API.
-- **CI/CD integration:** Trigger Missions from CI/CD pipelines (e.g., “fix this failing test” triggered by a GitHub Actions failure). Centurions commit fixes directly to branches for review.
+- **Learning from outcomes:** Track which planning strategies succeed for which request types. Use this history to improve Centurion Prime's planning over time.
+- **Web UI:** A browser-based Dispatch dashboard for Mission visualization, real-time Centurion monitoring, and interactive plan editing. Built as a separate frontend consuming the Dispatch REST API.
+- **CI/CD integration:** Trigger Missions from CI/CD pipelines (e.g., "fix this failing test" triggered by a GitHub Actions failure). Centurions commit fixes directly to branches for review.
 - **Worker engine alternatives:** The Stargate Bridge is designed to be worker-agnostic. Future Centurion implementations could use Claude Code, Aider, or custom LLM agents instead of Goose, selected per Centurion type based on task requirements.
 
 -----
 
 ## 14. Nomenclature Reference
 
-|Technical Concept   |Worldmind Name       |Description                                                  |
-|--------------------|---------------------|-------------------------------------------------------------|
-|Orchestration Server|**Worldmind**        |The LangGraph control plane that plans and manages execution.|
-|CLI / API Interface |**Helm**             |The operator’s interface. Named for the Nova Helm.           |
-|Specialist Agents   |**Centurions**       |Goose worker instances dispatched to execute Directives.     |
-|Planner Agent       |**Centurion Prime**  |The lead Centurion responsible for mission planning.         |
-|Agent Containers    |**Stargates**        |Docker/K8s environments in which Centurions operate.         |
-|Execution Plans     |**Missions**         |Structured plans with ordered Directives.                    |
-|Plan Steps          |**Directives**       |Individual tasks assigned to specific Centurions.            |
-|MCP Servers / Tools |**Nova Force**       |The MCP tool layer. Each server is a Force channel.          |
-|Shared State        |**Xandarian Archive**|The LangGraph state object (Pydantic model + Postgres).      |
-|Context Gathering   |**Upload**           |Scanning the codebase to build the context window.           |
-|Quality Gates       |**Seal of Approval** |Criteria for Directive success. Granted or denied.           |
-|User                |**Operator**         |The human using the system.                                  |
+|Technical Concept   |Worldmind Name       |Description                                                      |
+|--------------------|---------------------|-----------------------------------------------------------------|
+|Orchestration Server|**Worldmind**        |The LangGraph4j control plane that plans and manages execution.  |
+|CLI / API Interface |**Dispatch**         |The operator's interface. Dispatches missions to the Worldmind.  |
+|Specialist Agents   |**Centurions**       |Goose worker instances dispatched to execute Directives.         |
+|Planner Agent       |**Centurion Prime**  |The lead Centurion responsible for mission planning.             |
+|Agent Containers    |**Stargates**        |Docker/K8s environments in which Centurions operate.             |
+|Execution Plans     |**Missions**         |Structured plans with ordered Directives.                        |
+|Plan Steps          |**Directives**       |Individual tasks assigned to specific Centurions.                |
+|MCP Servers / Tools |**Nova Force**       |The MCP tool layer. Each server is a Force channel.              |
+|Shared State        |**Xandarian Archive**|The LangGraph4j state object (Java records + Postgres).          |
+|Context Gathering   |**Upload**           |Scanning the codebase to build the context window.               |
+|Quality Gates       |**Seal of Approval** |Criteria for Directive success. Granted or denied.               |
+|User                |**Operator**         |The human using the system.                                      |
 
 -----
 
 > **Architectural Invariant**
-> 
-> The separation between the LangGraph control plane and the Goose worker plane is the system’s most important architectural decision. The control plane must never execute code directly. The worker plane must never make routing decisions. Violating this boundary collapses the hybrid model into a monolith and loses the advantages of both frameworks.
+>
+> The separation between the LangGraph4j control plane and the Goose worker plane is the system's most important architectural decision. The control plane must never execute code directly. The worker plane must never make routing decisions. Violating this boundary collapses the hybrid model into a monolith and loses the advantages of both frameworks.
 
 -----
 
