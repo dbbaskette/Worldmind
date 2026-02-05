@@ -1,0 +1,73 @@
+package com.worldmind.core.engine;
+
+import com.worldmind.core.graph.WorldmindGraph;
+import com.worldmind.core.model.InteractionMode;
+import com.worldmind.core.model.MissionStatus;
+import com.worldmind.core.state.WorldmindState;
+import org.bsc.langgraph4j.RunnableConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+
+/**
+ * Orchestrates mission execution by bridging the CLI to the LangGraph4j graph.
+ * <p>
+ * Creates initial state from the user request and interaction mode,
+ * generates a unique mission ID, and invokes the compiled graph.
+ */
+@Service
+public class MissionEngine {
+
+    private static final Logger log = LoggerFactory.getLogger(MissionEngine.class);
+    private static final AtomicInteger MISSION_COUNTER = new AtomicInteger(0);
+
+    private final WorldmindGraph worldmindGraph;
+
+    public MissionEngine(WorldmindGraph worldmindGraph) {
+        this.worldmindGraph = worldmindGraph;
+    }
+
+    /**
+     * Runs the full planning pipeline for a mission request.
+     *
+     * @param request the natural-language mission request
+     * @param mode    the interaction mode (FULL_AUTO, APPROVE_PLAN, STEP_BY_STEP)
+     * @return the final graph state after all nodes have executed
+     * @throws RuntimeException if the graph execution returns empty state
+     */
+    public WorldmindState runMission(String request, InteractionMode mode) {
+        String missionId = generateMissionId();
+        log.info("Starting mission {} with mode {} — request: {}", missionId, mode, request);
+
+        Map<String, Object> initialState = Map.of(
+                "missionId", missionId,
+                "request", request,
+                "interactionMode", mode.name(),
+                "status", MissionStatus.CLASSIFYING.name()
+        );
+
+        // Configure graph invocation with thread ID for checkpointing
+        var config = RunnableConfig.builder()
+                .threadId(missionId)
+                .build();
+
+        var result = worldmindGraph.getCompiledGraph()
+                .invoke(initialState, config);
+
+        return result.orElseThrow(() ->
+                new RuntimeException("Graph execution returned empty state for mission " + missionId));
+    }
+
+    /**
+     * Generates a unique mission ID in the format WMND-YYYY-NNNN.
+     */
+    String generateMissionId() {
+        int count = MISSION_COUNTER.incrementAndGet();
+        int year = Instant.now().atZone(java.time.ZoneOffset.UTC).getYear();
+        return String.format("WMND-%d-%04d", year, count);
+    }
+}

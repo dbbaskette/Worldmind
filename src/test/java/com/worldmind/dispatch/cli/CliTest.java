@@ -1,5 +1,9 @@
 package com.worldmind.dispatch.cli;
 
+import com.worldmind.core.engine.MissionEngine;
+import com.worldmind.core.graph.WorldmindGraph;
+import com.worldmind.core.model.*;
+import com.worldmind.core.state.WorldmindState;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -7,13 +11,19 @@ import picocli.CommandLine;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests for the Worldmind CLI command structure.
  * These tests exercise picocli directly without Spring context,
- * validating command parsing, help output, and stub behavior.
+ * validating command parsing, help output, and execution behavior.
  */
 class CliTest {
 
@@ -24,9 +34,54 @@ class CliTest {
      */
     private record CliResult(int exitCode, String output) {}
 
+    /**
+     * Creates a mock MissionEngine that returns a well-formed WorldmindState.
+     */
+    private MissionEngine createMockEngine() {
+        MissionEngine mockEngine = mock(MissionEngine.class);
+        // Build a WorldmindState with typical planning output
+        var state = new WorldmindState(Map.of(
+                "missionId", "WMND-2025-0001",
+                "request", "Add logging",
+                "interactionMode", InteractionMode.APPROVE_PLAN.name(),
+                "status", MissionStatus.AWAITING_APPROVAL.name(),
+                "classification", new Classification("feature", 3, List.of("api"), "sequential"),
+                "projectContext", new ProjectContext(".", List.of(), "java", "spring", Map.of(), 42, "test project"),
+                "executionStrategy", ExecutionStrategy.SEQUENTIAL.name(),
+                "directives", List.of(
+                        new Directive("DIR-001", "FORGE", "Implement feature", "", "Works", List.of(),
+                                DirectiveStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of(), null)
+                )
+        ));
+        when(mockEngine.runMission(anyString(), any(InteractionMode.class))).thenReturn(state);
+        return mockEngine;
+    }
+
+    /**
+     * Custom picocli IFactory that provides mock dependencies for commands.
+     */
+    private CommandLine.IFactory createFactory(MissionEngine mockEngine, WorldmindGraph mockGraph) {
+        return new CommandLine.IFactory() {
+            @Override
+            @SuppressWarnings("unchecked")
+            public <K> K create(Class<K> cls) throws Exception {
+                if (cls == MissionCommand.class) {
+                    return (K) new MissionCommand(mockEngine);
+                }
+                if (cls == HealthCommand.class) {
+                    return (K) new HealthCommand(mockGraph);
+                }
+                // Default: use picocli's default factory for other classes
+                return CommandLine.defaultFactory().create(cls);
+            }
+        };
+    }
+
     private CliResult execute(String... args) {
-        // Redirect System.out BEFORE creating CommandLine so picocli
-        // picks up the redirected stream for its internal PrintWriter
+        return execute(null, null, args);
+    }
+
+    private CliResult execute(MissionEngine mockEngine, WorldmindGraph mockGraph, String... args) {
         ByteArrayOutputStream capture = new ByteArrayOutputStream();
         PrintStream capturePrintStream = new PrintStream(capture, true);
         PrintStream originalOut = System.out;
@@ -35,7 +90,17 @@ class CliTest {
         System.setErr(capturePrintStream);
         try {
             WorldmindCommand cmd = new WorldmindCommand();
-            CommandLine commandLine = new CommandLine(cmd);
+            CommandLine commandLine;
+            if (mockEngine != null || mockGraph != null) {
+                var factory = createFactory(
+                        mockEngine != null ? mockEngine : mock(MissionEngine.class),
+                        mockGraph);
+                commandLine = new CommandLine(cmd, factory);
+            } else {
+                // For help/version tests, use a factory that can handle the constructors
+                var factory = createFactory(mock(MissionEngine.class), null);
+                commandLine = new CommandLine(cmd, factory);
+            }
             int exitCode = commandLine.execute(args);
             capturePrintStream.flush();
             return new CliResult(exitCode, capture.toString());
@@ -45,9 +110,9 @@ class CliTest {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
     //  Help output tests
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
 
     @Nested
     @DisplayName("Help output")
@@ -119,36 +184,45 @@ class CliTest {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
     //  Command execution tests
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
 
     @Nested
-    @DisplayName("Command execution stubs")
+    @DisplayName("Command execution")
     class ExecutionTests {
 
         @Test
-        @DisplayName("mission command accepts request argument")
+        @DisplayName("mission command displays plan output")
         void missionWithRequest() {
-            CliResult result = execute("mission", "Add logging to all services");
+            MissionEngine mockEngine = createMockEngine();
+            CliResult result = execute(mockEngine, null, "mission", "Add logging to all services");
             assertEquals(0, result.exitCode());
             String output = result.output();
-            assertTrue(output.contains("Add logging to all services"),
-                    "Mission output should echo the request");
-            assertTrue(output.contains("Phase 1"),
-                    "Mission output should mention Phase 1");
+            assertTrue(output.contains("MISSION WMND-2025-0001"),
+                    "Output should contain mission ID");
+            assertTrue(output.contains("Objective: Add logging to all services"),
+                    "Output should echo the request");
+            assertTrue(output.contains("DIRECTIVES"),
+                    "Output should list directives");
+            assertTrue(output.contains("DIR-001"),
+                    "Output should contain directive ID");
+            assertTrue(output.contains("FORGE"),
+                    "Output should contain centurion name");
         }
 
         @Test
         @DisplayName("mission command accepts --mode option")
         void missionWithMode() {
-            CliResult result = execute("mission", "--mode", "FULL_AUTO", "Refactor database layer");
+            MissionEngine mockEngine = createMockEngine();
+            CliResult result = execute(mockEngine, null,
+                    "mission", "--mode", "FULL_AUTO", "Refactor database layer");
             assertEquals(0, result.exitCode());
             String output = result.output();
-            assertTrue(output.contains("FULL_AUTO"),
-                    "Mission output should show the mode");
+            assertTrue(output.contains("MISSION"),
+                    "Output should contain MISSION header");
             assertTrue(output.contains("Refactor database layer"),
-                    "Mission output should echo the request");
+                    "Output should echo the request");
         }
 
         @Test
@@ -177,17 +251,29 @@ class CliTest {
         }
 
         @Test
-        @DisplayName("health command produces expected stub output")
-        void healthCommandOutput() {
-            CliResult result = execute("health");
+        @DisplayName("health command with graph available shows compiled")
+        void healthCommandWithGraph() {
+            WorldmindGraph mockGraph = mock(WorldmindGraph.class);
+            CliResult result = execute(null, mockGraph, "health");
             assertEquals(0, result.exitCode());
             String output = result.output();
-            assertTrue(output.contains("Worldmind Core: not running"),
-                    "Health should show core status");
+            assertTrue(output.contains("graph compiled"),
+                    "Health should show graph compiled");
             assertTrue(output.contains("PostgreSQL: not connected"),
                     "Health should show PostgreSQL status");
-            assertTrue(output.contains("Docker: checking"),
+            assertTrue(output.contains("Docker: not connected"),
                     "Health should show Docker status");
+        }
+
+        @Test
+        @DisplayName("health command without graph shows not available")
+        void healthCommandWithoutGraph() {
+            // Pass null for graph to simulate unavailable
+            CliResult result = execute(mock(MissionEngine.class), null, "health");
+            assertEquals(0, result.exitCode());
+            String output = result.output();
+            assertTrue(output.contains("not available"),
+                    "Health should show core not available when graph is null");
         }
 
         @Test
@@ -209,9 +295,9 @@ class CliTest {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
     //  ConsoleOutput tests
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
 
     @Nested
     @DisplayName("ConsoleOutput")
@@ -284,9 +370,9 @@ class CliTest {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
     //  No-subcommand test
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
 
     @Test
     @DisplayName("Running with no args shows banner and usage")
