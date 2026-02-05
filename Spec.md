@@ -55,7 +55,7 @@ The system is organized into five layers, each with distinct responsibilities an
 |**Orchestration** |Worldmind Core|LangGraph StateGraph |The control plane. Houses Centurion Prime (planner), the mission state machine, conditional routing logic, the Send API fan-out for parallel directives, and the Postgres-backed checkpointer for state persistence.                    |
 |**Agent**         |Centurions    |Goose (headless mode)|The worker layer. Each Centurion is a Goose instance running in a containerized Stargate, connected to the Worldmind via a thin bridge that translates LangGraph state into Goose instructions and Goose output back into state updates.|
 |**Tool**          |Nova Force    |MCP Servers          |Provides capabilities to Centurions: filesystem access, git operations, shell execution, database queries, code search. Each MCP server is a Force channel. Goose connects to these natively as an MCP client.                          |
-|**Infrastructure**|Stargates     |Docker / Kubernetes  |Container lifecycle management. Spins up isolated environments for each Centurion deployment. Manages resource limits, volume mounts, network isolation, and cleanup.                                                                   |
+|**Infrastructure**|Stargates     |Docker / Kubernetes / cf  |Container lifecycle management. Spins up isolated environments for each Centurion deployment. Manages resource limits, volume mounts, network isolation, and cleanup.                                                                   |
 
 ### 2.2 System Flow Overview
 
