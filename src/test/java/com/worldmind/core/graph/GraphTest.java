@@ -4,14 +4,17 @@ import com.worldmind.core.llm.LlmService;
 import com.worldmind.core.model.Classification;
 import com.worldmind.core.model.InteractionMode;
 import com.worldmind.core.model.MissionStatus;
+import com.worldmind.core.model.ProjectContext;
 import com.worldmind.core.nodes.ClassifyRequestNode;
 import com.worldmind.core.nodes.PlanMissionNode;
 import com.worldmind.core.nodes.UploadContextNode;
+import com.worldmind.core.scanner.ProjectScanner;
 import com.worldmind.core.state.WorldmindState;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,9 +38,16 @@ class GraphTest {
         when(mockLlm.structuredCall(anyString(), anyString(), eq(Classification.class)))
                 .thenReturn(new Classification("feature", 3, List.of("api"), "sequential"));
 
+        // Create a mock ProjectScanner that returns a fixed ProjectContext
+        ProjectScanner mockScanner = mock(ProjectScanner.class);
+        when(mockScanner.scan(any(Path.class))).thenReturn(new ProjectContext(
+                ".", List.of(), "unknown", "unknown", Map.of(), 0,
+                "unknown project with 0 files"
+        ));
+
         worldmindGraph = new WorldmindGraph(
                 new ClassifyRequestNode(mockLlm),
-                new UploadContextNode(),
+                new UploadContextNode(mockScanner),
                 new PlanMissionNode()
         );
     }
