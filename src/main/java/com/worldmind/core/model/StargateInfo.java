@@ -1,5 +1,6 @@
 package com.worldmind.core.model;
 
+import java.io.Serializable;
 import java.time.Instant;
 
 /**
@@ -12,4 +13,4 @@ public record StargateInfo(
     String status,
     Instant startedAt,
     Instant completedAt
-) {}
+) implements Serializable {}

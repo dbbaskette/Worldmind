@@ -1,5 +1,7 @@
 package com.worldmind.core.model;
 
+import java.io.Serializable;
+
 /**
  * Tracks a single file change made by a directive execution.
  *
@@ -11,4 +13,4 @@ public record FileRecord(
     String path,
     String action,
     int linesChanged
-) {}
+) implements Serializable {}

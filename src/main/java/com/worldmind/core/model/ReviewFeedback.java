@@ -1,5 +1,6 @@
 package com.worldmind.core.model;
 
+import java.io.Serializable;
 import java.util.List;
 
 /**
@@ -12,4 +13,4 @@ public record ReviewFeedback(
     List<String> issues,
     List<String> suggestions,
     int score
-) {}
+) implements Serializable {}

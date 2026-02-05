@@ -1,5 +1,6 @@
 package com.worldmind.core.model;
 
+import java.io.Serializable;
 import java.util.List;
 
 /**
@@ -10,4 +11,4 @@ public record Classification(
     int complexity,
     List<String> affectedComponents,
     String planningStrategy
-) {}
+) implements Serializable {}

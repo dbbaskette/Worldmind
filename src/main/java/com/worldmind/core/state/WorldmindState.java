@@ -4,6 +4,7 @@ import com.worldmind.core.model.*;
 import org.bsc.langgraph4j.state.AgentState;
 import org.bsc.langgraph4j.state.Channel;
 import org.bsc.langgraph4j.state.Channels;
+import org.bsc.langgraph4j.state.Reducer;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,12 +26,12 @@ public class WorldmindState extends AgentState {
         Map.entry("request",               Channels.base(() -> "")),
         Map.entry("interactionMode",       Channels.base(() -> InteractionMode.APPROVE_PLAN.name())),
         Map.entry("status",                Channels.base(() -> MissionStatus.CLASSIFYING.name())),
-        Map.entry("classification",        Channels.base(() -> null)),
-        Map.entry("projectContext",        Channels.base(() -> null)),
+        Map.entry("classification",        Channels.base((Reducer<Classification>) null)),
+        Map.entry("projectContext",        Channels.base((Reducer<ProjectContext>) null)),
         Map.entry("executionStrategy",     Channels.base(() -> ExecutionStrategy.SEQUENTIAL.name())),
         Map.entry("currentDirectiveIndex", Channels.base(() -> 0)),
         Map.entry("sealGranted",           Channels.base(() -> false)),
-        Map.entry("metrics",               Channels.base(() -> null)),
+        Map.entry("metrics",               Channels.base((Reducer<MissionMetrics>) null)),
 
         // ── Appender channels (list accumulation) ────────────────────
         Map.entry("directives",      Channels.appender(ArrayList::new)),

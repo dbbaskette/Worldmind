@@ -1,5 +1,6 @@
 package com.worldmind.core.model;
 
+import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 
@@ -14,4 +15,4 @@ public record ProjectContext(
     Map<String, String> dependencies,
     int fileCount,
     String summary
-) {}
+) implements Serializable {}

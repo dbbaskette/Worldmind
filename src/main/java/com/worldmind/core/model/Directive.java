@@ -1,5 +1,6 @@
 package com.worldmind.core.model;
 
+import java.io.Serializable;
 import java.util.List;
 
 /**
@@ -18,4 +19,4 @@ public record Directive(
     FailureStrategy onFailure,
     List<FileRecord> filesAffected,
     Long elapsedMs
-) {}
+) implements Serializable {}
