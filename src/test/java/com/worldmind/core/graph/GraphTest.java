@@ -60,7 +60,8 @@ class GraphTest {
         worldmindGraph = new WorldmindGraph(
                 new ClassifyRequestNode(mockLlm),
                 new UploadContextNode(mockScanner),
-                new PlanMissionNode(mockLlm)
+                new PlanMissionNode(mockLlm),
+                null  // no checkpointer for these tests
         );
     }
 
