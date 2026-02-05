@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: worldmind
+  ai:
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY}
+      chat:
+        options:
+          model: claude-sonnet-4-5-20250929
+          temperature: 0.0
+          max-tokens: 8192
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/worldmind}
+    username: ${DB_USER:worldmind}
+    password: ${DB_PASSWORD:worldmind}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+worldmind:
+  goose:
+    model: ${GOOSE_MODEL:claude-sonnet-4-5-20250929}
+  stargate:
+    max-parallel: 10
+    timeout-seconds: 300
+    memory-limit: 4g
+    cpu-count: 2
