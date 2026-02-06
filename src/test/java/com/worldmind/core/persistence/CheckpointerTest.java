@@ -8,6 +8,7 @@ import com.worldmind.core.model.MissionStatus;
 import com.worldmind.core.model.ProjectContext;
 import com.worldmind.core.graph.WorldmindGraph;
 import com.worldmind.core.nodes.ClassifyRequestNode;
+import com.worldmind.core.nodes.DispatchCenturionNode;
 import com.worldmind.core.nodes.PlanMissionNode;
 import com.worldmind.core.nodes.UploadContextNode;
 import com.worldmind.core.scanner.ProjectScanner;
@@ -36,6 +37,7 @@ class CheckpointerTest {
 
     private LlmService mockLlm;
     private ProjectScanner mockScanner;
+    private DispatchCenturionNode mockDispatchNode;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -58,6 +60,16 @@ class CheckpointerTest {
                 ".", List.of(), "unknown", "unknown", Map.of(), 0,
                 "unknown project with 0 files"
         ));
+
+        mockDispatchNode = mock(DispatchCenturionNode.class);
+        when(mockDispatchNode.apply(any(WorldmindState.class))).thenAnswer(invocation -> {
+            WorldmindState state = invocation.getArgument(0);
+            int nextIndex = state.currentDirectiveIndex() + 1;
+            return Map.of(
+                    "currentDirectiveIndex", nextIndex,
+                    "status", MissionStatus.EXECUTING.name()
+            );
+        });
     }
 
     // ===================================================================
@@ -72,6 +84,7 @@ class CheckpointerTest {
                 new ClassifyRequestNode(mockLlm),
                 new UploadContextNode(mockScanner),
                 new PlanMissionNode(mockLlm),
+                mockDispatchNode,
                 saver
         );
 
@@ -87,6 +100,7 @@ class CheckpointerTest {
                 new ClassifyRequestNode(mockLlm),
                 new UploadContextNode(mockScanner),
                 new PlanMissionNode(mockLlm),
+                mockDispatchNode,
                 saver
         );
 
@@ -119,6 +133,7 @@ class CheckpointerTest {
                 new ClassifyRequestNode(mockLlm),
                 new UploadContextNode(mockScanner),
                 new PlanMissionNode(mockLlm),
+                mockDispatchNode,
                 saver
         );
 
@@ -150,6 +165,7 @@ class CheckpointerTest {
                 new ClassifyRequestNode(mockLlm),
                 new UploadContextNode(mockScanner),
                 new PlanMissionNode(mockLlm),
+                mockDispatchNode,
                 saver
         );
 
@@ -186,6 +202,7 @@ class CheckpointerTest {
                 new ClassifyRequestNode(mockLlm),
                 new UploadContextNode(mockScanner),
                 new PlanMissionNode(mockLlm),
+                mockDispatchNode,
                 null
         );
 
@@ -195,7 +212,8 @@ class CheckpointerTest {
 
         Optional<WorldmindState> result = graph.getCompiledGraph().invoke(input);
         assertTrue(result.isPresent(), "Graph should produce a result even without checkpointer");
-        assertEquals(MissionStatus.AWAITING_APPROVAL, result.get().status());
+        // After dispatch loop completes, status is EXECUTING (set by mock dispatch node)
+        assertEquals(MissionStatus.EXECUTING, result.get().status());
     }
 
     // ===================================================================

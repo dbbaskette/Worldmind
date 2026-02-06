@@ -4,6 +4,7 @@ import com.worldmind.core.graph.WorldmindGraph;
 import com.worldmind.core.llm.LlmService;
 import com.worldmind.core.model.*;
 import com.worldmind.core.nodes.ClassifyRequestNode;
+import com.worldmind.core.nodes.DispatchCenturionNode;
 import com.worldmind.core.nodes.PlanMissionNode;
 import com.worldmind.core.nodes.UploadContextNode;
 import com.worldmind.core.scanner.ProjectScanner;
@@ -53,11 +54,23 @@ class MissionEngineTest {
                 Map.of("spring-boot", "3.4.1"), 15, "Spring Boot project with 15 files"
         ));
 
+        // Create a mock DispatchCenturionNode that advances currentDirectiveIndex
+        DispatchCenturionNode mockDispatchNode = mock(DispatchCenturionNode.class);
+        when(mockDispatchNode.apply(any(WorldmindState.class))).thenAnswer(invocation -> {
+            WorldmindState state = invocation.getArgument(0);
+            int nextIndex = state.currentDirectiveIndex() + 1;
+            return java.util.Map.of(
+                    "currentDirectiveIndex", nextIndex,
+                    "status", MissionStatus.EXECUTING.name()
+            );
+        });
+
         // Build real graph with mocked nodes
         WorldmindGraph graph = new WorldmindGraph(
                 new ClassifyRequestNode(mockLlm),
                 new UploadContextNode(mockScanner),
                 new PlanMissionNode(mockLlm),
+                mockDispatchNode,
                 null  // no checkpointer for tests
         );
 
@@ -141,31 +154,32 @@ class MissionEngineTest {
     // =================================================================
 
     @Test
-    @DisplayName("APPROVE_PLAN mode ends with AWAITING_APPROVAL status")
-    void approvePlanEndsWithAwaitingApproval() {
+    @DisplayName("APPROVE_PLAN mode dispatches after approval")
+    void approvePlanDispatchesAfterApproval() {
         WorldmindState state = engine.runMission("Add logging", InteractionMode.APPROVE_PLAN);
-        assertEquals(MissionStatus.AWAITING_APPROVAL, state.status(),
-                "APPROVE_PLAN mode should end with AWAITING_APPROVAL");
+        // After dispatch loop completes, status is EXECUTING (set by mock dispatch node)
+        assertEquals(MissionStatus.EXECUTING, state.status(),
+                "APPROVE_PLAN mode should end with EXECUTING after dispatch");
     }
 
     @Test
-    @DisplayName("STEP_BY_STEP mode ends with AWAITING_APPROVAL status")
-    void stepByStepEndsWithAwaitingApproval() {
+    @DisplayName("STEP_BY_STEP mode dispatches after approval")
+    void stepByStepDispatchesAfterApproval() {
         WorldmindState state = engine.runMission("Add logging", InteractionMode.STEP_BY_STEP);
-        assertEquals(MissionStatus.AWAITING_APPROVAL, state.status(),
-                "STEP_BY_STEP mode should end with AWAITING_APPROVAL");
+        // After dispatch loop completes, status is EXECUTING (set by mock dispatch node)
+        assertEquals(MissionStatus.EXECUTING, state.status(),
+                "STEP_BY_STEP mode should end with EXECUTING after dispatch");
     }
 
     @Test
-    @DisplayName("FULL_AUTO mode skips approval node (routes to END directly)")
+    @DisplayName("FULL_AUTO mode skips approval and dispatches directly")
     void fullAutoSkipsApproval() {
         WorldmindState state = engine.runMission("Add logging", InteractionMode.FULL_AUTO);
-        // In FULL_AUTO, the graph routes from plan_mission directly to END,
-        // so the await_approval node (which sets AWAITING_APPROVAL) is NOT executed.
-        // The status remains as set by plan_mission (AWAITING_APPROVAL).
-        // The key difference is the routing path, not the final status value.
+        // In FULL_AUTO, the graph routes from plan_mission directly to dispatch_centurion
         assertEquals(InteractionMode.FULL_AUTO, state.interactionMode(),
                 "Interaction mode should be FULL_AUTO");
+        assertEquals(MissionStatus.EXECUTING, state.status(),
+                "FULL_AUTO should end with EXECUTING after dispatch");
         // Directives should still be present
         assertFalse(state.directives().isEmpty(),
                 "FULL_AUTO should still produce directives");

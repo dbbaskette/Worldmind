@@ -3,6 +3,7 @@ package com.worldmind.core.graph;
 import com.worldmind.core.model.InteractionMode;
 import com.worldmind.core.model.MissionStatus;
 import com.worldmind.core.nodes.ClassifyRequestNode;
+import com.worldmind.core.nodes.DispatchCenturionNode;
 import com.worldmind.core.nodes.PlanMissionNode;
 import com.worldmind.core.nodes.UploadContextNode;
 import com.worldmind.core.state.WorldmindState;
@@ -24,13 +25,13 @@ import static org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
 
 /**
  * Builds and holds the compiled LangGraph4j {@link StateGraph} that drives
- * the Worldmind planning pipeline.
+ * the Worldmind planning and execution pipeline.
  * <p>
  * The graph flows through:
  * <pre>
  *   START -> classify_request -> upload_context -> plan_mission
- *         -> [conditional] -> await_approval -> END
- *                          -> END  (FULL_AUTO skips approval)
+ *         -> [conditional] -> await_approval -> dispatch_centurion -> [loop/END]
+ *                          -> dispatch_centurion  (FULL_AUTO skips approval)
  * </pre>
  * <p>
  * When a {@link BaseCheckpointSaver} is available, the graph is compiled
@@ -47,6 +48,7 @@ public class WorldmindGraph {
             ClassifyRequestNode classifyNode,
             UploadContextNode uploadNode,
             PlanMissionNode planNode,
+            DispatchCenturionNode dispatchNode,
             @Autowired(required = false) BaseCheckpointSaver checkpointSaver) throws Exception {
 
         var graph = new StateGraph<>(WorldmindState.SCHEMA, WorldmindState::new)
@@ -55,14 +57,19 @@ public class WorldmindGraph {
                 .addNode("plan_mission", node_async(planNode::apply))
                 .addNode("await_approval", node_async(
                         state -> Map.of("status", MissionStatus.AWAITING_APPROVAL.name())))
+                .addNode("dispatch_centurion", node_async(dispatchNode::apply))
                 .addEdge(START, "classify_request")
                 .addEdge("classify_request", "upload_context")
                 .addEdge("upload_context", "plan_mission")
                 .addConditionalEdges("plan_mission",
                         edge_async(this::routeAfterPlan),
                         Map.of("await_approval", "await_approval",
-                                "end", END))
-                .addEdge("await_approval", END);
+                                "dispatch", "dispatch_centurion"))
+                .addEdge("await_approval", "dispatch_centurion")
+                .addConditionalEdges("dispatch_centurion",
+                        edge_async(this::routeAfterDispatch),
+                        Map.of("dispatch_centurion", "dispatch_centurion",
+                                "end", END));
 
         // Compile with checkpointer if available
         var configBuilder = CompileConfig.builder();
@@ -77,13 +84,27 @@ public class WorldmindGraph {
 
     /**
      * Routes after the plan_mission node based on interaction mode.
-     * In FULL_AUTO mode the graph skips the approval step and ends directly.
+     * In FULL_AUTO mode the graph skips the approval step and dispatches directly.
      */
     String routeAfterPlan(WorldmindState state) {
         if (state.interactionMode() == InteractionMode.FULL_AUTO) {
-            return "end";
+            return "dispatch";
         }
         return "await_approval";
+    }
+
+    /**
+     * Routes after the dispatch_centurion node.
+     * Loops back to dispatch_centurion if there are more pending directives,
+     * otherwise ends the graph.
+     */
+    String routeAfterDispatch(WorldmindState state) {
+        int currentIndex = state.currentDirectiveIndex();
+        int totalDirectives = state.directives().size();
+        if (currentIndex < totalDirectives) {
+            return "dispatch_centurion";
+        }
+        return "end";
     }
 
     public CompiledGraph<WorldmindState> getCompiledGraph() {

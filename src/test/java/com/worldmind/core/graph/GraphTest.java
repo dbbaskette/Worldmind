@@ -7,6 +7,7 @@ import com.worldmind.core.model.MissionPlan;
 import com.worldmind.core.model.MissionStatus;
 import com.worldmind.core.model.ProjectContext;
 import com.worldmind.core.nodes.ClassifyRequestNode;
+import com.worldmind.core.nodes.DispatchCenturionNode;
 import com.worldmind.core.nodes.PlanMissionNode;
 import com.worldmind.core.nodes.UploadContextNode;
 import com.worldmind.core.scanner.ProjectScanner;
@@ -57,10 +58,22 @@ class GraphTest {
                 "unknown project with 0 files"
         ));
 
+        // Create a mock DispatchCenturionNode that advances currentDirectiveIndex
+        DispatchCenturionNode mockDispatchNode = mock(DispatchCenturionNode.class);
+        when(mockDispatchNode.apply(any(WorldmindState.class))).thenAnswer(invocation -> {
+            WorldmindState state = invocation.getArgument(0);
+            int nextIndex = state.currentDirectiveIndex() + 1;
+            return Map.of(
+                    "currentDirectiveIndex", nextIndex,
+                    "status", MissionStatus.EXECUTING.name()
+            );
+        });
+
         worldmindGraph = new WorldmindGraph(
                 new ClassifyRequestNode(mockLlm),
                 new UploadContextNode(mockScanner),
                 new PlanMissionNode(mockLlm),
+                mockDispatchNode,
                 null  // no checkpointer for these tests
         );
     }
@@ -81,7 +94,7 @@ class GraphTest {
     // ===================================================================
 
     @Test
-    @DisplayName("Running graph with APPROVE_PLAN produces AWAITING_APPROVAL status")
+    @DisplayName("Running graph with APPROVE_PLAN dispatches after approval")
     void runWithApprovePlan() throws Exception {
         var input = new HashMap<String, Object>();
         input.put("missionId", "test-mission-1");
@@ -95,7 +108,8 @@ class GraphTest {
 
         assertEquals("test-mission-1", finalState.missionId());
         assertEquals("Add a REST endpoint", finalState.request());
-        assertEquals(MissionStatus.AWAITING_APPROVAL, finalState.status());
+        // After dispatch loop completes, status is EXECUTING (set by mock dispatch node)
+        assertEquals(MissionStatus.EXECUTING, finalState.status());
         assertTrue(finalState.classification().isPresent(),
                 "Classification should be set after classify_request");
         assertTrue(finalState.projectContext().isPresent(),
@@ -110,7 +124,7 @@ class GraphTest {
     // ===================================================================
 
     @Test
-    @DisplayName("Running graph with FULL_AUTO skips approval and ends directly")
+    @DisplayName("Running graph with FULL_AUTO skips approval and dispatches directly")
     void runWithFullAuto() throws Exception {
         var input = new HashMap<String, Object>();
         input.put("missionId", "test-mission-2");
@@ -122,9 +136,9 @@ class GraphTest {
         assertTrue(result.isPresent(), "Graph should produce a result");
         WorldmindState finalState = result.get();
 
-        // In FULL_AUTO, the plan_mission node sets status to AWAITING_APPROVAL
-        // but the graph routes to END directly, so status stays as set by plan_mission
-        assertEquals(MissionStatus.AWAITING_APPROVAL, finalState.status());
+        // In FULL_AUTO, the graph routes to dispatch_centurion directly
+        // After dispatch loop completes, status is EXECUTING (set by mock dispatch node)
+        assertEquals(MissionStatus.EXECUTING, finalState.status());
         assertEquals(InteractionMode.FULL_AUTO, finalState.interactionMode());
         assertTrue(finalState.classification().isPresent());
         assertTrue(finalState.projectContext().isPresent());
@@ -136,12 +150,12 @@ class GraphTest {
     // ===================================================================
 
     @Test
-    @DisplayName("routeAfterPlan returns 'end' for FULL_AUTO")
-    void routeReturnsEndForFullAuto() {
+    @DisplayName("routeAfterPlan returns 'dispatch' for FULL_AUTO")
+    void routeReturnsDispatchForFullAuto() {
         var state = new WorldmindState(
                 Map.of("interactionMode", InteractionMode.FULL_AUTO.name())
         );
-        assertEquals("end", worldmindGraph.routeAfterPlan(state));
+        assertEquals("dispatch", worldmindGraph.routeAfterPlan(state));
     }
 
     @Test
@@ -207,5 +221,38 @@ class GraphTest {
         assertTrue(result.isPresent());
         assertEquals("SEQUENTIAL",
                 result.get().<String>value("executionStrategy").orElse(""));
+    }
+
+    // ===================================================================
+    //  Dispatch routing logic
+    // ===================================================================
+
+    @Test
+    @DisplayName("routeAfterDispatch returns 'dispatch_centurion' when directives remain")
+    void routeReturnsDispatchWhenDirectivesRemain() {
+        var state = new WorldmindState(Map.of(
+                "currentDirectiveIndex", 0,
+                "directives", List.of("dir1", "dir2")
+        ));
+        assertEquals("dispatch_centurion", worldmindGraph.routeAfterDispatch(state));
+    }
+
+    @Test
+    @DisplayName("routeAfterDispatch returns 'end' when all directives dispatched")
+    void routeReturnsEndWhenAllDispatched() {
+        var state = new WorldmindState(Map.of(
+                "currentDirectiveIndex", 2,
+                "directives", List.of("dir1", "dir2")
+        ));
+        assertEquals("end", worldmindGraph.routeAfterDispatch(state));
+    }
+
+    @Test
+    @DisplayName("routeAfterDispatch returns 'end' when no directives exist")
+    void routeReturnsEndWhenNoDirectives() {
+        var state = new WorldmindState(Map.of(
+                "currentDirectiveIndex", 0
+        ));
+        assertEquals("end", worldmindGraph.routeAfterDispatch(state));
     }
 }
