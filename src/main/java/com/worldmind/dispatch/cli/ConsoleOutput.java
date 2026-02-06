@@ -31,4 +31,20 @@ public class ConsoleOutput {
         System.out.println(CommandLine.Help.Ansi.AUTO.string(
                 "@|fg(red) x|@ " + message));
     }
+
+    public static void stargate(String message) {
+        System.out.println(CommandLine.Help.Ansi.AUTO.string(
+                "@|fg(magenta) [STARGATE]|@ " + message));
+    }
+
+    public static void centurion(String type, String message) {
+        System.out.println(CommandLine.Help.Ansi.AUTO.string(
+                "@|fg(blue) [CENTURION " + type + "]|@ " + message));
+    }
+
+    public static void fileChange(String action, String path) {
+        String symbol = "created".equals(action) ? "+" : "~";
+        System.out.println(CommandLine.Help.Ansi.AUTO.string(
+                "  @|fg(green) " + symbol + "|@ " + path));
+    }
 }

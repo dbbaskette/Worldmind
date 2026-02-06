@@ -83,10 +83,39 @@ public class MissionCommand implements Runnable {
             }
         }
 
-        // Display approval status
-        if (finalState.status() == com.worldmind.core.model.MissionStatus.AWAITING_APPROVAL) {
+        // Display execution results
+        var stargates = finalState.stargates();
+        if (!stargates.isEmpty()) {
             System.out.println();
-            ConsoleOutput.info("Mission planned. Execution coming in Phase 2.");
+            for (var sg : stargates) {
+                ConsoleOutput.stargate(String.format(
+                    "Centurion %s — %s (%s)",
+                    sg.centurionType(), sg.directiveId(), sg.status()));
+            }
+        }
+
+        // Display file changes from directives
+        var allDirectives = finalState.directives();
+        for (var d : allDirectives) {
+            if (d.filesAffected() != null) {
+                for (var f : d.filesAffected()) {
+                    ConsoleOutput.fileChange(f.action(), f.path());
+                }
+            }
+        }
+
+        // Display final status
+        System.out.println();
+        var missionStatus = finalState.status();
+        if (missionStatus == com.worldmind.core.model.MissionStatus.COMPLETED) {
+            ConsoleOutput.success("Mission complete.");
+        } else if (missionStatus == com.worldmind.core.model.MissionStatus.AWAITING_APPROVAL) {
+            ConsoleOutput.info("Mission planned. Awaiting approval.");
+        } else if (missionStatus == com.worldmind.core.model.MissionStatus.FAILED) {
+            ConsoleOutput.error("Mission failed.");
+            finalState.errors().forEach(e -> ConsoleOutput.error("  " + e));
+        } else {
+            ConsoleOutput.info("Mission status: " + missionStatus);
         }
     }
 }
