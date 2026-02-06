@@ -1,0 +1,19 @@
+## Profile: local
+## Connects to a local OpenAI-compatible server (LM Studio, Ollama, etc.)
+## Usage: ./run.sh local
+
+spring:
+  ai:
+    openai:
+      base-url: ${LOCAL_LLM_URL:http://localhost:1234}
+      api-key: ${LOCAL_LLM_KEY:lm-studio}
+      chat:
+        options:
+          model: ${LOCAL_LLM_MODEL:qwen3-coder}
+          temperature: 0.0
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration
+      - org.springframework.ai.model.anthropic.autoconfigure.AnthropicChatAutoConfiguration
