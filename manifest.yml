@@ -1,0 +1,54 @@
+---
+applications:
+
+  # --- Worldmind Orchestrator (Spring Boot JAR) ---
+  - name: worldmind
+    memory: 1G
+    disk_quota: 2G
+    instances: 1
+    path: target/worldmind-0.1.0-SNAPSHOT.jar
+    buildpacks:
+      - java_buildpack_offline
+    env:
+      JBP_CONFIG_OPEN_JDK_JRE: '{ jre: { version: 21.+ } }'
+      SPRING_PROFILES_ACTIVE: cf
+      worldmind.stargate.provider: cloudfoundry
+    services:
+      - worldmind-db
+      - worldmind-genai
+
+  # --- Centurion: Forge (code generation) ---
+  - name: centurion-forge
+    docker:
+      image: worldmind/centurion-forge:latest
+    memory: 2G
+    disk_quota: 4G
+    instances: 0
+    health-check-type: process
+    no-route: true
+    services:
+      - worldmind-genai
+
+  # --- Centurion: Gauntlet (testing) ---
+  - name: centurion-gauntlet
+    docker:
+      image: worldmind/centurion-gauntlet:latest
+    memory: 2G
+    disk_quota: 4G
+    instances: 0
+    health-check-type: process
+    no-route: true
+    services:
+      - worldmind-genai
+
+  # --- Centurion: Vigil (code review) ---
+  - name: centurion-vigil
+    docker:
+      image: worldmind/centurion-vigil:latest
+    memory: 2G
+    disk_quota: 4G
+    instances: 0
+    health-check-type: process
+    no-route: true
+    services:
+      - worldmind-genai
