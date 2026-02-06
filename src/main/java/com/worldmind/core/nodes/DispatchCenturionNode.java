@@ -1,5 +1,6 @@
 package com.worldmind.core.nodes;
 
+import com.worldmind.core.model.Directive;
 import com.worldmind.core.model.DirectiveStatus;
 import com.worldmind.core.model.MissionStatus;
 import com.worldmind.core.state.WorldmindState;
@@ -36,6 +37,7 @@ public class DispatchCenturionNode {
     public Map<String, Object> apply(WorldmindState state) {
         var directives = state.directives();
         int currentIndex = state.currentDirectiveIndex();
+        String retryContext = state.<String>value("retryContext").orElse(null);
 
         if (directives.isEmpty() || currentIndex >= directives.size()) {
             log.info("No pending directives — mission complete");
@@ -44,19 +46,37 @@ public class DispatchCenturionNode {
 
         var directive = directives.get(currentIndex);
         if (directive.status() != DirectiveStatus.PENDING) {
-            log.info("Directive {} already {}, advancing", directive.id(), directive.status());
-            return Map.of("currentDirectiveIndex", currentIndex + 1);
+            if (retryContext != null && !retryContext.isEmpty() && directive.status() == DirectiveStatus.FAILED) {
+                log.info("Retrying FAILED directive {} with retry context", directive.id());
+                // Fall through to dispatch with augmented context
+            } else {
+                log.info("Directive {} already {}, advancing", directive.id(), directive.status());
+                return Map.of("currentDirectiveIndex", currentIndex + 1);
+            }
+        }
+
+        // If retryContext is present, augment the directive's inputContext
+        var directiveToDispatch = directive;
+        if (retryContext != null && !retryContext.isEmpty()) {
+            String augmentedContext = (directive.inputContext() != null ? directive.inputContext() + "\n\n" : "") +
+                "## Retry Context (from previous attempt)\n\n" + retryContext;
+            directiveToDispatch = new Directive(
+                directive.id(), directive.centurion(), directive.description(),
+                augmentedContext, directive.successCriteria(), directive.dependencies(),
+                DirectiveStatus.PENDING, directive.iteration(), directive.maxIterations(),
+                directive.onFailure(), directive.filesAffected(), directive.elapsedMs()
+            );
         }
 
         log.info("Dispatching directive {} [{}]: {}",
-                directive.id(), directive.centurion(), directive.description());
+                directiveToDispatch.id(), directiveToDispatch.centurion(), directiveToDispatch.description());
 
         var projectContext = state.projectContext().orElse(null);
         String projectPath = projectContext != null ? projectContext.rootPath() : ".";
 
         try {
             var result = bridge.executeDirective(
-                directive, projectContext, Path.of(projectPath)
+                directiveToDispatch, projectContext, Path.of(projectPath)
             );
 
             var updates = new HashMap<String, Object>();
@@ -69,6 +89,11 @@ public class DispatchCenturionNode {
                     "Directive " + directive.id() + " failed: " + result.output()));
             }
 
+            // Clear retryContext after consuming
+            if (retryContext != null && !retryContext.isEmpty()) {
+                updates.put("retryContext", "");
+            }
+
             return updates;
         } catch (Exception e) {
             log.error("Infrastructure error dispatching directive {}: {}",
@@ -78,6 +103,10 @@ public class DispatchCenturionNode {
             updates.put("status", MissionStatus.FAILED.name());
             updates.put("errors", List.of(
                 "Directive " + directive.id() + " infrastructure error: " + e.getMessage()));
+            // Clear retryContext even on infrastructure error
+            if (retryContext != null && !retryContext.isEmpty()) {
+                updates.put("retryContext", "");
+            }
             return updates;
         }
     }

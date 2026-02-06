@@ -4,7 +4,9 @@ import com.worldmind.core.graph.WorldmindGraph;
 import com.worldmind.core.llm.LlmService;
 import com.worldmind.core.model.*;
 import com.worldmind.core.nodes.ClassifyRequestNode;
+import com.worldmind.core.nodes.ConvergeResultsNode;
 import com.worldmind.core.nodes.DispatchCenturionNode;
+import com.worldmind.core.nodes.EvaluateSealNode;
 import com.worldmind.core.nodes.PlanMissionNode;
 import com.worldmind.core.nodes.UploadContextNode;
 import com.worldmind.core.scanner.ProjectScanner;
@@ -65,12 +67,25 @@ class MissionEngineTest {
             );
         });
 
+        // Create mocks for evaluate_seal and converge_results nodes
+        EvaluateSealNode mockEvaluateSealNode = mock(EvaluateSealNode.class);
+        when(mockEvaluateSealNode.apply(any(WorldmindState.class))).thenReturn(
+                Map.of("sealGranted", true));
+
+        ConvergeResultsNode mockConvergeNode = mock(ConvergeResultsNode.class);
+        when(mockConvergeNode.apply(any(WorldmindState.class))).thenReturn(Map.of(
+                "metrics", new MissionMetrics(1000, 1, 0, 1, 2, 1, 5, 5),
+                "status", MissionStatus.COMPLETED.name()
+        ));
+
         // Build real graph with mocked nodes
         WorldmindGraph graph = new WorldmindGraph(
                 new ClassifyRequestNode(mockLlm),
                 new UploadContextNode(mockScanner),
                 new PlanMissionNode(mockLlm),
                 mockDispatchNode,
+                mockEvaluateSealNode,
+                mockConvergeNode,
                 null  // no checkpointer for tests
         );
 
@@ -175,11 +190,12 @@ class MissionEngineTest {
     @DisplayName("FULL_AUTO mode skips approval and dispatches directly")
     void fullAutoSkipsApproval() {
         WorldmindState state = engine.runMission("Add logging", InteractionMode.FULL_AUTO);
-        // In FULL_AUTO, the graph routes from plan_mission directly to dispatch_centurion
+        // In FULL_AUTO, the graph routes from plan_mission directly to dispatch_centurion,
+        // then through evaluate_seal and converge_results
         assertEquals(InteractionMode.FULL_AUTO, state.interactionMode(),
                 "Interaction mode should be FULL_AUTO");
-        assertEquals(MissionStatus.EXECUTING, state.status(),
-                "FULL_AUTO should end with EXECUTING after dispatch");
+        assertEquals(MissionStatus.COMPLETED, state.status(),
+                "FULL_AUTO should end with COMPLETED after converge_results");
         // Directives should still be present
         assertFalse(state.directives().isEmpty(),
                 "FULL_AUTO should still produce directives");

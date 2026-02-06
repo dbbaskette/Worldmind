@@ -3,11 +3,14 @@ package com.worldmind.core.graph;
 import com.worldmind.core.llm.LlmService;
 import com.worldmind.core.model.Classification;
 import com.worldmind.core.model.InteractionMode;
+import com.worldmind.core.model.MissionMetrics;
 import com.worldmind.core.model.MissionPlan;
 import com.worldmind.core.model.MissionStatus;
 import com.worldmind.core.model.ProjectContext;
 import com.worldmind.core.nodes.ClassifyRequestNode;
+import com.worldmind.core.nodes.ConvergeResultsNode;
 import com.worldmind.core.nodes.DispatchCenturionNode;
+import com.worldmind.core.nodes.EvaluateSealNode;
 import com.worldmind.core.nodes.PlanMissionNode;
 import com.worldmind.core.nodes.UploadContextNode;
 import com.worldmind.core.scanner.ProjectScanner;
@@ -69,11 +72,24 @@ class GraphTest {
             );
         });
 
+        // Create mocks for evaluate_seal and converge_results nodes
+        EvaluateSealNode mockEvaluateSealNode = mock(EvaluateSealNode.class);
+        when(mockEvaluateSealNode.apply(any(WorldmindState.class))).thenReturn(
+                Map.of("sealGranted", true));
+
+        ConvergeResultsNode mockConvergeNode = mock(ConvergeResultsNode.class);
+        when(mockConvergeNode.apply(any(WorldmindState.class))).thenReturn(Map.of(
+                "metrics", new MissionMetrics(1000, 1, 0, 1, 2, 1, 5, 5),
+                "status", MissionStatus.COMPLETED.name()
+        ));
+
         worldmindGraph = new WorldmindGraph(
                 new ClassifyRequestNode(mockLlm),
                 new UploadContextNode(mockScanner),
                 new PlanMissionNode(mockLlm),
                 mockDispatchNode,
+                mockEvaluateSealNode,
+                mockConvergeNode,
                 null  // no checkpointer for these tests
         );
     }
@@ -137,8 +153,8 @@ class GraphTest {
         WorldmindState finalState = result.get();
 
         // In FULL_AUTO, the graph routes to dispatch_centurion directly
-        // After dispatch loop completes, status is EXECUTING (set by mock dispatch node)
-        assertEquals(MissionStatus.EXECUTING, finalState.status());
+        // After dispatch loop completes, converge_results sets status to COMPLETED
+        assertEquals(MissionStatus.COMPLETED, finalState.status());
         assertEquals(InteractionMode.FULL_AUTO, finalState.interactionMode());
         assertTrue(finalState.classification().isPresent());
         assertTrue(finalState.projectContext().isPresent());
@@ -224,35 +240,35 @@ class GraphTest {
     }
 
     // ===================================================================
-    //  Dispatch routing logic
+    //  Seal routing logic
     // ===================================================================
 
     @Test
-    @DisplayName("routeAfterDispatch returns 'dispatch_centurion' when directives remain")
-    void routeReturnsDispatchWhenDirectivesRemain() {
+    @DisplayName("routeAfterSeal returns 'dispatch_centurion' when directives remain")
+    void routeReturnsSealDispatchWhenDirectivesRemain() {
         var state = new WorldmindState(Map.of(
                 "currentDirectiveIndex", 0,
                 "directives", List.of("dir1", "dir2")
         ));
-        assertEquals("dispatch_centurion", worldmindGraph.routeAfterDispatch(state));
+        assertEquals("dispatch_centurion", worldmindGraph.routeAfterSeal(state));
     }
 
     @Test
-    @DisplayName("routeAfterDispatch returns 'end' when all directives dispatched")
-    void routeReturnsEndWhenAllDispatched() {
+    @DisplayName("routeAfterSeal returns 'converge_results' when all directives dispatched")
+    void routeReturnsConvergeWhenAllDispatched() {
         var state = new WorldmindState(Map.of(
                 "currentDirectiveIndex", 2,
                 "directives", List.of("dir1", "dir2")
         ));
-        assertEquals("end", worldmindGraph.routeAfterDispatch(state));
+        assertEquals("converge_results", worldmindGraph.routeAfterSeal(state));
     }
 
     @Test
-    @DisplayName("routeAfterDispatch returns 'end' when no directives exist")
-    void routeReturnsEndWhenNoDirectives() {
+    @DisplayName("routeAfterSeal returns 'converge_results' when no directives exist")
+    void routeReturnsConvergeWhenNoDirectives() {
         var state = new WorldmindState(Map.of(
                 "currentDirectiveIndex", 0
         ));
-        assertEquals("end", worldmindGraph.routeAfterDispatch(state));
+        assertEquals("converge_results", worldmindGraph.routeAfterSeal(state));
     }
 }

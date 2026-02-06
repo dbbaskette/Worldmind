@@ -31,6 +31,7 @@ public class WorldmindState extends AgentState {
         Map.entry("executionStrategy",     Channels.base(() -> ExecutionStrategy.SEQUENTIAL.name())),
         Map.entry("currentDirectiveIndex", Channels.base(() -> 0)),
         Map.entry("sealGranted",           Channels.base(() -> false)),
+        Map.entry("retryContext",          Channels.base(() -> "")),
         Map.entry("metrics",               Channels.base((Reducer<MissionMetrics>) null)),
 
         // ── Appender channels (list accumulation) ────────────────────
@@ -84,6 +85,10 @@ public class WorldmindState extends AgentState {
 
     public boolean sealGranted() {
         return this.<Boolean>value("sealGranted").orElse(false);
+    }
+
+    public String retryContext() {
+        return this.<String>value("retryContext").orElse("");
     }
 
     public Optional<MissionMetrics> metrics() {

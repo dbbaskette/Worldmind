@@ -247,7 +247,7 @@ class ModelTest {
                 "classification", "projectContext", "executionStrategy",
                 "directives", "currentDirectiveIndex", "stargates",
                 "testResults", "reviewFeedback", "sealGranted",
-                "metrics", "errors"
+                "retryContext", "metrics", "errors"
             );
             for (String key : expected) {
                 assertTrue(keys.contains(key), "SCHEMA missing key: " + key);

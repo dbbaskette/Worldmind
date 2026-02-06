@@ -1,7 +1,11 @@
 package com.worldmind.stargate;
 
 import com.worldmind.core.model.Directive;
+import com.worldmind.core.model.FileRecord;
 import com.worldmind.core.model.ProjectContext;
+import com.worldmind.core.model.TestResult;
+
+import java.util.List;
 
 /**
  * Converts a Directive and ProjectContext into a Goose-readable instruction string.
@@ -51,6 +55,123 @@ public final class InstructionBuilder {
         sb.append("- If you encounter an error, attempt to fix it before reporting failure\n");
 
         return sb.toString();
+    }
+
+    /**
+     * Builds a test-focused instruction for the GAUNTLET centurion.
+     * Gauntlet runs tests to verify code changes made by a Forge directive.
+     */
+    public static String buildGauntletInstruction(Directive forgeDirective, ProjectContext context,
+                                                   List<FileRecord> fileChanges) {
+        var sb = new StringBuilder();
+
+        sb.append("# Test Directive for: ").append(forgeDirective.id()).append("\n\n");
+
+        sb.append("## Objective\n\n");
+        sb.append("Run tests to verify the code changes made by directive ")
+          .append(forgeDirective.id()).append(".\n\n");
+
+        sb.append("## What Was Changed\n\n");
+        sb.append(forgeDirective.description()).append("\n\n");
+
+        sb.append("## Files Modified\n\n");
+        sb.append(formatFileChanges(fileChanges)).append("\n");
+
+        appendProjectContext(sb, context);
+
+        sb.append("## Test Instructions\n\n");
+        sb.append("- Run all existing tests in the project\n");
+        sb.append("- If the project has a build tool (Maven, Gradle, npm), use it to run tests\n");
+        sb.append("- Report the test results clearly: number of tests run, passed, failed\n");
+        sb.append("- If tests fail, include the failure messages\n");
+        sb.append("- Do NOT fix any code — only run tests and report results\n\n");
+
+        sb.append("## Output Format\n\n");
+        sb.append("Report results as:\n");
+        sb.append("Tests run: X, Failures: Y, Errors: Z\n");
+        sb.append("{failure details if any}\n");
+
+        return sb.toString();
+    }
+
+    /**
+     * Builds a review-focused instruction for the VIGIL centurion.
+     * Vigil reviews code changes for correctness, security, and quality.
+     */
+    public static String buildVigilInstruction(Directive forgeDirective, ProjectContext context,
+                                                List<FileRecord> fileChanges, TestResult testResult) {
+        var sb = new StringBuilder();
+
+        sb.append("# Code Review for: ").append(forgeDirective.id()).append("\n\n");
+
+        sb.append("## Objective\n\n");
+        sb.append("Review the code changes made by directive ")
+          .append(forgeDirective.id()).append(".\n\n");
+
+        sb.append("## What Was Changed\n\n");
+        sb.append(forgeDirective.description()).append("\n\n");
+
+        sb.append("## Files Modified\n\n");
+        sb.append(formatFileChanges(fileChanges)).append("\n");
+
+        sb.append("## Test Results\n\n");
+        if (testResult != null) {
+            sb.append("- Tests passed: ").append(testResult.passed()).append("\n");
+            sb.append("- Total: ").append(testResult.totalTests())
+              .append(", Failed: ").append(testResult.failedTests()).append("\n");
+            sb.append("- Duration: ").append(testResult.durationMs()).append("ms\n");
+        } else {
+            sb.append("- No test results available\n");
+        }
+        sb.append("\n");
+
+        appendProjectContext(sb, context);
+
+        sb.append("## Review Instructions\n\n");
+        sb.append("- Review each modified file for correctness, security, and code quality\n");
+        sb.append("- Check that the implementation matches the directive objective\n");
+        sb.append("- Look for: bugs, security vulnerabilities, performance issues, code style problems\n");
+        sb.append("- Provide a quality score from 1-10\n");
+        sb.append("- List specific issues found\n");
+        sb.append("- List improvement suggestions\n\n");
+
+        sb.append("## Output Format\n\n");
+        sb.append("Provide your review as:\n");
+        sb.append("Score: X/10\n");
+        sb.append("Approved: yes/no\n");
+        sb.append("Summary: {brief summary}\n");
+        sb.append("Issues: {bullet list}\n");
+        sb.append("Suggestions: {bullet list}\n");
+
+        return sb.toString();
+    }
+
+    private static String formatFileChanges(List<FileRecord> fileChanges) {
+        if (fileChanges == null || fileChanges.isEmpty()) {
+            return "- No file changes recorded\n";
+        }
+        var sb = new StringBuilder();
+        for (var fc : fileChanges) {
+            sb.append("- ").append(fc.action()).append(": ").append(fc.path())
+              .append(" (").append(fc.linesChanged()).append(" lines)\n");
+        }
+        return sb.toString();
+    }
+
+    private static void appendProjectContext(StringBuilder sb, ProjectContext context) {
+        if (context != null) {
+            sb.append("## Project Context\n\n");
+            sb.append("- **Language:** ").append(context.language()).append("\n");
+            sb.append("- **Framework:** ").append(context.framework()).append("\n");
+            if (context.dependencies() != null && !context.dependencies().isEmpty()) {
+                sb.append("- **Dependencies:** ").append(formatDependencies(context)).append("\n");
+            }
+            if (context.fileTree() != null && !context.fileTree().isEmpty()) {
+                sb.append("\n### File Structure\n\n```\n");
+                sb.append(String.join("\n", context.fileTree())).append("\n```\n");
+            }
+            sb.append("\n");
+        }
     }
 
     private static String formatDependencies(ProjectContext context) {

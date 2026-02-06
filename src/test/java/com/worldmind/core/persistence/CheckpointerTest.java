@@ -3,12 +3,15 @@ package com.worldmind.core.persistence;
 import com.worldmind.core.llm.LlmService;
 import com.worldmind.core.model.Classification;
 import com.worldmind.core.model.InteractionMode;
+import com.worldmind.core.model.MissionMetrics;
 import com.worldmind.core.model.MissionPlan;
 import com.worldmind.core.model.MissionStatus;
 import com.worldmind.core.model.ProjectContext;
 import com.worldmind.core.graph.WorldmindGraph;
 import com.worldmind.core.nodes.ClassifyRequestNode;
+import com.worldmind.core.nodes.ConvergeResultsNode;
 import com.worldmind.core.nodes.DispatchCenturionNode;
+import com.worldmind.core.nodes.EvaluateSealNode;
 import com.worldmind.core.nodes.PlanMissionNode;
 import com.worldmind.core.nodes.UploadContextNode;
 import com.worldmind.core.scanner.ProjectScanner;
@@ -38,6 +41,8 @@ class CheckpointerTest {
     private LlmService mockLlm;
     private ProjectScanner mockScanner;
     private DispatchCenturionNode mockDispatchNode;
+    private EvaluateSealNode mockEvaluateSealNode;
+    private ConvergeResultsNode mockConvergeNode;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -70,6 +75,16 @@ class CheckpointerTest {
                     "status", MissionStatus.EXECUTING.name()
             );
         });
+
+        mockEvaluateSealNode = mock(EvaluateSealNode.class);
+        when(mockEvaluateSealNode.apply(any(WorldmindState.class))).thenReturn(
+                Map.of("sealGranted", true));
+
+        mockConvergeNode = mock(ConvergeResultsNode.class);
+        when(mockConvergeNode.apply(any(WorldmindState.class))).thenReturn(Map.of(
+                "metrics", new MissionMetrics(1000, 1, 0, 1, 2, 1, 5, 5),
+                "status", MissionStatus.COMPLETED.name()
+        ));
     }
 
     // ===================================================================
@@ -85,6 +100,8 @@ class CheckpointerTest {
                 new UploadContextNode(mockScanner),
                 new PlanMissionNode(mockLlm),
                 mockDispatchNode,
+                mockEvaluateSealNode,
+                mockConvergeNode,
                 saver
         );
 
@@ -101,6 +118,8 @@ class CheckpointerTest {
                 new UploadContextNode(mockScanner),
                 new PlanMissionNode(mockLlm),
                 mockDispatchNode,
+                mockEvaluateSealNode,
+                mockConvergeNode,
                 saver
         );
 
@@ -134,6 +153,8 @@ class CheckpointerTest {
                 new UploadContextNode(mockScanner),
                 new PlanMissionNode(mockLlm),
                 mockDispatchNode,
+                mockEvaluateSealNode,
+                mockConvergeNode,
                 saver
         );
 
@@ -166,6 +187,8 @@ class CheckpointerTest {
                 new UploadContextNode(mockScanner),
                 new PlanMissionNode(mockLlm),
                 mockDispatchNode,
+                mockEvaluateSealNode,
+                mockConvergeNode,
                 saver
         );
 
@@ -203,6 +226,8 @@ class CheckpointerTest {
                 new UploadContextNode(mockScanner),
                 new PlanMissionNode(mockLlm),
                 mockDispatchNode,
+                mockEvaluateSealNode,
+                mockConvergeNode,
                 null
         );
 

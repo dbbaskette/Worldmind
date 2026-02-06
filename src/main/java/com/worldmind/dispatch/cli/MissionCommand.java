@@ -111,6 +111,23 @@ public class MissionCommand implements Runnable {
             }
         }
 
+        // Test results
+        for (var tr : finalState.testResults()) {
+            ConsoleOutput.testResult(tr);
+        }
+
+        // Review feedback
+        for (var rf : finalState.reviewFeedback()) {
+            ConsoleOutput.reviewFeedback(rf);
+        }
+
+        // Seal status
+        ConsoleOutput.seal(finalState.sealGranted(),
+            finalState.sealGranted() ? "Quality gate passed" : "Quality gate failed");
+
+        // Mission metrics
+        finalState.metrics().ifPresent(ConsoleOutput::metrics);
+
         // Display errors (if any, regardless of status)
         var errors = finalState.errors();
         if (!errors.isEmpty()) {
