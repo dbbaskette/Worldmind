@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit;
  *   <li>Environment variables for Goose configuration</li>
  *   <li>Memory and CPU limits from the StargateRequest</li>
  *   <li>Extra host entry for host.docker.internal (for LM Studio access)</li>
- *   <li>Command: goose run -t "&lt;instruction&gt;"</li>
+ *   <li>Command: goose run /workspace/.worldmind/directives/{directiveId}.md</li>
  * </ul>
  */
 public class DockerStargateProvider implements StargateProvider {
@@ -59,7 +59,7 @@ public class DockerStargateProvider implements StargateProvider {
                 .withName(containerName)
                 .withHostConfig(hostConfig)
                 .withEnv(envList)
-                .withCmd("goose", "run", "-t", request.instructionText())
+                .withCmd("/workspace/.worldmind/directives/" + request.directiveId() + ".md")
                 .withWorkingDir("/workspace")
                 .exec();
 

@@ -3,14 +3,18 @@
 ## Usage: ./run.sh local
 
 spring:
+  http:
+    client:
+      factory: simple
   ai:
     openai:
       base-url: ${LOCAL_LLM_URL:http://localhost:1234}
       api-key: ${LOCAL_LLM_KEY:lm-studio}
       chat:
         options:
-          model: ${LOCAL_LLM_MODEL:qwen3-coder}
+          model: ${LOCAL_LLM_MODEL:qwen/qwen3-coder-30b}
           temperature: 0.0
+          max-tokens: 8192
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration

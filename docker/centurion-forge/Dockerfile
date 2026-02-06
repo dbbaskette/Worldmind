@@ -10,7 +10,6 @@ LABEL com.worldmind.description="Code generation centurion"
 #   OPENAI_HOST - LM Studio URL (when provider=openai)
 #   OPENAI_API_KEY - API key (not-needed-for-local when using LM Studio)
 #   ANTHROPIC_API_KEY - API key (when provider=anthropic)
-
-# Entry point is overridden by Docker Java client
-# Default: goose run -t "<instruction>"
-ENTRYPOINT ["goose", "run"]
+#
+# entrypoint.sh (from base) generates profiles.yaml from these env vars,
+# then runs: goose run <message_file>

@@ -111,6 +111,16 @@ public class MissionCommand implements Runnable {
             }
         }
 
+        // Display errors (if any, regardless of status)
+        var errors = finalState.errors();
+        if (!errors.isEmpty()) {
+            System.out.println();
+            ConsoleOutput.error("Errors (" + errors.size() + "):");
+            for (var e : errors) {
+                ConsoleOutput.error("  " + e);
+            }
+        }
+
         // Display final status
         System.out.println();
         var missionStatus = finalState.status();
@@ -120,7 +130,6 @@ public class MissionCommand implements Runnable {
             ConsoleOutput.info("Mission planned. Awaiting approval.");
         } else if (missionStatus == com.worldmind.core.model.MissionStatus.FAILED) {
             ConsoleOutput.error("Mission failed.");
-            finalState.errors().forEach(e -> ConsoleOutput.error("  " + e));
         } else {
             ConsoleOutput.info("Mission status: " + missionStatus);
         }

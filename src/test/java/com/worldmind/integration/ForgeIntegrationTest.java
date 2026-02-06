@@ -3,7 +3,7 @@ package com.worldmind.integration;
 import com.worldmind.stargate.*;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
 import com.github.dockerjava.core.DockerClientImpl;
-import com.github.dockerjava.httpclient5.ApacheDockerHttpClient;
+import com.github.dockerjava.zerodep.ZerodepDockerHttpClient;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -26,7 +26,7 @@ class ForgeIntegrationTest {
     void stargateExecutesGooseAndCreatesFile(@TempDir Path tempDir) throws Exception {
         // Setup Docker client
         var dockerConfig = DefaultDockerClientConfig.createDefaultConfigBuilder().build();
-        var httpClient = new ApacheDockerHttpClient.Builder()
+        var httpClient = new ZerodepDockerHttpClient.Builder()
                 .dockerHost(dockerConfig.getDockerHost())
                 .sslConfig(dockerConfig.getSSLConfig())
                 .build();

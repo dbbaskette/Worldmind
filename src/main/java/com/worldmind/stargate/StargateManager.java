@@ -79,6 +79,11 @@ public class StargateManager {
         if ("openai".equals(properties.getGooseProvider())) {
             envVars.put("OPENAI_HOST", properties.getLmStudioUrl());
             envVars.put("OPENAI_API_KEY", "not-needed-for-local");
+        } else if ("anthropic".equals(properties.getGooseProvider())) {
+            String apiKey = System.getenv("ANTHROPIC_API_KEY");
+            if (apiKey != null && !apiKey.isBlank()) {
+                envVars.put("ANTHROPIC_API_KEY", apiKey);
+            }
         }
 
         var request = new StargateRequest(
@@ -86,6 +91,16 @@ public class StargateManager {
             instructionText, envVars,
             properties.getMemoryLimitMb(), properties.getCpuCount()
         );
+
+        // Write instruction file for Goose CLI (expects a markdown file path, not inline text)
+        Path directiveDir = projectPath.resolve(".worldmind/directives");
+        Path instructionFile = directiveDir.resolve(directiveId + ".md");
+        try {
+            Files.createDirectories(directiveDir);
+            Files.writeString(instructionFile, instructionText);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to write instruction file for " + directiveId, e);
+        }
 
         Map<String, Long> beforeSnapshot = snapshotFiles(projectPath);
 
@@ -105,6 +120,11 @@ public class StargateManager {
             return new ExecutionResult(exitCode, output, stargateId, changes, elapsedMs);
         } finally {
             provider.teardownStargate(stargateId);
+            try {
+                Files.deleteIfExists(instructionFile);
+            } catch (IOException e) {
+                log.debug("Could not clean up instruction file: {}", instructionFile);
+            }
         }
     }
 
@@ -120,6 +140,7 @@ public class StargateManager {
             return walk
                 .filter(Files::isRegularFile)
                 .filter(p -> !p.toString().contains(".git"))
+                .filter(p -> !p.toString().contains(".worldmind"))
                 .collect(Collectors.toMap(
                     p -> directory.relativize(p).toString(),
                     p -> {

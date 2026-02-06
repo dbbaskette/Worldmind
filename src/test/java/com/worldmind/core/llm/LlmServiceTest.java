@@ -44,7 +44,7 @@ class LlmServiceTest {
         ChatClient.Builder mockBuilder = mock(ChatClient.Builder.class);
         when(mockBuilder.build()).thenReturn(mockChatClient);
 
-        llmService = new LlmService(mockBuilder);
+        llmService = new LlmService(mockBuilder, "http://test:1234");
     }
 
     @Test

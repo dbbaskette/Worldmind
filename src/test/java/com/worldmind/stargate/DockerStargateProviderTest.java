@@ -128,7 +128,7 @@ class DockerStargateProviderTest {
 
         provider.openStargate(request);
 
-        verify(createCmd).withCmd("goose", "run", "-t", "Create a REST API");
+        verify(createCmd).withCmd("/workspace/.worldmind/directives/DIR-004.md");
     }
 
     @Test
