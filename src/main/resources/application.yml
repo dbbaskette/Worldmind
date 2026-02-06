@@ -13,6 +13,8 @@ spring:
           model: claude-sonnet-4-5-20250929
           temperature: 0.0
           max-tokens: 8192
+    openai:
+      enabled: false
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/worldmind}
     username: ${DB_USER:worldmind}
@@ -25,6 +27,8 @@ spring:
       - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
       - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
       - org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration
+      - org.springframework.ai.model.anthropic.autoconfigure.AnthropicChatAutoConfiguration
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiChatAutoConfiguration
 
 logging:
   level:
@@ -33,9 +37,13 @@ logging:
 
 worldmind:
   goose:
-    model: ${GOOSE_MODEL:claude-sonnet-4-5-20250929}
+    provider: ${GOOSE_PROVIDER:openai}
+    model: ${GOOSE_MODEL:qwen2.5-coder-32b}
+    lm-studio-url: ${LM_STUDIO_URL:http://host.docker.internal:1234/v1}
   stargate:
+    provider: ${STARGATE_PROVIDER:docker}
     max-parallel: 10
     timeout-seconds: 300
-    memory-limit: 4g
+    memory-limit-mb: 4096
     cpu-count: 2
+    image: worldmind/centurion-forge:latest
