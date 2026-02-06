@@ -1,0 +1,73 @@
+package com.worldmind.core.nodes;
+
+import com.worldmind.core.model.DirectiveStatus;
+import com.worldmind.core.model.MissionStatus;
+import com.worldmind.core.state.WorldmindState;
+import com.worldmind.stargate.StargateBridge;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * LangGraph4j node that dispatches the next pending directive to a Stargate
+ * container via the {@link StargateBridge}.
+ *
+ * <p>Reads {@code directives} and {@code currentDirectiveIndex} from the graph state,
+ * finds the next {@link DirectiveStatus#PENDING} directive, executes it through the
+ * bridge, and returns state updates including the stargate info, advanced index,
+ * mission status, and any errors.
+ */
+@Component
+public class DispatchCenturionNode {
+
+    private static final Logger log = LoggerFactory.getLogger(DispatchCenturionNode.class);
+
+    private final StargateBridge bridge;
+
+    public DispatchCenturionNode(StargateBridge bridge) {
+        this.bridge = bridge;
+    }
+
+    public Map<String, Object> apply(WorldmindState state) {
+        var directives = state.directives();
+        int currentIndex = state.currentDirectiveIndex();
+
+        if (directives.isEmpty() || currentIndex >= directives.size()) {
+            log.info("No pending directives — mission complete");
+            return Map.of("status", MissionStatus.COMPLETED.name());
+        }
+
+        var directive = directives.get(currentIndex);
+        if (directive.status() != DirectiveStatus.PENDING) {
+            log.info("Directive {} already {}, advancing", directive.id(), directive.status());
+            return Map.of("currentDirectiveIndex", currentIndex + 1);
+        }
+
+        log.info("Dispatching directive {} [{}]: {}",
+                directive.id(), directive.centurion(), directive.description());
+
+        var projectContext = state.projectContext().orElse(null);
+        String projectPath = projectContext != null ? projectContext.rootPath() : ".";
+
+        var result = bridge.executeDirective(
+            directive, projectContext, Path.of(projectPath)
+        );
+
+        var updates = new HashMap<String, Object>();
+        updates.put("stargates", List.of(result.stargateInfo()));
+        updates.put("currentDirectiveIndex", currentIndex + 1);
+        updates.put("status", MissionStatus.EXECUTING.name());
+
+        if (result.directive().status() == DirectiveStatus.FAILED) {
+            updates.put("errors", List.of(
+                "Directive " + directive.id() + " failed: " + result.output()));
+        }
+
+        return updates;
+    }
+}
