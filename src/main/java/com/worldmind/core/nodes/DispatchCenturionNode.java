@@ -54,20 +54,31 @@ public class DispatchCenturionNode {
         var projectContext = state.projectContext().orElse(null);
         String projectPath = projectContext != null ? projectContext.rootPath() : ".";
 
-        var result = bridge.executeDirective(
-            directive, projectContext, Path.of(projectPath)
-        );
+        try {
+            var result = bridge.executeDirective(
+                directive, projectContext, Path.of(projectPath)
+            );
 
-        var updates = new HashMap<String, Object>();
-        updates.put("stargates", List.of(result.stargateInfo()));
-        updates.put("currentDirectiveIndex", currentIndex + 1);
-        updates.put("status", MissionStatus.EXECUTING.name());
+            var updates = new HashMap<String, Object>();
+            updates.put("stargates", List.of(result.stargateInfo()));
+            updates.put("currentDirectiveIndex", currentIndex + 1);
+            updates.put("status", MissionStatus.EXECUTING.name());
 
-        if (result.directive().status() == DirectiveStatus.FAILED) {
+            if (result.directive().status() == DirectiveStatus.FAILED) {
+                updates.put("errors", List.of(
+                    "Directive " + directive.id() + " failed: " + result.output()));
+            }
+
+            return updates;
+        } catch (Exception e) {
+            log.error("Infrastructure error dispatching directive {}: {}",
+                    directive.id(), e.getMessage());
+            var updates = new HashMap<String, Object>();
+            updates.put("currentDirectiveIndex", currentIndex + 1);
+            updates.put("status", MissionStatus.FAILED.name());
             updates.put("errors", List.of(
-                "Directive " + directive.id() + " failed: " + result.output()));
+                "Directive " + directive.id() + " infrastructure error: " + e.getMessage()));
+            return updates;
         }
-
-        return updates;
     }
 }

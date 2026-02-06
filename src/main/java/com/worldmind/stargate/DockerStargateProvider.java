@@ -37,8 +37,9 @@ public class DockerStargateProvider implements StargateProvider {
 
     @Override
     public String openStargate(StargateRequest request) {
-        String containerName = "stargate-" + request.centurionType() + "-" + request.directiveId();
-        String imageName = IMAGE_PREFIX + request.centurionType() + IMAGE_TAG;
+        String type = request.centurionType().toLowerCase();
+        String containerName = "stargate-" + type + "-" + request.directiveId();
+        String imageName = IMAGE_PREFIX + type + IMAGE_TAG;
         log.info("Opening Stargate {} for directive {} (image: {})",
                 containerName, request.directiveId(), imageName);
 

@@ -46,7 +46,14 @@ public class MissionCommand implements Runnable {
         }
 
         ConsoleOutput.info("Classifying request...");
-        var finalState = missionEngine.runMission(request, interactionMode);
+
+        com.worldmind.core.state.WorldmindState finalState;
+        try {
+            finalState = missionEngine.runMission(request, interactionMode);
+        } catch (Exception e) {
+            ConsoleOutput.error("Mission failed: " + rootCauseMessage(e));
+            return;
+        }
 
         // Display classification
         finalState.classification().ifPresent(classification ->
@@ -117,5 +124,13 @@ public class MissionCommand implements Runnable {
         } else {
             ConsoleOutput.info("Mission status: " + missionStatus);
         }
+    }
+
+    private static String rootCauseMessage(Throwable t) {
+        Throwable cause = t;
+        while (cause.getCause() != null) {
+            cause = cause.getCause();
+        }
+        return cause.getMessage() != null ? cause.getMessage() : cause.getClass().getSimpleName();
     }
 }

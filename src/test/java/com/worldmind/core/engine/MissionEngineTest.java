@@ -154,21 +154,21 @@ class MissionEngineTest {
     // =================================================================
 
     @Test
-    @DisplayName("APPROVE_PLAN mode dispatches after approval")
-    void approvePlanDispatchesAfterApproval() {
+    @DisplayName("APPROVE_PLAN mode stops at plan (awaiting approval)")
+    void approvePlanStopsAtPlan() {
         WorldmindState state = engine.runMission("Add logging", InteractionMode.APPROVE_PLAN);
-        // After dispatch loop completes, status is EXECUTING (set by mock dispatch node)
-        assertEquals(MissionStatus.EXECUTING, state.status(),
-                "APPROVE_PLAN mode should end with EXECUTING after dispatch");
+        // APPROVE_PLAN stops at await_approval → END, no dispatch
+        assertEquals(MissionStatus.AWAITING_APPROVAL, state.status(),
+                "APPROVE_PLAN mode should end with AWAITING_APPROVAL");
     }
 
     @Test
-    @DisplayName("STEP_BY_STEP mode dispatches after approval")
-    void stepByStepDispatchesAfterApproval() {
+    @DisplayName("STEP_BY_STEP mode stops at plan (awaiting approval)")
+    void stepByStepStopsAtPlan() {
         WorldmindState state = engine.runMission("Add logging", InteractionMode.STEP_BY_STEP);
-        // After dispatch loop completes, status is EXECUTING (set by mock dispatch node)
-        assertEquals(MissionStatus.EXECUTING, state.status(),
-                "STEP_BY_STEP mode should end with EXECUTING after dispatch");
+        // STEP_BY_STEP stops at await_approval → END, no dispatch
+        assertEquals(MissionStatus.AWAITING_APPROVAL, state.status(),
+                "STEP_BY_STEP mode should end with AWAITING_APPROVAL");
     }
 
     @Test

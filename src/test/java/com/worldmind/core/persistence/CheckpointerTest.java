@@ -212,8 +212,8 @@ class CheckpointerTest {
 
         Optional<WorldmindState> result = graph.getCompiledGraph().invoke(input);
         assertTrue(result.isPresent(), "Graph should produce a result even without checkpointer");
-        // After dispatch loop completes, status is EXECUTING (set by mock dispatch node)
-        assertEquals(MissionStatus.EXECUTING, result.get().status());
+        // Default mode (APPROVE_PLAN) stops at await_approval → END
+        assertEquals(MissionStatus.AWAITING_APPROVAL, result.get().status());
     }
 
     // ===================================================================

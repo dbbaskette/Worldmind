@@ -30,8 +30,8 @@ import static org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
  * The graph flows through:
  * <pre>
  *   START -> classify_request -> upload_context -> plan_mission
- *         -> [conditional] -> await_approval -> dispatch_centurion -> [loop/END]
- *                          -> dispatch_centurion  (FULL_AUTO skips approval)
+ *         -> [conditional] -> await_approval -> END  (APPROVE_PLAN / STEP_BY_STEP)
+ *                          -> dispatch_centurion -> [loop/END]  (FULL_AUTO)
  * </pre>
  * <p>
  * When a {@link BaseCheckpointSaver} is available, the graph is compiled
@@ -65,7 +65,7 @@ public class WorldmindGraph {
                         edge_async(this::routeAfterPlan),
                         Map.of("await_approval", "await_approval",
                                 "dispatch", "dispatch_centurion"))
-                .addEdge("await_approval", "dispatch_centurion")
+                .addEdge("await_approval", END)
                 .addConditionalEdges("dispatch_centurion",
                         edge_async(this::routeAfterDispatch),
                         Map.of("dispatch_centurion", "dispatch_centurion",

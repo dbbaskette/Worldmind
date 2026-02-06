@@ -94,7 +94,7 @@ class GraphTest {
     // ===================================================================
 
     @Test
-    @DisplayName("Running graph with APPROVE_PLAN dispatches after approval")
+    @DisplayName("Running graph with APPROVE_PLAN stops at plan (no dispatch)")
     void runWithApprovePlan() throws Exception {
         var input = new HashMap<String, Object>();
         input.put("missionId", "test-mission-1");
@@ -108,8 +108,8 @@ class GraphTest {
 
         assertEquals("test-mission-1", finalState.missionId());
         assertEquals("Add a REST endpoint", finalState.request());
-        // After dispatch loop completes, status is EXECUTING (set by mock dispatch node)
-        assertEquals(MissionStatus.EXECUTING, finalState.status());
+        // APPROVE_PLAN stops at await_approval → END, no dispatch
+        assertEquals(MissionStatus.AWAITING_APPROVAL, finalState.status());
         assertTrue(finalState.classification().isPresent(),
                 "Classification should be set after classify_request");
         assertTrue(finalState.projectContext().isPresent(),
