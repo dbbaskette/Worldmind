@@ -1,5 +1,7 @@
 package com.worldmind.core.engine;
 
+import com.worldmind.core.events.EventBus;
+import com.worldmind.core.events.WorldmindEvent;
 import com.worldmind.core.graph.WorldmindGraph;
 import com.worldmind.core.model.InteractionMode;
 import com.worldmind.core.model.MissionStatus;
@@ -26,9 +28,11 @@ public class MissionEngine {
     private static final AtomicInteger MISSION_COUNTER = new AtomicInteger(0);
 
     private final WorldmindGraph worldmindGraph;
+    private final EventBus eventBus;
 
-    public MissionEngine(WorldmindGraph worldmindGraph) {
+    public MissionEngine(WorldmindGraph worldmindGraph, EventBus eventBus) {
         this.worldmindGraph = worldmindGraph;
+        this.eventBus = eventBus;
     }
 
     /**
@@ -42,6 +46,11 @@ public class MissionEngine {
     public WorldmindState runMission(String request, InteractionMode mode) {
         String missionId = generateMissionId();
         log.info("Starting mission {} with mode {} — request: {}", missionId, mode, request);
+
+        eventBus.publish(new WorldmindEvent(
+                "mission.created", missionId, null,
+                Map.of("mode", mode.name(), "request", request),
+                Instant.now()));
 
         Map<String, Object> initialState = Map.of(
                 "missionId", missionId,
@@ -65,7 +74,7 @@ public class MissionEngine {
     /**
      * Generates a unique mission ID in the format WMND-YYYY-NNNN.
      */
-    String generateMissionId() {
+    public String generateMissionId() {
         int count = MISSION_COUNTER.incrementAndGet();
         int year = Instant.now().atZone(java.time.ZoneOffset.UTC).getYear();
         return String.format("WMND-%d-%04d", year, count);

@@ -1,5 +1,6 @@
 package com.worldmind.core.engine;
 
+import com.worldmind.core.events.EventBus;
 import com.worldmind.core.graph.WorldmindGraph;
 import com.worldmind.core.llm.LlmService;
 import com.worldmind.core.model.*;
@@ -111,7 +112,7 @@ class MissionEngineTest {
                 null
         );
 
-        engine = new MissionEngine(graph);
+        engine = new MissionEngine(graph, new EventBus());
     }
 
     // =================================================================

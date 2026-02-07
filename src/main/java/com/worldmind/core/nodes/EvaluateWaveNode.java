@@ -1,5 +1,7 @@
 package com.worldmind.core.nodes;
 
+import com.worldmind.core.events.EventBus;
+import com.worldmind.core.events.WorldmindEvent;
 import com.worldmind.core.model.*;
 import com.worldmind.core.seal.SealEvaluationService;
 import com.worldmind.core.state.WorldmindState;
@@ -10,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.*;
 
 /**
@@ -24,10 +27,12 @@ public class EvaluateWaveNode {
 
     private final StargateBridge bridge;
     private final SealEvaluationService sealService;
+    private final EventBus eventBus;
 
-    public EvaluateWaveNode(StargateBridge bridge, SealEvaluationService sealService) {
+    public EvaluateWaveNode(StargateBridge bridge, SealEvaluationService sealService, EventBus eventBus) {
         this.bridge = bridge;
         this.sealService = sealService;
+        this.eventBus = eventBus;
     }
 
     public Map<String, Object> apply(WorldmindState state) {
@@ -128,6 +133,11 @@ public class EvaluateWaveNode {
             if (sealDecision.sealGranted()) {
                 completedIds.add(id);
             } else {
+                eventBus.publish(new WorldmindEvent("seal.denied",
+                        state.missionId(), id,
+                        Map.of("reason", sealDecision.reason(),
+                               "action", sealDecision.action() != null ? sealDecision.action().name() : "UNKNOWN"),
+                        Instant.now()));
                 var outcome = applyFailureStrategy(id, directive, sealDecision.action(),
                         sealDecision.reason());
                 completedIds.addAll(outcome.completedIds);

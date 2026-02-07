@@ -1,5 +1,7 @@
 package com.worldmind.core.nodes;
 
+import com.worldmind.core.events.EventBus;
+import com.worldmind.core.events.WorldmindEvent;
 import com.worldmind.core.model.*;
 import com.worldmind.core.state.WorldmindState;
 import com.worldmind.stargate.StargateBridge;
@@ -9,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -24,14 +27,20 @@ public class ParallelDispatchNode {
 
     private final StargateBridge bridge;
     private final int maxParallel;
+    private final EventBus eventBus;
 
-    public ParallelDispatchNode(StargateBridge bridge, StargateProperties properties) {
-        this(bridge, properties.getMaxParallel());
+    public ParallelDispatchNode(StargateBridge bridge, StargateProperties properties, EventBus eventBus) {
+        this(bridge, properties.getMaxParallel(), eventBus);
     }
 
     ParallelDispatchNode(StargateBridge bridge, int maxParallel) {
+        this(bridge, maxParallel, new EventBus());
+    }
+
+    ParallelDispatchNode(StargateBridge bridge, int maxParallel, EventBus eventBus) {
         this.bridge = bridge;
         this.maxParallel = maxParallel;
+        this.eventBus = eventBus;
     }
 
     public Map<String, Object> apply(WorldmindState state) {
@@ -75,8 +84,32 @@ public class ParallelDispatchNode {
                             log.info("Dispatching directive {} [{}]: {}",
                                     directiveToDispatch.id(), directiveToDispatch.centurion(),
                                     directiveToDispatch.description());
+
+                            eventBus.publish(new WorldmindEvent("directive.started",
+                                    state.missionId(), directiveToDispatch.id(),
+                                    Map.of("centurion", directiveToDispatch.centurion(),
+                                           "description", directiveToDispatch.description()),
+                                    Instant.now()));
+
                             var result = bridge.executeDirective(
                                     directiveToDispatch, projectContext, Path.of(projectPath));
+
+                            eventBus.publish(new WorldmindEvent(
+                                    result.directive().status() == DirectiveStatus.FAILED
+                                            ? "directive.progress" : "directive.fulfilled",
+                                    state.missionId(), directive.id(),
+                                    Map.of("status", result.directive().status().name(),
+                                           "centurion", directiveToDispatch.centurion()),
+                                    Instant.now()));
+
+                            if (result.stargateInfo() != null) {
+                                eventBus.publish(new WorldmindEvent("stargate.opened",
+                                        state.missionId(), directive.id(),
+                                        Map.of("containerId", result.stargateInfo().containerId(),
+                                               "centurion", directiveToDispatch.centurion()),
+                                        Instant.now()));
+                            }
+
                             return new DispatchOutcome(
                                     new WaveDispatchResult(
                                             directive.id(), result.directive().status(),

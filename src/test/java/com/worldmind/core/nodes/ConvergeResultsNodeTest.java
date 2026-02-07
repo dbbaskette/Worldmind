@@ -1,5 +1,6 @@
 package com.worldmind.core.nodes;
 
+import com.worldmind.core.events.EventBus;
 import com.worldmind.core.model.*;
 import com.worldmind.core.state.WorldmindState;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,7 +25,7 @@ class ConvergeResultsNodeTest {
 
     @BeforeEach
     void setUp() {
-        node = new ConvergeResultsNode();
+        node = new ConvergeResultsNode(new EventBus());
     }
 
     @Test

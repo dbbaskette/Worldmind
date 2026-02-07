@@ -1,9 +1,9 @@
+server:
+  port: ${WORLDMIND_PORT:8080}
+
 spring:
   application:
     name: worldmind
-  main:
-    web-application-type: none
-    banner-mode: off
   ai:
     anthropic:
       enabled: false

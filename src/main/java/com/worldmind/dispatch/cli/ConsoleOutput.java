@@ -120,6 +120,21 @@ public class ConsoleOutput {
                 (m.aggregateDurationMs() > 0 ? " (aggregate: " + formatDuration(m.aggregateDurationMs()) + ")" : "")));
     }
 
+    public static void watchEvent(String eventType, String data) {
+        String prefix = switch (eventType) {
+            case "mission.created" -> "@|fg(cyan) [MISSION]|@";
+            case "stargate.opened", "stargate.closed" -> "@|fg(magenta) [STARGATE]|@";
+            case "directive.started", "directive.completed", "directive.failed" -> "@|fg(blue) [DIRECTIVE]|@";
+            case "wave.started", "wave.completed" -> "@|bold,fg(yellow) [WAVE]|@";
+            case "seal.granted" -> "@|fg(green),bold [SEAL]|@";
+            case "seal.denied" -> "@|fg(red),bold [SEAL]|@";
+            case "mission.completed" -> "@|fg(green),bold [COMPLETE]|@";
+            case "mission.failed" -> "@|fg(red),bold [FAILED]|@";
+            default -> "@|fg(white) [" + eventType + "]|@";
+        };
+        System.out.println(CommandLine.Help.Ansi.AUTO.string(prefix + " " + data));
+    }
+
     private static String formatDuration(long ms) {
         if (ms < 1000) return ms + "ms";
         long seconds = ms / 1000;

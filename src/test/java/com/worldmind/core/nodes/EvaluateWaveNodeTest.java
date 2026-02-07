@@ -1,5 +1,6 @@
 package com.worldmind.core.nodes;
 
+import com.worldmind.core.events.EventBus;
 import com.worldmind.core.model.*;
 import com.worldmind.core.seal.SealEvaluationService;
 import com.worldmind.core.state.WorldmindState;
@@ -26,7 +27,7 @@ class EvaluateWaveNodeTest {
     void setUp() {
         mockBridge = mock(StargateBridge.class);
         mockSealService = mock(SealEvaluationService.class);
-        node = new EvaluateWaveNode(mockBridge, mockSealService);
+        node = new EvaluateWaveNode(mockBridge, mockSealService, new EventBus());
     }
 
     private Directive forgeDirective(String id, int iteration, int maxIterations, FailureStrategy onFailure) {

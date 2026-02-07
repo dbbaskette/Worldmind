@@ -1,5 +1,7 @@
 package com.worldmind.core.nodes;
 
+import com.worldmind.core.events.EventBus;
+import com.worldmind.core.events.WorldmindEvent;
 import com.worldmind.core.model.DirectiveStatus;
 import com.worldmind.core.model.MissionMetrics;
 import com.worldmind.core.model.MissionStatus;
@@ -9,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Map;
 
 /**
@@ -22,6 +25,12 @@ import java.util.Map;
 public class ConvergeResultsNode {
 
     private static final Logger log = LoggerFactory.getLogger(ConvergeResultsNode.class);
+
+    private final EventBus eventBus;
+
+    public ConvergeResultsNode(EventBus eventBus) {
+        this.eventBus = eventBus;
+    }
 
     public Map<String, Object> apply(WorldmindState state) {
         var directives = state.directives();
@@ -94,6 +103,13 @@ public class ConvergeResultsNode {
 
         log.info("Mission converged — {} completed, {} failed, {} tests ({} passed), {} files changed",
                 completed, failed, testsRun, testsPassed, filesCreated + filesModified);
+
+        eventBus.publish(new WorldmindEvent(
+                "mission.completed", state.missionId(), null,
+                Map.of("status", finalStatus.name(),
+                       "directivesCompleted", completed,
+                       "directivesFailed", failed),
+                Instant.now()));
 
         return Map.of(
             "metrics", metrics,

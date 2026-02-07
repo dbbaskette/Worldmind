@@ -187,6 +187,30 @@ public class JdbcCheckpointSaver implements BaseCheckpointSaver {
         return new Tag(threadId, released);
     }
 
+    // ── Query helpers for CLI ────────────────────────────────────────────
+
+    private static final String SELECT_ALL_THREADS_SQL = """
+            SELECT DISTINCT thread_id FROM %s ORDER BY thread_id
+            """.formatted(TABLE_NAME);
+
+    /**
+     * Returns all distinct thread IDs stored in the checkpoint table.
+     * Used by the CLI history command to list all missions.
+     */
+    public List<String> listAllThreadIds() {
+        List<String> threadIds = new ArrayList<>();
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(SELECT_ALL_THREADS_SQL);
+             ResultSet rs = stmt.executeQuery()) {
+            while (rs.next()) {
+                threadIds.add(rs.getString("thread_id"));
+            }
+        } catch (SQLException e) {
+            log.error("Failed to list all thread IDs", e);
+        }
+        return threadIds;
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────
 
     private String resolveThreadId(RunnableConfig config) {

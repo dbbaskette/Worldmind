@@ -3,7 +3,9 @@ package com.worldmind.dispatch.cli;
 import com.worldmind.core.engine.MissionEngine;
 import com.worldmind.core.graph.WorldmindGraph;
 import com.worldmind.core.model.*;
+import com.worldmind.core.persistence.CheckpointQueryService;
 import com.worldmind.core.state.WorldmindState;
+import org.bsc.langgraph4j.checkpoint.Checkpoint;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -11,8 +13,10 @@ import picocli.CommandLine;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -58,9 +62,86 @@ class CliTest {
     }
 
     /**
+     * Creates a mock CheckpointQueryService for testing CLI commands
+     * that query checkpoint data.
+     */
+    private CheckpointQueryService createMockQueryService() {
+        CheckpointQueryService mockService = mock(CheckpointQueryService.class);
+
+        // Default: no missions
+        when(mockService.listAllThreadIds()).thenReturn(List.of());
+        when(mockService.getLatestState(anyString())).thenReturn(Optional.empty());
+        when(mockService.listCheckpoints(anyString())).thenReturn(List.of());
+
+        return mockService;
+    }
+
+    /**
+     * Creates a mock CheckpointQueryService populated with test mission data.
+     */
+    private CheckpointQueryService createPopulatedQueryService() {
+        CheckpointQueryService mockService = mock(CheckpointQueryService.class);
+
+        // Two missions
+        when(mockService.listAllThreadIds()).thenReturn(List.of("WMND-2025-0001", "WMND-2025-0002"));
+
+        // Mission 1 state
+        var state1 = new WorldmindState(Map.of(
+                "missionId", "WMND-2025-0001",
+                "request", "Add logging to all services",
+                "status", MissionStatus.COMPLETED.name(),
+                "executionStrategy", ExecutionStrategy.SEQUENTIAL.name(),
+                "sealGranted", true,
+                "directives", List.of(
+                        new Directive("DIR-001", "FORGE", "Implement logging", "", "Works", List.of(),
+                                DirectiveStatus.PASSED, 1, 3, FailureStrategy.RETRY,
+                                List.of(new FileRecord("src/Logger.java", "created", 50)), 1500L),
+                        new Directive("DIR-002", "VIGIL", "Review code", "", "Quality ok", List.of("DIR-001"),
+                                DirectiveStatus.PASSED, 1, 3, FailureStrategy.RETRY, List.of(), 800L)
+                ),
+                "testResults", List.of(
+                        new TestResult("DIR-001", true, 5, 0, "All tests passed", 200L)
+                ),
+                "reviewFeedback", List.of(
+                        new ReviewFeedback("DIR-001", true, "Excellent code quality", List.of(), List.of(), 9)
+                ),
+                "completedDirectiveIds", List.of("DIR-001", "DIR-002"),
+                "waveCount", 2
+        ));
+        when(mockService.getLatestState("WMND-2025-0001")).thenReturn(Optional.of(state1));
+
+        // Mission 2 state
+        var state2 = new WorldmindState(Map.of(
+                "missionId", "WMND-2025-0002",
+                "request", "Refactor database layer",
+                "status", MissionStatus.FAILED.name(),
+                "executionStrategy", ExecutionStrategy.PARALLEL.name(),
+                "errors", List.of("Build failed: compilation error in DbService.java")
+        ));
+        when(mockService.getLatestState("WMND-2025-0002")).thenReturn(Optional.of(state2));
+
+        // Checkpoints for mission 1
+        var cp1 = Checkpoint.builder().id("cp-1").nodeId("classify_request").nextNodeId("upload_context")
+                .state(Map.of("status", MissionStatus.CLASSIFYING.name(), "missionId", "WMND-2025-0001")).build();
+        var cp2 = Checkpoint.builder().id("cp-2").nodeId("upload_context").nextNodeId("plan_mission")
+                .state(Map.of("status", MissionStatus.UPLOADING.name(), "missionId", "WMND-2025-0001")).build();
+        var cp3 = Checkpoint.builder().id("cp-3").nodeId("plan_mission").nextNodeId("schedule_wave")
+                .state(Map.of("status", MissionStatus.PLANNING.name(), "missionId", "WMND-2025-0001")).build();
+        when(mockService.listCheckpoints("WMND-2025-0001")).thenReturn(List.of(cp1, cp2, cp3));
+
+        // No checkpoints for unknown mission
+        when(mockService.listCheckpoints("WMND-UNKNOWN")).thenReturn(List.of());
+        when(mockService.getLatestState("WMND-UNKNOWN")).thenReturn(Optional.empty());
+
+        return mockService;
+    }
+
+    /**
      * Custom picocli IFactory that provides mock dependencies for commands.
      */
-    private CommandLine.IFactory createFactory(MissionEngine mockEngine, WorldmindGraph mockGraph) {
+    private CommandLine.IFactory createFactory(MissionEngine mockEngine,
+                                                WorldmindGraph mockGraph,
+                                                CheckpointQueryService mockQueryService) {
         return new CommandLine.IFactory() {
             @Override
             @SuppressWarnings("unchecked")
@@ -71,6 +152,24 @@ class CliTest {
                 if (cls == HealthCommand.class) {
                     return (K) new HealthCommand(mockGraph);
                 }
+                if (cls == HistoryCommand.class) {
+                    return (K) new HistoryCommand(mockQueryService);
+                }
+                if (cls == StatusCommand.class) {
+                    return (K) new StatusCommand(mockQueryService);
+                }
+                if (cls == TimelineCommand.class) {
+                    return (K) new TimelineCommand(mockQueryService);
+                }
+                if (cls == InspectCommand.class) {
+                    return (K) new InspectCommand(mockQueryService);
+                }
+                if (cls == LogCommand.class) {
+                    return (K) new LogCommand(mockQueryService);
+                }
+                if (cls == ServeCommand.class) {
+                    return (K) new ServeCommand();
+                }
                 // Default: use picocli's default factory for other classes
                 return CommandLine.defaultFactory().create(cls);
             }
@@ -78,10 +177,15 @@ class CliTest {
     }
 
     private CliResult execute(String... args) {
-        return execute(null, null, args);
+        return execute(null, null, null, args);
     }
 
     private CliResult execute(MissionEngine mockEngine, WorldmindGraph mockGraph, String... args) {
+        return execute(mockEngine, mockGraph, null, args);
+    }
+
+    private CliResult execute(MissionEngine mockEngine, WorldmindGraph mockGraph,
+                              CheckpointQueryService mockQueryService, String... args) {
         ByteArrayOutputStream capture = new ByteArrayOutputStream();
         PrintStream capturePrintStream = new PrintStream(capture, true);
         PrintStream originalOut = System.out;
@@ -90,17 +194,11 @@ class CliTest {
         System.setErr(capturePrintStream);
         try {
             WorldmindCommand cmd = new WorldmindCommand();
-            CommandLine commandLine;
-            if (mockEngine != null || mockGraph != null) {
-                var factory = createFactory(
-                        mockEngine != null ? mockEngine : mock(MissionEngine.class),
-                        mockGraph);
-                commandLine = new CommandLine(cmd, factory);
-            } else {
-                // For help/version tests, use a factory that can handle the constructors
-                var factory = createFactory(mock(MissionEngine.class), null);
-                commandLine = new CommandLine(cmd, factory);
-            }
+            var factory = createFactory(
+                    mockEngine != null ? mockEngine : mock(MissionEngine.class),
+                    mockGraph,
+                    mockQueryService != null ? mockQueryService : createMockQueryService());
+            CommandLine commandLine = new CommandLine(cmd, factory);
             int exitCode = commandLine.execute(args);
             capturePrintStream.flush();
             return new CliResult(exitCode, capture.toString());
@@ -128,6 +226,10 @@ class CliTest {
             assertTrue(output.contains("status"), "Help should list 'status' subcommand");
             assertTrue(output.contains("health"), "Help should list 'health' subcommand");
             assertTrue(output.contains("history"), "Help should list 'history' subcommand");
+            assertTrue(output.contains("timeline"), "Help should list 'timeline' subcommand");
+            assertTrue(output.contains("inspect"), "Help should list 'inspect' subcommand");
+            assertTrue(output.contains("log"), "Help should list 'log' subcommand");
+            assertTrue(output.contains("serve"), "Help should list 'serve' subcommand");
             assertTrue(output.contains("help"), "Help should list 'help' subcommand");
         }
 
@@ -182,6 +284,54 @@ class CliTest {
             assertTrue(output.contains("--limit"),
                     "History help should show --limit option");
         }
+
+        @Test
+        @DisplayName("timeline --help shows timeline description")
+        void timelineHelpOutput() {
+            CliResult result = execute("timeline", "--help");
+            assertEquals(0, result.exitCode());
+            String output = result.output();
+            assertTrue(output.contains("Show mission execution timeline"),
+                    "Timeline help should show description");
+        }
+
+        @Test
+        @DisplayName("inspect --help shows inspect description")
+        void inspectHelpOutput() {
+            CliResult result = execute("inspect", "--help");
+            assertEquals(0, result.exitCode());
+            String output = result.output();
+            assertTrue(output.contains("Inspect a directive within a mission"),
+                    "Inspect help should show description");
+        }
+
+        @Test
+        @DisplayName("log --help shows log description")
+        void logHelpOutput() {
+            CliResult result = execute("log", "--help");
+            assertEquals(0, result.exitCode());
+            String output = result.output();
+            assertTrue(output.contains("Show mission execution log"),
+                    "Log help should show description");
+        }
+
+        @Test
+        @DisplayName("--help includes serve subcommand")
+        void helpIncludesServeCommand() {
+            CliResult result = execute("--help");
+            assertEquals(0, result.exitCode());
+            assertTrue(result.output().contains("serve"), "Help should list 'serve' subcommand");
+        }
+
+        @Test
+        @DisplayName("serve --help shows serve description")
+        void serveHelpOutput() {
+            CliResult result = execute("serve", "--help");
+            assertEquals(0, result.exitCode());
+            String output = result.output();
+            assertTrue(output.contains("Start the Worldmind HTTP server"),
+                    "Serve help should show description");
+        }
     }
 
     // =====================================================================
@@ -234,12 +384,32 @@ class CliTest {
         }
 
         @Test
-        @DisplayName("status command accepts mission ID")
+        @DisplayName("status command shows mission details")
         void statusWithMissionId() {
-            CliResult result = execute("status", "m-42");
+            var queryService = createPopulatedQueryService();
+            CliResult result = execute(null, null, queryService, "status", "WMND-2025-0001");
             assertEquals(0, result.exitCode());
-            assertTrue(result.output().contains("m-42"),
-                    "Status output should echo the mission ID");
+            String output = result.output();
+            assertTrue(output.contains("MISSION WMND-2025-0001"),
+                    "Status should show mission ID");
+            assertTrue(output.contains("Add logging to all services"),
+                    "Status should show objective");
+            assertTrue(output.contains("COMPLETED"),
+                    "Status should show status");
+            assertTrue(output.contains("DIR-001"),
+                    "Status should show directives");
+            assertTrue(output.contains("FORGE"),
+                    "Status should show centurion type");
+        }
+
+        @Test
+        @DisplayName("status command shows error for unknown mission")
+        void statusWithUnknownMission() {
+            var queryService = createPopulatedQueryService();
+            CliResult result = execute(null, null, queryService, "status", "WMND-UNKNOWN");
+            assertEquals(0, result.exitCode());
+            assertTrue(result.output().contains("Mission not found"),
+                    "Status should show not found message");
         }
 
         @Test
@@ -248,6 +418,19 @@ class CliTest {
             CliResult result = execute("status");
             assertNotEquals(0, result.exitCode(),
                     "Status without mission ID should fail");
+        }
+
+        @Test
+        @DisplayName("status --watch prints connection error when server not running")
+        void statusWatchMode() {
+            var queryService = createPopulatedQueryService();
+            CliResult result = execute(null, null, queryService, "status", "--watch", "WMND-2025-0001");
+            assertEquals(0, result.exitCode());
+            String output = result.output();
+            // Should show either connection error or watch attempt
+            assertTrue(output.contains("Watching mission") || output.contains("Cannot connect")
+                            || output.contains("requires serve mode") || output.contains("Watch mode"),
+                    "Watch should attempt connection or show error");
         }
 
         @Test
@@ -277,21 +460,184 @@ class CliTest {
         }
 
         @Test
-        @DisplayName("history command runs with default limit")
-        void historyCommandDefault() {
+        @DisplayName("history command with no missions shows info message")
+        void historyCommandEmpty() {
             CliResult result = execute("history");
             assertEquals(0, result.exitCode());
-            assertTrue(result.output().contains("No missions yet"),
+            assertTrue(result.output().contains("No missions found"),
                     "History should indicate no missions");
+        }
+
+        @Test
+        @DisplayName("history command lists missions from checkpoint store")
+        void historyCommandWithMissions() {
+            var queryService = createPopulatedQueryService();
+            CliResult result = execute(null, null, queryService, "history");
+            assertEquals(0, result.exitCode());
+            String output = result.output();
+            assertTrue(output.contains("WMND-2025-0001"),
+                    "History should list mission 1");
+            assertTrue(output.contains("WMND-2025-0002"),
+                    "History should list mission 2");
+            assertTrue(output.contains("COMPLETED"),
+                    "History should show mission 1 status");
+            assertTrue(output.contains("FAILED"),
+                    "History should show mission 2 status");
         }
 
         @Test
         @DisplayName("history command accepts --limit option")
         void historyWithLimit() {
-            CliResult result = execute("history", "--limit", "5");
+            var queryService = createPopulatedQueryService();
+            CliResult result = execute(null, null, queryService, "history", "--limit", "1");
             assertEquals(0, result.exitCode());
-            assertTrue(result.output().contains("No missions yet"),
-                    "History should indicate no missions");
+            String output = result.output();
+            assertTrue(output.contains("1 of 2"),
+                    "History should show limited count");
+        }
+    }
+
+    // =====================================================================
+    //  Timeline command tests
+    // =====================================================================
+
+    @Nested
+    @DisplayName("Timeline command")
+    class TimelineTests {
+
+        @Test
+        @DisplayName("timeline shows chronological checkpoints")
+        void timelineShowsCheckpoints() {
+            var queryService = createPopulatedQueryService();
+            CliResult result = execute(null, null, queryService, "timeline", "WMND-2025-0001");
+            assertEquals(0, result.exitCode());
+            String output = result.output();
+            assertTrue(output.contains("Timeline for mission WMND-2025-0001"),
+                    "Timeline should show mission ID");
+            assertTrue(output.contains("classify_request"),
+                    "Timeline should show node names");
+            assertTrue(output.contains("upload_context"),
+                    "Timeline should show upload node");
+            assertTrue(output.contains("plan_mission"),
+                    "Timeline should show plan node");
+            assertTrue(output.contains("3 checkpoints"),
+                    "Timeline should show checkpoint count");
+        }
+
+        @Test
+        @DisplayName("timeline shows error for unknown mission")
+        void timelineUnknownMission() {
+            var queryService = createPopulatedQueryService();
+            CliResult result = execute(null, null, queryService, "timeline", "WMND-UNKNOWN");
+            assertEquals(0, result.exitCode());
+            assertTrue(result.output().contains("No checkpoints found"),
+                    "Timeline should show not found message");
+        }
+
+        @Test
+        @DisplayName("timeline fails without mission ID")
+        void timelineWithoutMissionId() {
+            CliResult result = execute("timeline");
+            assertNotEquals(0, result.exitCode(),
+                    "Timeline without mission ID should fail");
+        }
+    }
+
+    // =====================================================================
+    //  Inspect command tests
+    // =====================================================================
+
+    @Nested
+    @DisplayName("Inspect command")
+    class InspectTests {
+
+        @Test
+        @DisplayName("inspect shows directive details")
+        void inspectShowsDirectiveDetails() {
+            var queryService = createPopulatedQueryService();
+            CliResult result = execute(null, null, queryService, "inspect", "WMND-2025-0001", "DIR-001");
+            assertEquals(0, result.exitCode());
+            String output = result.output();
+            assertTrue(output.contains("DIRECTIVE DIR-001"),
+                    "Inspect should show directive ID");
+            assertTrue(output.contains("FORGE"),
+                    "Inspect should show centurion type");
+            assertTrue(output.contains("PASSED"),
+                    "Inspect should show status");
+            assertTrue(output.contains("Implement logging"),
+                    "Inspect should show description");
+            assertTrue(output.contains("src/Logger.java"),
+                    "Inspect should show affected files");
+        }
+
+        @Test
+        @DisplayName("inspect shows error for unknown directive")
+        void inspectUnknownDirective() {
+            var queryService = createPopulatedQueryService();
+            CliResult result = execute(null, null, queryService, "inspect", "WMND-2025-0001", "DIR-999");
+            assertEquals(0, result.exitCode());
+            assertTrue(result.output().contains("Directive DIR-999 not found"),
+                    "Inspect should show directive not found");
+        }
+
+        @Test
+        @DisplayName("inspect shows error for unknown mission")
+        void inspectUnknownMission() {
+            var queryService = createPopulatedQueryService();
+            CliResult result = execute(null, null, queryService, "inspect", "WMND-UNKNOWN", "DIR-001");
+            assertEquals(0, result.exitCode());
+            assertTrue(result.output().contains("Mission not found"),
+                    "Inspect should show mission not found");
+        }
+
+        @Test
+        @DisplayName("inspect fails without arguments")
+        void inspectWithoutArgs() {
+            CliResult result = execute("inspect");
+            assertNotEquals(0, result.exitCode(),
+                    "Inspect without arguments should fail");
+        }
+    }
+
+    // =====================================================================
+    //  Log command tests
+    // =====================================================================
+
+    @Nested
+    @DisplayName("Log command")
+    class LogTests {
+
+        @Test
+        @DisplayName("log shows execution log with checkpoint steps")
+        void logShowsExecutionLog() {
+            var queryService = createPopulatedQueryService();
+            CliResult result = execute(null, null, queryService, "log", "WMND-2025-0001");
+            assertEquals(0, result.exitCode());
+            String output = result.output();
+            assertTrue(output.contains("Execution log for mission WMND-2025-0001"),
+                    "Log should show mission ID");
+            assertTrue(output.contains("classify_request"),
+                    "Log should show node names");
+            assertTrue(output.contains("Final status"),
+                    "Log should show final summary");
+        }
+
+        @Test
+        @DisplayName("log shows error for unknown mission")
+        void logUnknownMission() {
+            var queryService = createPopulatedQueryService();
+            CliResult result = execute(null, null, queryService, "log", "WMND-UNKNOWN");
+            assertEquals(0, result.exitCode());
+            assertTrue(result.output().contains("No log entries found"),
+                    "Log should show not found message");
+        }
+
+        @Test
+        @DisplayName("log fails without mission ID")
+        void logWithoutMissionId() {
+            CliResult result = execute("log");
+            assertNotEquals(0, result.exitCode(),
+                    "Log without mission ID should fail");
         }
     }
 

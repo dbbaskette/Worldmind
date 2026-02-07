@@ -18,6 +18,10 @@ import picocli.CommandLine.Command;
                 StatusCommand.class,
                 HealthCommand.class,
                 HistoryCommand.class,
+                TimelineCommand.class,
+                InspectCommand.class,
+                LogCommand.class,
+                ServeCommand.class,
                 CommandLine.HelpCommand.class
         }
 )
