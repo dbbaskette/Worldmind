@@ -368,6 +368,80 @@ class CliTest {
                 System.setOut(originalOut);
             }
         }
+
+        @Test
+        @DisplayName("wave outputs wave number and directive count")
+        void waveOutputsWaveInfo() {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            PrintStream originalOut = System.out;
+            System.setOut(new PrintStream(out));
+            try {
+                ConsoleOutput.wave(2, 3);
+                String output = out.toString();
+                assertTrue(output.contains("WAVE 2"),
+                        "Wave should contain wave number");
+                assertTrue(output.contains("3 directives"),
+                        "Wave should contain directive count");
+            } finally {
+                System.setOut(originalOut);
+            }
+        }
+
+        @Test
+        @DisplayName("parallelProgress outputs directive status")
+        void parallelProgressOutputsStatus() {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            PrintStream originalOut = System.out;
+            System.setOut(new PrintStream(out));
+            try {
+                ConsoleOutput.parallelProgress("DIR-001", "PASSED");
+                String output = out.toString();
+                assertTrue(output.contains("PASSED"),
+                        "Progress should contain status");
+                assertTrue(output.contains("DIR-001"),
+                        "Progress should contain directive ID");
+            } finally {
+                System.setOut(originalOut);
+            }
+        }
+
+        @Test
+        @DisplayName("waveComplete outputs completion summary")
+        void waveCompleteOutputsSummary() {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            PrintStream originalOut = System.out;
+            System.setOut(new PrintStream(out));
+            try {
+                ConsoleOutput.waveComplete(1, 2, 1);
+                String output = out.toString();
+                assertTrue(output.contains("WAVE 1 COMPLETE"),
+                        "Wave complete should contain wave number");
+                assertTrue(output.contains("2 passed"),
+                        "Wave complete should contain passed count");
+                assertTrue(output.contains("1 failed"),
+                        "Wave complete should contain failed count");
+            } finally {
+                System.setOut(originalOut);
+            }
+        }
+
+        @Test
+        @DisplayName("metrics shows wave count when non-zero")
+        void metricsShowsWaveCount() {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            PrintStream originalOut = System.out;
+            System.setOut(new PrintStream(out));
+            try {
+                ConsoleOutput.metrics(new MissionMetrics(5000L, 3, 0, 4, 2, 1, 10, 10, 2, 8000L));
+                String output = out.toString();
+                assertTrue(output.contains("Waves: 2"),
+                        "Metrics should show wave count");
+                assertTrue(output.contains("aggregate"),
+                        "Metrics should show aggregate duration");
+            } finally {
+                System.setOut(originalOut);
+            }
+        }
     }
 
     // =====================================================================

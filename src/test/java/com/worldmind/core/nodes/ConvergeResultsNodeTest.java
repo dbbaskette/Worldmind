@@ -212,6 +212,36 @@ class ConvergeResultsNodeTest {
     }
 
     @Test
+    @DisplayName("includes waveCount and aggregateDurationMs in metrics")
+    void includesWaveMetrics() {
+        var d1 = new Directive(
+            "DIR-001", "FORGE", "Create service",
+            "", "Service exists",
+            List.of(), DirectiveStatus.PASSED, 1, 3,
+            FailureStrategy.RETRY, List.of(), 2000L
+        );
+        var d2 = new Directive(
+            "DIR-002", "FORGE", "Create controller",
+            "", "Controller exists",
+            List.of(), DirectiveStatus.PASSED, 1, 3,
+            FailureStrategy.RETRY, List.of(), 3000L
+        );
+
+        var state = new WorldmindState(Map.of(
+            "directives", List.of(d1, d2),
+            "testResults", List.of(),
+            "stargates", List.of(),
+            "waveCount", 2
+        ));
+
+        var result = node.apply(state);
+
+        var metrics = (MissionMetrics) result.get("metrics");
+        assertEquals(2, metrics.wavesExecuted());
+        assertEquals(5000L, metrics.aggregateDurationMs()); // 2000 + 3000
+    }
+
+    @Test
     @DisplayName("calculates duration from stargate start/completion times")
     void calculatesDurationFromStargates() {
         var start1 = Instant.parse("2026-02-06T10:00:00Z");

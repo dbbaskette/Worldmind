@@ -90,6 +90,13 @@ public class MissionCommand implements Runnable {
             }
         }
 
+        // Display wave info
+        int waveCount = finalState.waveCount();
+        if (waveCount > 0) {
+            System.out.println();
+            ConsoleOutput.info("Executed in " + waveCount + " wave" + (waveCount != 1 ? "s" : ""));
+        }
+
         // Display execution results
         var stargates = finalState.stargates();
         if (!stargates.isEmpty()) {

@@ -199,7 +199,7 @@ class ModelTest {
         @Test
         @DisplayName("MissionMetrics record construction and accessors")
         void missionMetricsRecord() {
-            var mm = new MissionMetrics(60000L, 5, 1, 8, 3, 4, 20, 18);
+            var mm = new MissionMetrics(60000L, 5, 1, 8, 3, 4, 20, 18, 3, 45000L);
             assertEquals(60000L, mm.totalDurationMs());
             assertEquals(5, mm.directivesCompleted());
             assertEquals(1, mm.directivesFailed());
@@ -208,6 +208,28 @@ class ModelTest {
             assertEquals(4, mm.filesModified());
             assertEquals(20, mm.testsRun());
             assertEquals(18, mm.testsPassed());
+            assertEquals(3, mm.wavesExecuted());
+            assertEquals(45000L, mm.aggregateDurationMs());
+        }
+
+        @Test
+        @DisplayName("MissionMetrics backward-compatible constructor defaults wave fields")
+        void missionMetricsBackwardCompatible() {
+            var mm = new MissionMetrics(1000L, 2, 0, 3, 1, 1, 5, 5);
+            assertEquals(0, mm.wavesExecuted());
+            assertEquals(0L, mm.aggregateDurationMs());
+        }
+
+        @Test
+        @DisplayName("WaveDispatchResult record construction and accessors")
+        void waveDispatchResultRecord() {
+            var files = List.of(new FileRecord("Foo.java", "created", 50));
+            var wdr = new WaveDispatchResult("d-001", DirectiveStatus.PASSED, files, "output text", 1500L);
+            assertEquals("d-001", wdr.directiveId());
+            assertEquals(DirectiveStatus.PASSED, wdr.status());
+            assertEquals(1, wdr.filesAffected().size());
+            assertEquals("output text", wdr.output());
+            assertEquals(1500L, wdr.elapsedMs());
         }
 
         @Test
@@ -247,7 +269,8 @@ class ModelTest {
                 "classification", "projectContext", "executionStrategy",
                 "directives", "currentDirectiveIndex", "stargates",
                 "testResults", "reviewFeedback", "sealGranted",
-                "retryContext", "metrics", "errors"
+                "retryContext", "metrics", "errors",
+                "completedDirectiveIds", "waveDirectiveIds", "waveCount", "waveDispatchResults"
             );
             for (String key : expected) {
                 assertTrue(keys.contains(key), "SCHEMA missing key: " + key);
@@ -319,6 +342,50 @@ class ModelTest {
             var state = new WorldmindState(Map.of("metrics", m));
             assertTrue(state.metrics().isPresent());
             assertEquals(5000L, state.metrics().get().totalDurationMs());
+        }
+
+        @Test
+        @DisplayName("Wave channels default to empty/zero")
+        void waveChannelsDefault() {
+            var state = new WorldmindState(Map.of());
+            assertTrue(state.waveDirectiveIds().isEmpty());
+            assertEquals(0, state.waveCount());
+            assertTrue(state.waveDispatchResults().isEmpty());
+            assertTrue(state.completedDirectiveIds().isEmpty());
+        }
+
+        @Test
+        @DisplayName("Wave channels can be set and retrieved")
+        void waveChannelsSetAndRetrieve() {
+            var wdr = new WaveDispatchResult("d-1", DirectiveStatus.PASSED, List.of(), "ok", 100L);
+            var state = new WorldmindState(Map.of(
+                "waveDirectiveIds", List.of("d-1", "d-2"),
+                "waveCount", 3,
+                "waveDispatchResults", List.of(wdr),
+                "completedDirectiveIds", List.of("d-0")
+            ));
+            assertEquals(List.of("d-1", "d-2"), state.waveDirectiveIds());
+            assertEquals(3, state.waveCount());
+            assertEquals(1, state.waveDispatchResults().size());
+            assertEquals("d-1", state.waveDispatchResults().get(0).directiveId());
+            assertEquals(List.of("d-0"), state.completedDirectiveIds());
+        }
+
+        @Test
+        @DisplayName("completedDirectiveIds appender accumulates")
+        void completedDirectiveIdsAppenderAccumulates() {
+            var initData = new HashMap<String, Object>();
+            initData.put("completedDirectiveIds", List.of("d-1"));
+            var state1Data = AgentState.updateState(initData, Map.of(), WorldmindState.SCHEMA);
+            var state1 = new WorldmindState(state1Data);
+            assertEquals(1, state1.completedDirectiveIds().size());
+
+            var update = Map.<String, Object>of("completedDirectiveIds", List.of("d-2"));
+            var state2Data = AgentState.updateState(state1, update, WorldmindState.SCHEMA);
+            var state2 = new WorldmindState(state2Data);
+            assertEquals(2, state2.completedDirectiveIds().size());
+            assertEquals("d-1", state2.completedDirectiveIds().get(0));
+            assertEquals("d-2", state2.completedDirectiveIds().get(1));
         }
 
         @Test

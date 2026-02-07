@@ -146,6 +146,39 @@ public final class InstructionBuilder {
         return sb.toString();
     }
 
+    /**
+     * Builds a read-only research instruction for the PULSE centurion.
+     * Pulse centurions analyze code, gather information, and produce reports
+     * without modifying any files.
+     */
+    public static String buildPulseInstruction(Directive directive, ProjectContext context) {
+        var sb = new StringBuilder();
+
+        sb.append("# Research Directive: ").append(directive.id()).append("\n\n");
+
+        sb.append("## Objective\n\n");
+        sb.append(directive.description()).append("\n\n");
+
+        if (directive.inputContext() != null && !directive.inputContext().isBlank()) {
+            sb.append("## Additional Context\n\n");
+            sb.append(directive.inputContext()).append("\n\n");
+        }
+
+        appendProjectContext(sb, context);
+
+        sb.append("## Success Criteria\n\n");
+        sb.append(directive.successCriteria()).append("\n\n");
+
+        sb.append("## Constraints\n\n");
+        sb.append("- READ-ONLY: Do NOT create, modify, or delete any files\n");
+        sb.append("- Do NOT run any commands that modify state (no git commit, no file writes)\n");
+        sb.append("- Analyze existing code, configurations, and documentation only\n");
+        sb.append("- Report findings as structured output\n");
+        sb.append("- If you need to suggest changes, describe them in your output — do not apply them\n");
+
+        return sb.toString();
+    }
+
     private static String formatFileChanges(List<FileRecord> fileChanges) {
         if (fileChanges == null || fileChanges.isEmpty()) {
             return "- No file changes recorded\n";

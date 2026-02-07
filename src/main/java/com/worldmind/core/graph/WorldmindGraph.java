@@ -2,12 +2,7 @@ package com.worldmind.core.graph;
 
 import com.worldmind.core.model.InteractionMode;
 import com.worldmind.core.model.MissionStatus;
-import com.worldmind.core.nodes.ClassifyRequestNode;
-import com.worldmind.core.nodes.ConvergeResultsNode;
-import com.worldmind.core.nodes.DispatchCenturionNode;
-import com.worldmind.core.nodes.EvaluateSealNode;
-import com.worldmind.core.nodes.PlanMissionNode;
-import com.worldmind.core.nodes.UploadContextNode;
+import com.worldmind.core.nodes.*;
 import com.worldmind.core.state.WorldmindState;
 import org.bsc.langgraph4j.CompileConfig;
 import org.bsc.langgraph4j.CompiledGraph;
@@ -29,17 +24,17 @@ import static org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
  * Builds and holds the compiled LangGraph4j {@link StateGraph} that drives
  * the Worldmind planning and execution pipeline.
  * <p>
- * The graph flows through:
+ * Phase 4 graph topology (wave-based parallel execution):
  * <pre>
  *   START -> classify_request -> upload_context -> plan_mission
- *         -> [conditional] -> await_approval -> END  (APPROVE_PLAN / STEP_BY_STEP)
- *                          -> dispatch_centurion -> evaluate_seal -> [conditional]
- *                               -> dispatch_centurion (retry or next)
- *                               -> converge_results -> END
+ *         -> [routeAfterPlan]
+ *            -> await_approval -> END
+ *            -> schedule_wave -> [routeAfterSchedule]
+ *               -> parallel_dispatch -> evaluate_wave -> [routeAfterWaveEval]
+ *                  -> schedule_wave (loop back for next wave)
+ *                  -> converge_results -> END
+ *               -> converge_results -> END  (empty wave = all done)
  * </pre>
- * <p>
- * When a {@link BaseCheckpointSaver} is available, the graph is compiled
- * with checkpointing enabled so state is persisted across executions.
  */
 @Component
 public class WorldmindGraph {
@@ -52,8 +47,9 @@ public class WorldmindGraph {
             ClassifyRequestNode classifyNode,
             UploadContextNode uploadNode,
             PlanMissionNode planNode,
-            DispatchCenturionNode dispatchNode,
-            EvaluateSealNode evaluateSealNode,
+            ScheduleWaveNode scheduleWaveNode,
+            ParallelDispatchNode parallelDispatchNode,
+            EvaluateWaveNode evaluateWaveNode,
             ConvergeResultsNode convergeNode,
             @Autowired(required = false) BaseCheckpointSaver checkpointSaver) throws Exception {
 
@@ -63,8 +59,9 @@ public class WorldmindGraph {
                 .addNode("plan_mission", node_async(planNode::apply))
                 .addNode("await_approval", node_async(
                         state -> Map.of("status", MissionStatus.AWAITING_APPROVAL.name())))
-                .addNode("dispatch_centurion", node_async(dispatchNode::apply))
-                .addNode("evaluate_seal", node_async(evaluateSealNode::apply))
+                .addNode("schedule_wave", node_async(scheduleWaveNode::apply))
+                .addNode("parallel_dispatch", node_async(parallelDispatchNode::apply))
+                .addNode("evaluate_wave", node_async(evaluateWaveNode::apply))
                 .addNode("converge_results", node_async(convergeNode::apply))
                 .addEdge(START, "classify_request")
                 .addEdge("classify_request", "upload_context")
@@ -72,16 +69,19 @@ public class WorldmindGraph {
                 .addConditionalEdges("plan_mission",
                         edge_async(this::routeAfterPlan),
                         Map.of("await_approval", "await_approval",
-                                "dispatch", "dispatch_centurion"))
+                                "schedule_wave", "schedule_wave"))
                 .addEdge("await_approval", END)
-                .addEdge("dispatch_centurion", "evaluate_seal")
-                .addConditionalEdges("evaluate_seal",
-                        edge_async(this::routeAfterSeal),
-                        Map.of("dispatch_centurion", "dispatch_centurion",
+                .addConditionalEdges("schedule_wave",
+                        edge_async(this::routeAfterSchedule),
+                        Map.of("parallel_dispatch", "parallel_dispatch",
+                                "converge_results", "converge_results"))
+                .addEdge("parallel_dispatch", "evaluate_wave")
+                .addConditionalEdges("evaluate_wave",
+                        edge_async(this::routeAfterWaveEval),
+                        Map.of("schedule_wave", "schedule_wave",
                                 "converge_results", "converge_results"))
                 .addEdge("converge_results", END);
 
-        // Compile with checkpointer if available
         var configBuilder = CompileConfig.builder();
         if (checkpointSaver != null) {
             configBuilder.checkpointSaver(checkpointSaver);
@@ -93,28 +93,44 @@ public class WorldmindGraph {
     }
 
     /**
-     * Routes after the plan_mission node based on interaction mode.
-     * In FULL_AUTO mode the graph skips the approval step and dispatches directly.
+     * Routes after plan_mission based on interaction mode.
+     * FULL_AUTO skips approval and starts scheduling waves directly.
      */
     String routeAfterPlan(WorldmindState state) {
         if (state.interactionMode() == InteractionMode.FULL_AUTO) {
-            return "dispatch";
+            return "schedule_wave";
         }
         return "await_approval";
     }
 
     /**
-     * Routes after the evaluate_seal node.
-     * Loops back to dispatch_centurion if there are more pending directives,
-     * otherwise converges results and ends.
+     * Routes after schedule_wave.
+     * Empty wave means all directives are done -> converge.
+     * Non-empty wave -> dispatch.
      */
-    String routeAfterSeal(WorldmindState state) {
-        int currentIndex = state.currentDirectiveIndex();
-        int totalDirectives = state.directives().size();
-        if (currentIndex < totalDirectives) {
-            return "dispatch_centurion";
+    String routeAfterSchedule(WorldmindState state) {
+        if (state.waveDirectiveIds().isEmpty()) {
+            return "converge_results";
         }
-        return "converge_results";
+        return "parallel_dispatch";
+    }
+
+    /**
+     * Routes after evaluate_wave.
+     * If mission FAILED or all directives completed -> converge.
+     * Otherwise -> schedule next wave.
+     */
+    String routeAfterWaveEval(WorldmindState state) {
+        if (state.status() == MissionStatus.FAILED) {
+            return "converge_results";
+        }
+        // Check if all directives are in completedIds
+        var completedIds = state.completedDirectiveIds();
+        var allIds = state.directives().stream().map(d -> d.id()).toList();
+        if (completedIds.containsAll(allIds)) {
+            return "converge_results";
+        }
+        return "schedule_wave";
     }
 
     public CompiledGraph<WorldmindState> getCompiledGraph() {

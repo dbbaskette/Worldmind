@@ -13,5 +13,16 @@ public record MissionMetrics(
     int filesCreated,
     int filesModified,
     int testsRun,
-    int testsPassed
-) implements Serializable {}
+    int testsPassed,
+    int wavesExecuted,
+    long aggregateDurationMs
+) implements Serializable {
+
+    /** Backward-compatible constructor for existing code. */
+    public MissionMetrics(long totalDurationMs, int directivesCompleted, int directivesFailed,
+                          int totalIterations, int filesCreated, int filesModified,
+                          int testsRun, int testsPassed) {
+        this(totalDurationMs, directivesCompleted, directivesFailed, totalIterations,
+                filesCreated, filesModified, testsRun, testsPassed, 0, 0L);
+    }
+}

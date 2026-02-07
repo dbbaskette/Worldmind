@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  * Central graph state for the Worldmind agent workflow.
@@ -34,12 +35,18 @@ public class WorldmindState extends AgentState {
         Map.entry("retryContext",          Channels.base(() -> "")),
         Map.entry("metrics",               Channels.base((Reducer<MissionMetrics>) null)),
 
+        // ── Wave execution channels (Phase 4) ────────────────────────
+        Map.entry("waveDirectiveIds",      Channels.base((Supplier<List<String>>) List::of)),
+        Map.entry("waveCount",             Channels.base(() -> 0)),
+        Map.entry("waveDispatchResults",   Channels.base((Supplier<List<WaveDispatchResult>>) List::of)),
+
         // ── Appender channels (list accumulation) ────────────────────
-        Map.entry("directives",      Channels.appender(ArrayList::new)),
-        Map.entry("stargates",       Channels.appender(ArrayList::new)),
-        Map.entry("testResults",     Channels.appender(ArrayList::new)),
-        Map.entry("reviewFeedback",  Channels.appender(ArrayList::new)),
-        Map.entry("errors",          Channels.appender(ArrayList::new))
+        Map.entry("directives",            Channels.appender(ArrayList::new)),
+        Map.entry("completedDirectiveIds", Channels.appender(ArrayList::new)),
+        Map.entry("stargates",             Channels.appender(ArrayList::new)),
+        Map.entry("testResults",           Channels.appender(ArrayList::new)),
+        Map.entry("reviewFeedback",        Channels.appender(ArrayList::new)),
+        Map.entry("errors",                Channels.appender(ArrayList::new))
     );
 
     public WorldmindState(Map<String, Object> initData) {
@@ -95,7 +102,28 @@ public class WorldmindState extends AgentState {
         return value("metrics");
     }
 
+    // ── Wave execution accessors (Phase 4) ────────────────────────────
+
+    @SuppressWarnings("unchecked")
+    public List<String> waveDirectiveIds() {
+        return this.<List<String>>value("waveDirectiveIds").orElse(List.of());
+    }
+
+    public int waveCount() {
+        return this.<Integer>value("waveCount").orElse(0);
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<WaveDispatchResult> waveDispatchResults() {
+        return this.<List<WaveDispatchResult>>value("waveDispatchResults").orElse(List.of());
+    }
+
     // ── List accessors (appender channels) ───────────────────────────
+
+    @SuppressWarnings("unchecked")
+    public List<String> completedDirectiveIds() {
+        return this.<List<String>>value("completedDirectiveIds").orElse(List.of());
+    }
 
     @SuppressWarnings("unchecked")
     public List<Directive> directives() {

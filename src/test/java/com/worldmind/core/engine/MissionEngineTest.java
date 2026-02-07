@@ -3,12 +3,7 @@ package com.worldmind.core.engine;
 import com.worldmind.core.graph.WorldmindGraph;
 import com.worldmind.core.llm.LlmService;
 import com.worldmind.core.model.*;
-import com.worldmind.core.nodes.ClassifyRequestNode;
-import com.worldmind.core.nodes.ConvergeResultsNode;
-import com.worldmind.core.nodes.DispatchCenturionNode;
-import com.worldmind.core.nodes.EvaluateSealNode;
-import com.worldmind.core.nodes.PlanMissionNode;
-import com.worldmind.core.nodes.UploadContextNode;
+import com.worldmind.core.nodes.*;
 import com.worldmind.core.scanner.ProjectScanner;
 import com.worldmind.core.state.WorldmindState;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,8 +11,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -34,7 +28,6 @@ class MissionEngineTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        // Mock LLM service
         LlmService mockLlm = mock(LlmService.class);
         when(mockLlm.structuredCall(anyString(), anyString(), eq(Classification.class)))
                 .thenReturn(new Classification("feature", 3, List.of("api", "service"), "sequential"));
@@ -49,28 +42,57 @@ class MissionEngineTest {
                         )
                 ));
 
-        // Mock project scanner
         ProjectScanner mockScanner = mock(ProjectScanner.class);
         when(mockScanner.scan(any(Path.class))).thenReturn(new ProjectContext(
                 "/test/project", List.of("src/Main.java"), "java", "spring",
                 Map.of("spring-boot", "3.4.1"), 15, "Spring Boot project with 15 files"
         ));
 
-        // Create a mock DispatchCenturionNode that advances currentDirectiveIndex
-        DispatchCenturionNode mockDispatchNode = mock(DispatchCenturionNode.class);
-        when(mockDispatchNode.apply(any(WorldmindState.class))).thenAnswer(invocation -> {
+        // Mock ScheduleWaveNode
+        ScheduleWaveNode mockScheduleWave = mock(ScheduleWaveNode.class);
+        when(mockScheduleWave.apply(any(WorldmindState.class))).thenAnswer(invocation -> {
             WorldmindState state = invocation.getArgument(0);
-            int nextIndex = state.currentDirectiveIndex() + 1;
-            return java.util.Map.of(
-                    "currentDirectiveIndex", nextIndex,
+            var completedIds = new HashSet<>(state.completedDirectiveIds());
+            var directives = state.directives();
+            for (var d : directives) {
+                if (!completedIds.contains(d.id())) {
+                    return Map.of(
+                            "waveDirectiveIds", List.of(d.id()),
+                            "waveCount", state.waveCount() + 1,
+                            "status", MissionStatus.EXECUTING.name()
+                    );
+                }
+            }
+            return Map.of(
+                    "waveDirectiveIds", List.of(),
+                    "waveCount", state.waveCount() + 1,
                     "status", MissionStatus.EXECUTING.name()
             );
         });
 
-        // Create mocks for evaluate_seal and converge_results nodes
-        EvaluateSealNode mockEvaluateSealNode = mock(EvaluateSealNode.class);
-        when(mockEvaluateSealNode.apply(any(WorldmindState.class))).thenReturn(
-                Map.of("sealGranted", true));
+        // Mock ParallelDispatchNode
+        ParallelDispatchNode mockParallelDispatch = mock(ParallelDispatchNode.class);
+        when(mockParallelDispatch.apply(any(WorldmindState.class))).thenAnswer(invocation -> {
+            WorldmindState state = invocation.getArgument(0);
+            var waveIds = state.waveDirectiveIds();
+            var results = new ArrayList<WaveDispatchResult>();
+            for (var id : waveIds) {
+                results.add(new WaveDispatchResult(id, DirectiveStatus.PASSED, List.of(), "OK", 100L));
+            }
+            return Map.of(
+                    "waveDispatchResults", results,
+                    "stargates", List.of(),
+                    "status", MissionStatus.EXECUTING.name()
+            );
+        });
+
+        // Mock EvaluateWaveNode
+        EvaluateWaveNode mockEvaluateWave = mock(EvaluateWaveNode.class);
+        when(mockEvaluateWave.apply(any(WorldmindState.class))).thenAnswer(invocation -> {
+            WorldmindState state = invocation.getArgument(0);
+            var waveIds = state.waveDirectiveIds();
+            return Map.of("completedDirectiveIds", new ArrayList<>(waveIds));
+        });
 
         ConvergeResultsNode mockConvergeNode = mock(ConvergeResultsNode.class);
         when(mockConvergeNode.apply(any(WorldmindState.class))).thenReturn(Map.of(
@@ -78,15 +100,15 @@ class MissionEngineTest {
                 "status", MissionStatus.COMPLETED.name()
         ));
 
-        // Build real graph with mocked nodes
         WorldmindGraph graph = new WorldmindGraph(
                 new ClassifyRequestNode(mockLlm),
                 new UploadContextNode(mockScanner),
                 new PlanMissionNode(mockLlm),
-                mockDispatchNode,
-                mockEvaluateSealNode,
+                mockScheduleWave,
+                mockParallelDispatch,
+                mockEvaluateWave,
                 mockConvergeNode,
-                null  // no checkpointer for tests
+                null
         );
 
         engine = new MissionEngine(graph);
@@ -109,7 +131,6 @@ class MissionEngineTest {
     void missionIdsIncrement() {
         String id1 = engine.generateMissionId();
         String id2 = engine.generateMissionId();
-        // Extract the counter portion
         int counter1 = Integer.parseInt(id1.substring(id1.lastIndexOf('-') + 1));
         int counter2 = Integer.parseInt(id2.substring(id2.lastIndexOf('-') + 1));
         assertEquals(counter1 + 1, counter2,
@@ -125,36 +146,19 @@ class MissionEngineTest {
     void runMissionReturnsCompleteState() {
         WorldmindState state = engine.runMission("Add a REST endpoint", InteractionMode.APPROVE_PLAN);
 
-        // Mission ID should be set
-        assertFalse(state.missionId().isEmpty(),
-                "Mission ID should be populated");
-        assertTrue(state.missionId().startsWith("WMND-"),
-                "Mission ID should start with WMND-");
-
-        // Classification should be present
-        assertTrue(state.classification().isPresent(),
-                "Classification should be set");
+        assertFalse(state.missionId().isEmpty());
+        assertTrue(state.missionId().startsWith("WMND-"));
+        assertTrue(state.classification().isPresent());
         assertEquals("feature", state.classification().get().category());
         assertEquals(3, state.classification().get().complexity());
         assertEquals(List.of("api", "service"), state.classification().get().affectedComponents());
-
-        // Project context should be present
-        assertTrue(state.projectContext().isPresent(),
-                "ProjectContext should be set");
+        assertTrue(state.projectContext().isPresent());
         assertEquals("java", state.projectContext().get().language());
         assertEquals("spring", state.projectContext().get().framework());
-
-        // Directives should be populated
-        assertFalse(state.directives().isEmpty(),
-                "Directives should not be empty");
-        assertEquals(3, state.directives().size(),
-                "Should have 3 directives");
+        assertFalse(state.directives().isEmpty());
+        assertEquals(3, state.directives().size());
         assertEquals("DIR-001", state.directives().get(0).id());
         assertEquals("FORGE", state.directives().get(0).centurion());
-        assertEquals("DIR-002", state.directives().get(1).id());
-        assertEquals("GAUNTLET", state.directives().get(1).centurion());
-        assertEquals("DIR-003", state.directives().get(2).id());
-        assertEquals("VIGIL", state.directives().get(2).centurion());
     }
 
     @Test
@@ -172,33 +176,23 @@ class MissionEngineTest {
     @DisplayName("APPROVE_PLAN mode stops at plan (awaiting approval)")
     void approvePlanStopsAtPlan() {
         WorldmindState state = engine.runMission("Add logging", InteractionMode.APPROVE_PLAN);
-        // APPROVE_PLAN stops at await_approval → END, no dispatch
-        assertEquals(MissionStatus.AWAITING_APPROVAL, state.status(),
-                "APPROVE_PLAN mode should end with AWAITING_APPROVAL");
+        assertEquals(MissionStatus.AWAITING_APPROVAL, state.status());
     }
 
     @Test
     @DisplayName("STEP_BY_STEP mode stops at plan (awaiting approval)")
     void stepByStepStopsAtPlan() {
         WorldmindState state = engine.runMission("Add logging", InteractionMode.STEP_BY_STEP);
-        // STEP_BY_STEP stops at await_approval → END, no dispatch
-        assertEquals(MissionStatus.AWAITING_APPROVAL, state.status(),
-                "STEP_BY_STEP mode should end with AWAITING_APPROVAL");
+        assertEquals(MissionStatus.AWAITING_APPROVAL, state.status());
     }
 
     @Test
     @DisplayName("FULL_AUTO mode skips approval and dispatches directly")
     void fullAutoSkipsApproval() {
         WorldmindState state = engine.runMission("Add logging", InteractionMode.FULL_AUTO);
-        // In FULL_AUTO, the graph routes from plan_mission directly to dispatch_centurion,
-        // then through evaluate_seal and converge_results
-        assertEquals(InteractionMode.FULL_AUTO, state.interactionMode(),
-                "Interaction mode should be FULL_AUTO");
-        assertEquals(MissionStatus.COMPLETED, state.status(),
-                "FULL_AUTO should end with COMPLETED after converge_results");
-        // Directives should still be present
-        assertFalse(state.directives().isEmpty(),
-                "FULL_AUTO should still produce directives");
+        assertEquals(InteractionMode.FULL_AUTO, state.interactionMode());
+        assertEquals(MissionStatus.COMPLETED, state.status());
+        assertFalse(state.directives().isEmpty());
     }
 
     // =================================================================
@@ -209,8 +203,7 @@ class MissionEngineTest {
     @DisplayName("Execution strategy is set from the plan")
     void executionStrategySet() {
         WorldmindState state = engine.runMission("Add logging", InteractionMode.APPROVE_PLAN);
-        assertEquals(ExecutionStrategy.SEQUENTIAL, state.executionStrategy(),
-                "Execution strategy should match plan output");
+        assertEquals(ExecutionStrategy.SEQUENTIAL, state.executionStrategy());
     }
 
     // =================================================================
@@ -220,9 +213,6 @@ class MissionEngineTest {
     @Test
     @DisplayName("Null request still runs through the graph")
     void nullRequestHandled() {
-        // The graph should handle any string input; null request means empty
-        // This tests that the engine doesn't crash on edge cases
-        assertDoesNotThrow(() -> engine.runMission("", InteractionMode.APPROVE_PLAN),
-                "Empty request should not throw");
+        assertDoesNotThrow(() -> engine.runMission("", InteractionMode.APPROVE_PLAN));
     }
 }

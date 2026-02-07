@@ -515,21 +515,38 @@ MCP git server. Auto-commit to `worldmind/<mission-id>` branch at convergence.
 
 ---
 
-## Phase 4: Fan-Out
+## Phase 4: Fan-Out ✅
 
 ### Runnable Milestone
-Multiple Goose containers running simultaneously for independent directives. 3 parallel Forge stargates visible in output.
+Multiple Goose containers running simultaneously for independent directives. Wave-based parallel execution with dependency-aware scheduling visible in CLI output.
+
+**Status: COMPLETE** — 295 unit tests pass, JAR builds.
 
 ---
 
-### Task 4.1: Parallel Execution in Graph
-Use LangGraph4j parallel branch execution. Fan-out eligible directives (no unmet dependencies) to concurrent dispatch nodes using `CompletableFuture` + virtual threads.
+### Task 4.1: Wave Execution State Channels ✅
+Added 4 new state channels to `WorldmindState`: `completedDirectiveIds` (appender), `waveDirectiveIds` (base), `waveCount` (base), `waveDispatchResults` (base). Created `WaveDispatchResult` record for per-directive dispatch results.
 
-### Task 4.2: Centurion Pulse (Research) Image
-Read-only research centurion. Scans project, produces structured context. Eventually replaces the simple Java scanner.
+### Task 4.2: DirectiveScheduler Service ✅
+Dependency-aware `DirectiveScheduler.computeNextWave()` — filters directives by completion status and dependency satisfaction, respects `ExecutionStrategy` (SEQUENTIAL caps wave to 1), bounded by `maxParallel`. 10 unit tests covering diamond deps, linear chains, and edge cases.
 
-### Task 4.3: Dependency-Aware Scheduler
-Scheduler service that respects directive dependencies. Re-evaluates eligibility after each completion.
+### Task 4.3: ScheduleWaveNode ✅
+Graph node that calls `DirectiveScheduler`, writes `waveDirectiveIds` and increments `waveCount`. Empty wave signals all directives complete (routes to converge).
+
+### Task 4.4: ParallelDispatchNode ✅
+Dispatches all directives in a wave concurrently via `CompletableFuture.supplyAsync()` on `Executors.newVirtualThreadPerTaskExecutor()`. Bounded by `Semaphore(maxParallel)`. Applies retry context augmentation. Collects `WaveDispatchResult`, `StargateInfo`, and errors.
+
+### Task 4.5: EvaluateWaveNode ✅
+Batch seal evaluation for all directives in a wave. Non-FORGE directives auto-pass. FORGE directives run GAUNTLET + VIGIL through `SealEvaluationService`. Handles RETRY (re-enter next wave), SKIP (mark complete), ESCALATE (mission failed). 9 unit tests.
+
+### Task 4.6: Rewire WorldmindGraph ✅
+Replaced `dispatch_centurion → evaluate_seal` index-based loop with wave-based loop: `schedule_wave → parallel_dispatch → evaluate_wave → schedule_wave`. New routing: `routeAfterSchedule` (empty wave → converge), `routeAfterWaveEval` (all done or failed → converge, else → next wave). Updated GraphTest, CheckpointerTest, MissionEngineTest.
+
+### Task 4.7: Centurion Pulse Docker Image ✅
+Created `docker/centurion-pulse/Dockerfile` (FROM centurion-base). Added `InstructionBuilder.buildPulseInstruction()` with read-only constraints. Works through existing StargateBridge infrastructure.
+
+### Task 4.8: CLI Output & Metrics ✅
+Added `wavesExecuted` and `aggregateDurationMs` to `MissionMetrics`. Added `wave()`, `parallelProgress()`, `waveComplete()` to `ConsoleOutput`. Updated `ConvergeResultsNode` to compute wave metrics. Updated `MissionCommand` for wave-aware display.
 
 ---
 

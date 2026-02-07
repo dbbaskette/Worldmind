@@ -71,6 +71,25 @@ public class ConsoleOutput {
         }
     }
 
+    public static void wave(int waveNumber, int directiveCount) {
+        System.out.println(CommandLine.Help.Ansi.AUTO.string(
+                "@|bold,fg(yellow) [WAVE " + waveNumber + "]|@ dispatching " +
+                directiveCount + " directive" + (directiveCount != 1 ? "s" : "")));
+    }
+
+    public static void parallelProgress(String directiveId, String status) {
+        String statusColor = "PASSED".equals(status) ? "fg(green)" : "fg(red)";
+        System.out.println(CommandLine.Help.Ansi.AUTO.string(
+                "  @|" + statusColor + " " + status + "|@ " + directiveId));
+    }
+
+    public static void waveComplete(int waveNumber, int passed, int failed) {
+        System.out.println(CommandLine.Help.Ansi.AUTO.string(
+                "@|fg(yellow) [WAVE " + waveNumber + " COMPLETE]|@ " +
+                "@|fg(green) " + passed + " passed|@" +
+                (failed > 0 ? ", @|fg(red) " + failed + " failed|@" : "")));
+    }
+
     public static void seal(boolean granted, String reason) {
         if (granted) {
             System.out.println(CommandLine.Help.Ansi.AUTO.string(
@@ -88,12 +107,17 @@ public class ConsoleOutput {
         System.out.println(CommandLine.Help.Ansi.AUTO.string(
                 "  Directives: @|fg(green) " + m.directivesCompleted() + " passed|@, @|fg(red) " +
                 m.directivesFailed() + " failed|@"));
+        if (m.wavesExecuted() > 0) {
+            System.out.println(CommandLine.Help.Ansi.AUTO.string(
+                    "  Waves: " + m.wavesExecuted()));
+        }
         System.out.println(CommandLine.Help.Ansi.AUTO.string(
                 "  Tests: " + m.testsRun() + " run, @|fg(green) " + m.testsPassed() + " passed|@"));
         System.out.println(CommandLine.Help.Ansi.AUTO.string(
                 "  Files: " + m.filesCreated() + " created, " + m.filesModified() + " modified"));
         System.out.println(CommandLine.Help.Ansi.AUTO.string(
-                "  Duration: " + formatDuration(m.totalDurationMs())));
+                "  Duration: " + formatDuration(m.totalDurationMs()) +
+                (m.aggregateDurationMs() > 0 ? " (aggregate: " + formatDuration(m.aggregateDurationMs()) + ")" : "")));
     }
 
     private static String formatDuration(long ms) {

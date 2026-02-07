@@ -60,6 +60,15 @@ public class ConvergeResultsNode {
             .mapToLong(s -> Duration.between(s.startedAt(), s.completedAt()).toMillis())
             .sum();
 
+        // Wave metrics
+        int wavesExecuted = state.waveCount();
+
+        // Aggregate duration: sum of all individual directive elapsed times
+        long aggregateDurationMs = directives.stream()
+                .filter(d -> d.elapsedMs() != null)
+                .mapToLong(d -> d.elapsedMs())
+                .sum();
+
         var metrics = new MissionMetrics(
             totalDurationMs,
             completed,
@@ -68,7 +77,9 @@ public class ConvergeResultsNode {
             filesCreated,
             filesModified,
             testsRun,
-            testsPassed
+            testsPassed,
+            wavesExecuted,
+            aggregateDurationMs
         );
 
         // Final status: COMPLETED if any directives passed, FAILED if all failed

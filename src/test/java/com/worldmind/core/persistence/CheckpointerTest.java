@@ -1,19 +1,9 @@
 package com.worldmind.core.persistence;
 
 import com.worldmind.core.llm.LlmService;
-import com.worldmind.core.model.Classification;
-import com.worldmind.core.model.InteractionMode;
-import com.worldmind.core.model.MissionMetrics;
-import com.worldmind.core.model.MissionPlan;
-import com.worldmind.core.model.MissionStatus;
-import com.worldmind.core.model.ProjectContext;
+import com.worldmind.core.model.*;
 import com.worldmind.core.graph.WorldmindGraph;
-import com.worldmind.core.nodes.ClassifyRequestNode;
-import com.worldmind.core.nodes.ConvergeResultsNode;
-import com.worldmind.core.nodes.DispatchCenturionNode;
-import com.worldmind.core.nodes.EvaluateSealNode;
-import com.worldmind.core.nodes.PlanMissionNode;
-import com.worldmind.core.nodes.UploadContextNode;
+import com.worldmind.core.nodes.*;
 import com.worldmind.core.scanner.ProjectScanner;
 import com.worldmind.core.state.WorldmindState;
 import org.bsc.langgraph4j.RunnableConfig;
@@ -40,8 +30,9 @@ class CheckpointerTest {
 
     private LlmService mockLlm;
     private ProjectScanner mockScanner;
-    private DispatchCenturionNode mockDispatchNode;
-    private EvaluateSealNode mockEvaluateSealNode;
+    private ScheduleWaveNode mockScheduleWave;
+    private ParallelDispatchNode mockParallelDispatch;
+    private EvaluateWaveNode mockEvaluateWave;
     private ConvergeResultsNode mockConvergeNode;
 
     @BeforeEach
@@ -66,25 +57,70 @@ class CheckpointerTest {
                 "unknown project with 0 files"
         ));
 
-        mockDispatchNode = mock(DispatchCenturionNode.class);
-        when(mockDispatchNode.apply(any(WorldmindState.class))).thenAnswer(invocation -> {
+        // Mock ScheduleWaveNode
+        mockScheduleWave = mock(ScheduleWaveNode.class);
+        when(mockScheduleWave.apply(any(WorldmindState.class))).thenAnswer(invocation -> {
             WorldmindState state = invocation.getArgument(0);
-            int nextIndex = state.currentDirectiveIndex() + 1;
+            var completedIds = new HashSet<>(state.completedDirectiveIds());
+            var directives = state.directives();
+            for (var d : directives) {
+                if (!completedIds.contains(d.id())) {
+                    return Map.of(
+                            "waveDirectiveIds", List.of(d.id()),
+                            "waveCount", state.waveCount() + 1,
+                            "status", MissionStatus.EXECUTING.name()
+                    );
+                }
+            }
             return Map.of(
-                    "currentDirectiveIndex", nextIndex,
+                    "waveDirectiveIds", List.of(),
+                    "waveCount", state.waveCount() + 1,
                     "status", MissionStatus.EXECUTING.name()
             );
         });
 
-        mockEvaluateSealNode = mock(EvaluateSealNode.class);
-        when(mockEvaluateSealNode.apply(any(WorldmindState.class))).thenReturn(
-                Map.of("sealGranted", true));
+        // Mock ParallelDispatchNode
+        mockParallelDispatch = mock(ParallelDispatchNode.class);
+        when(mockParallelDispatch.apply(any(WorldmindState.class))).thenAnswer(invocation -> {
+            WorldmindState state = invocation.getArgument(0);
+            var waveIds = state.waveDirectiveIds();
+            var results = new ArrayList<WaveDispatchResult>();
+            for (var id : waveIds) {
+                results.add(new WaveDispatchResult(id, DirectiveStatus.PASSED, List.of(), "OK", 100L));
+            }
+            return Map.of(
+                    "waveDispatchResults", results,
+                    "stargates", List.of(),
+                    "status", MissionStatus.EXECUTING.name()
+            );
+        });
+
+        // Mock EvaluateWaveNode
+        mockEvaluateWave = mock(EvaluateWaveNode.class);
+        when(mockEvaluateWave.apply(any(WorldmindState.class))).thenAnswer(invocation -> {
+            WorldmindState state = invocation.getArgument(0);
+            var waveIds = state.waveDirectiveIds();
+            return Map.of("completedDirectiveIds", new ArrayList<>(waveIds));
+        });
 
         mockConvergeNode = mock(ConvergeResultsNode.class);
         when(mockConvergeNode.apply(any(WorldmindState.class))).thenReturn(Map.of(
                 "metrics", new MissionMetrics(1000, 1, 0, 1, 2, 1, 5, 5),
                 "status", MissionStatus.COMPLETED.name()
         ));
+    }
+
+    private WorldmindGraph buildGraph(BaseCheckpointSaver saver) throws Exception {
+        return new WorldmindGraph(
+                new ClassifyRequestNode(mockLlm),
+                new UploadContextNode(mockScanner),
+                new PlanMissionNode(mockLlm),
+                mockScheduleWave,
+                mockParallelDispatch,
+                mockEvaluateWave,
+                mockConvergeNode,
+                saver
+        );
     }
 
     // ===================================================================
@@ -95,16 +131,7 @@ class CheckpointerTest {
     @DisplayName("Graph compiles with MemorySaver checkpointer")
     void graphCompilesWithMemorySaver() throws Exception {
         var saver = new MemorySaver();
-        var graph = new WorldmindGraph(
-                new ClassifyRequestNode(mockLlm),
-                new UploadContextNode(mockScanner),
-                new PlanMissionNode(mockLlm),
-                mockDispatchNode,
-                mockEvaluateSealNode,
-                mockConvergeNode,
-                saver
-        );
-
+        var graph = buildGraph(saver);
         assertNotNull(graph.getCompiledGraph(),
                 "Compiled graph with MemorySaver should not be null");
     }
@@ -113,22 +140,13 @@ class CheckpointerTest {
     @DisplayName("MemorySaver persists checkpoints after graph execution")
     void memorySaverPersistsCheckpoints() throws Exception {
         var saver = new MemorySaver();
-        var graph = new WorldmindGraph(
-                new ClassifyRequestNode(mockLlm),
-                new UploadContextNode(mockScanner),
-                new PlanMissionNode(mockLlm),
-                mockDispatchNode,
-                mockEvaluateSealNode,
-                mockConvergeNode,
-                saver
-        );
+        var graph = buildGraph(saver);
 
         var input = new HashMap<String, Object>();
         input.put("missionId", "checkpoint-test-1");
         input.put("request", "Add a REST endpoint");
         input.put("interactionMode", InteractionMode.APPROVE_PLAN.name());
 
-        // Run with a thread ID so checkpoints are keyed
         var runnableConfig = RunnableConfig.builder()
                 .threadId("test-thread-1")
                 .build();
@@ -138,7 +156,6 @@ class CheckpointerTest {
 
         assertTrue(result.isPresent(), "Graph should produce a result");
 
-        // Verify checkpoints were saved for this thread
         Collection<Checkpoint> checkpoints = saver.list(runnableConfig);
         assertFalse(checkpoints.isEmpty(),
                 "MemorySaver should have persisted at least one checkpoint");
@@ -148,15 +165,7 @@ class CheckpointerTest {
     @DisplayName("MemorySaver retrieves latest checkpoint for a thread")
     void memorySaverRetrievesLatestCheckpoint() throws Exception {
         var saver = new MemorySaver();
-        var graph = new WorldmindGraph(
-                new ClassifyRequestNode(mockLlm),
-                new UploadContextNode(mockScanner),
-                new PlanMissionNode(mockLlm),
-                mockDispatchNode,
-                mockEvaluateSealNode,
-                mockConvergeNode,
-                saver
-        );
+        var graph = buildGraph(saver);
 
         var input = new HashMap<String, Object>();
         input.put("missionId", "checkpoint-test-2");
@@ -169,7 +178,6 @@ class CheckpointerTest {
 
         graph.getCompiledGraph().invoke(input, runnableConfig);
 
-        // Get the latest checkpoint
         Optional<Checkpoint> latest = saver.get(runnableConfig);
         assertTrue(latest.isPresent(), "Should retrieve latest checkpoint");
 
@@ -182,31 +190,20 @@ class CheckpointerTest {
     @DisplayName("Different threads have independent checkpoints")
     void differentThreadsHaveIndependentCheckpoints() throws Exception {
         var saver = new MemorySaver();
-        var graph = new WorldmindGraph(
-                new ClassifyRequestNode(mockLlm),
-                new UploadContextNode(mockScanner),
-                new PlanMissionNode(mockLlm),
-                mockDispatchNode,
-                mockEvaluateSealNode,
-                mockConvergeNode,
-                saver
-        );
+        var graph = buildGraph(saver);
 
-        // Run thread 1
         var input1 = new HashMap<String, Object>();
         input1.put("missionId", "mission-A");
         input1.put("request", "Task A");
         var config1 = RunnableConfig.builder().threadId("thread-A").build();
         graph.getCompiledGraph().invoke(input1, config1);
 
-        // Run thread 2
         var input2 = new HashMap<String, Object>();
         input2.put("missionId", "mission-B");
         input2.put("request", "Task B");
         var config2 = RunnableConfig.builder().threadId("thread-B").build();
         graph.getCompiledGraph().invoke(input2, config2);
 
-        // Verify independent
         Collection<Checkpoint> thread1Checkpoints = saver.list(config1);
         Collection<Checkpoint> thread2Checkpoints = saver.list(config2);
 
@@ -221,15 +218,7 @@ class CheckpointerTest {
     @Test
     @DisplayName("Graph compiles and runs without any checkpointer")
     void graphWorksWithoutCheckpointer() throws Exception {
-        var graph = new WorldmindGraph(
-                new ClassifyRequestNode(mockLlm),
-                new UploadContextNode(mockScanner),
-                new PlanMissionNode(mockLlm),
-                mockDispatchNode,
-                mockEvaluateSealNode,
-                mockConvergeNode,
-                null
-        );
+        var graph = buildGraph(null);
 
         var input = new HashMap<String, Object>();
         input.put("missionId", "no-checkpoint-test");
@@ -237,7 +226,6 @@ class CheckpointerTest {
 
         Optional<WorldmindState> result = graph.getCompiledGraph().invoke(input);
         assertTrue(result.isPresent(), "Graph should produce a result even without checkpointer");
-        // Default mode (APPROVE_PLAN) stops at await_approval → END
         assertEquals(MissionStatus.AWAITING_APPROVAL, result.get().status());
     }
 
@@ -273,7 +261,6 @@ class CheckpointerTest {
         assertInstanceOf(JdbcCheckpointSaver.class, saver,
                 "Saver should be JdbcCheckpointSaver");
 
-        // Verify createTables was called (via statement.execute)
         verify(mockStatement).execute();
     }
 }
