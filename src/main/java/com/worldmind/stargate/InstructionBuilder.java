@@ -179,6 +179,48 @@ public final class InstructionBuilder {
         return sb.toString();
     }
 
+    /**
+     * Builds a refactoring instruction for the PRISM centurion.
+     * Prism performs refactoring with before/after test verification to ensure
+     * behavioral equivalence.
+     */
+    public static String buildPrismInstruction(Directive directive, ProjectContext context,
+                                                TestResult baselineTests) {
+        var sb = new StringBuilder();
+        sb.append("# Refactoring Directive: ").append(directive.id()).append("\n\n");
+        sb.append("## Objective\n\n");
+        sb.append(directive.description()).append("\n\n");
+
+        if (directive.inputContext() != null && !directive.inputContext().isBlank()) {
+            sb.append("## Additional Context\n\n");
+            sb.append(directive.inputContext()).append("\n\n");
+        }
+
+        appendProjectContext(sb, context);
+
+        sb.append("## Baseline Test Results\n\n");
+        if (baselineTests != null) {
+            sb.append("- Tests passed: ").append(baselineTests.passed()).append("\n");
+            sb.append("- Total: ").append(baselineTests.totalTests())
+              .append(", Failed: ").append(baselineTests.failedTests()).append("\n");
+        } else {
+            sb.append("- No baseline tests available — run tests after refactoring to verify\n");
+        }
+        sb.append("\n");
+
+        sb.append("## Success Criteria\n\n");
+        sb.append(directive.successCriteria()).append("\n\n");
+
+        sb.append("## Constraints\n\n");
+        sb.append("- BEHAVIORAL EQUIVALENCE: Tests must pass identically before and after refactoring\n");
+        sb.append("- Do NOT change any public APIs, method signatures, or external behavior\n");
+        sb.append("- Focus on internal code quality: extract methods, reduce duplication, improve naming\n");
+        sb.append("- Run tests after each refactoring step to ensure nothing breaks\n");
+        sb.append("- If any test fails after refactoring, revert that specific change\n");
+        sb.append("- Commit nothing — file changes are detected externally\n");
+        return sb.toString();
+    }
+
     private static String formatFileChanges(List<FileRecord> fileChanges) {
         if (fileChanges == null || fileChanges.isEmpty()) {
             return "- No file changes recorded\n";

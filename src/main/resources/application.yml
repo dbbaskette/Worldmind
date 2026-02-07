@@ -35,6 +35,18 @@ logging:
     root: WARN
     com.worldmind: INFO
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,metrics,info
+  metrics:
+    tags:
+      application: worldmind
+    distribution:
+      percentiles-histogram:
+        worldmind: true
+
 worldmind:
   goose:
     provider: ${GOOSE_PROVIDER:openai}
@@ -47,3 +59,86 @@ worldmind:
     memory-limit-mb: 4096
     cpu-count: 2
     image: worldmind/centurion-forge:latest
+  security:
+    jwt:
+      secret: ${WORLDMIND_JWT_SECRET:worldmind-dev-secret-change-in-production}
+      expiration-seconds: 600
+    command-allowlists:
+      FORGE:
+        - "mvn *"
+        - "gradle *"
+        - "npm *"
+        - "pip *"
+        - "python *"
+        - "java *"
+        - "node *"
+        - "cargo *"
+        - "go *"
+        - "make *"
+      GAUNTLET:
+        - "mvn test*"
+        - "gradle test*"
+        - "npm test*"
+        - "pytest*"
+        - "python -m pytest*"
+        - "java -jar *"
+        - "go test*"
+        - "cargo test*"
+      VIGIL:
+        - "find *"
+        - "grep *"
+        - "cat *"
+        - "head *"
+        - "tail *"
+        - "wc *"
+        - "ls *"
+        - "tree *"
+      PULSE:
+        - "find *"
+        - "grep *"
+        - "cat *"
+        - "head *"
+        - "tail *"
+        - "ls *"
+      PRISM:
+        - "mvn *"
+        - "gradle *"
+        - "npm *"
+        - "pytest*"
+        - "python -m pytest*"
+        - "go test*"
+    path-restrictions:
+      FORGE:
+        writable:
+          - "src/**"
+          - "lib/**"
+          - "app/**"
+          - "pkg/**"
+        read-only:
+          - "**"
+      GAUNTLET:
+        writable:
+          - "src/test/**"
+          - "test/**"
+          - "tests/**"
+          - "spec/**"
+        read-only:
+          - "**"
+      VIGIL:
+        writable: []
+        read-only:
+          - "**"
+      PULSE:
+        writable: []
+        read-only:
+          - "**"
+      PRISM:
+        writable:
+          - "src/**"
+          - "lib/**"
+          - "app/**"
+          - "pkg/**"
+        read-only:
+          - "**"
+  health:
+    timeout-seconds: 5

@@ -2,6 +2,8 @@ package com.worldmind.core.nodes;
 
 import com.worldmind.core.events.EventBus;
 import com.worldmind.core.events.WorldmindEvent;
+import com.worldmind.core.logging.MdcContext;
+import com.worldmind.core.metrics.WorldmindMetrics;
 import com.worldmind.core.model.*;
 import com.worldmind.core.state.WorldmindState;
 import com.worldmind.stargate.StargateBridge;
@@ -28,19 +30,22 @@ public class ParallelDispatchNode {
     private final StargateBridge bridge;
     private final int maxParallel;
     private final EventBus eventBus;
+    private final WorldmindMetrics metrics;
 
-    public ParallelDispatchNode(StargateBridge bridge, StargateProperties properties, EventBus eventBus) {
-        this(bridge, properties.getMaxParallel(), eventBus);
+    public ParallelDispatchNode(StargateBridge bridge, StargateProperties properties,
+                                EventBus eventBus, WorldmindMetrics metrics) {
+        this(bridge, properties.getMaxParallel(), eventBus, metrics);
     }
 
     ParallelDispatchNode(StargateBridge bridge, int maxParallel) {
-        this(bridge, maxParallel, new EventBus());
+        this(bridge, maxParallel, new EventBus(), null);
     }
 
-    ParallelDispatchNode(StargateBridge bridge, int maxParallel, EventBus eventBus) {
+    ParallelDispatchNode(StargateBridge bridge, int maxParallel, EventBus eventBus, WorldmindMetrics metrics) {
         this.bridge = bridge;
         this.maxParallel = maxParallel;
         this.eventBus = eventBus;
+        this.metrics = metrics;
     }
 
     public Map<String, Object> apply(WorldmindState state) {
@@ -78,6 +83,8 @@ public class ParallelDispatchNode {
                 var directiveToDispatch = applyRetryContext(directive, retryContext);
 
                 futures.add(CompletableFuture.supplyAsync(() -> {
+                    MdcContext.setDirective(state.missionId(), directiveToDispatch.id(),
+                            directiveToDispatch.centurion());
                     try {
                         semaphore.acquire();
                         try {
@@ -91,8 +98,13 @@ public class ParallelDispatchNode {
                                            "description", directiveToDispatch.description()),
                                     Instant.now()));
 
+                            long startMs = System.currentTimeMillis();
                             var result = bridge.executeDirective(
                                     directiveToDispatch, projectContext, Path.of(projectPath));
+                            long elapsedMs = System.currentTimeMillis() - startMs;
+                            if (metrics != null) {
+                                metrics.recordDirectiveExecution(directiveToDispatch.centurion(), elapsedMs);
+                            }
 
                             eventBus.publish(new WorldmindEvent(
                                     result.directive().status() == DirectiveStatus.FAILED
@@ -131,6 +143,8 @@ public class ParallelDispatchNode {
                         log.error("Infrastructure error dispatching directive {}: {}",
                                 directive.id(), e.getMessage());
                         return errorOutcome(directive.id(), e.getMessage());
+                    } finally {
+                        MdcContext.clear();
                     }
                 }, executor));
             }

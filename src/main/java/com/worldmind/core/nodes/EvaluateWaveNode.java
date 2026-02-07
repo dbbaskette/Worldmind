@@ -2,7 +2,10 @@ package com.worldmind.core.nodes;
 
 import com.worldmind.core.events.EventBus;
 import com.worldmind.core.events.WorldmindEvent;
+import com.worldmind.core.logging.MdcContext;
+import com.worldmind.core.metrics.WorldmindMetrics;
 import com.worldmind.core.model.*;
+import com.worldmind.core.scheduler.OscillationDetector;
 import com.worldmind.core.seal.SealEvaluationService;
 import com.worldmind.core.state.WorldmindState;
 import com.worldmind.stargate.InstructionBuilder;
@@ -28,14 +31,22 @@ public class EvaluateWaveNode {
     private final StargateBridge bridge;
     private final SealEvaluationService sealService;
     private final EventBus eventBus;
+    private final WorldmindMetrics metrics;
+    private final OscillationDetector oscillationDetector;
 
-    public EvaluateWaveNode(StargateBridge bridge, SealEvaluationService sealService, EventBus eventBus) {
+    public EvaluateWaveNode(StargateBridge bridge, SealEvaluationService sealService,
+                            EventBus eventBus, WorldmindMetrics metrics,
+                            OscillationDetector oscillationDetector) {
         this.bridge = bridge;
         this.sealService = sealService;
         this.eventBus = eventBus;
+        this.metrics = metrics;
+        this.oscillationDetector = oscillationDetector;
     }
 
     public Map<String, Object> apply(WorldmindState state) {
+        MdcContext.setWave(state.missionId(), state.waveCount());
+        try {
         var waveIds = state.waveDirectiveIds();
         var directives = state.directives();
         var waveResults = state.waveDispatchResults();
@@ -129,6 +140,7 @@ public class EvaluateWaveNode {
             var sealDecision = sealService.evaluateSeal(testResult, reviewFeedback, directive);
             log.info("Seal evaluation for {}: {} — {}", id,
                     sealDecision.sealGranted() ? "GRANTED" : "DENIED", sealDecision.reason());
+            metrics.recordSealResult(sealDecision.sealGranted());
 
             if (sealDecision.sealGranted()) {
                 completedIds.add(id);
@@ -158,10 +170,20 @@ public class EvaluateWaveNode {
         if (missionStatus != null) updates.put("status", missionStatus.name());
 
         return updates;
+        } finally {
+            MdcContext.clear();
+        }
     }
 
     private FailureOutcome applyFailureStrategy(String id, Directive directive,
                                                   FailureStrategy action, String reason) {
+        if (action == FailureStrategy.RETRY) {
+            oscillationDetector.recordFailure(id, reason);
+            if (oscillationDetector.isOscillating(id)) {
+                log.warn("Oscillation detected for directive {} — overriding RETRY to ESCALATE", id);
+                action = FailureStrategy.ESCALATE;
+            }
+        }
         var outcome = new FailureOutcome();
         switch (action) {
             case RETRY -> {
@@ -176,6 +198,7 @@ public class EvaluateWaveNode {
                 outcome.missionFailed = true;
                 outcome.errors.add("Directive " + id + " escalated: " + reason);
                 log.warn("Directive {} ESCALATED — mission failed", id);
+                metrics.incrementEscalations(reason);
             }
             case REPLAN -> {
                 outcome.missionFailed = true;

@@ -3,6 +3,7 @@ package com.worldmind.core.engine;
 import com.worldmind.core.events.EventBus;
 import com.worldmind.core.graph.WorldmindGraph;
 import com.worldmind.core.llm.LlmService;
+import com.worldmind.core.metrics.WorldmindMetrics;
 import com.worldmind.core.model.*;
 import com.worldmind.core.nodes.*;
 import com.worldmind.core.scanner.ProjectScanner;
@@ -112,7 +113,7 @@ class MissionEngineTest {
                 null
         );
 
-        engine = new MissionEngine(graph, new EventBus());
+        engine = new MissionEngine(graph, new EventBus(), mock(WorldmindMetrics.class));
     }
 
     // =================================================================

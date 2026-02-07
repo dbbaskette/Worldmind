@@ -1,9 +1,11 @@
 package com.worldmind.dispatch.api;
 
-import com.worldmind.core.graph.WorldmindGraph;
+import com.worldmind.core.health.HealthCheckService;
+import com.worldmind.core.health.HealthStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -20,24 +22,45 @@ public class HealthController {
 
     private static final Logger log = LoggerFactory.getLogger(HealthController.class);
 
-    private final WorldmindGraph worldmindGraph;
+    private final HealthCheckService healthCheckService;
 
-    public HealthController(@Autowired(required = false) WorldmindGraph worldmindGraph) {
-        this.worldmindGraph = worldmindGraph;
+    public HealthController(@Autowired(required = false) HealthCheckService healthCheckService) {
+        this.healthCheckService = healthCheckService;
     }
 
     /**
      * GET /api/v1/health — System health check.
+     * Returns 200 if all components UP, 503 if any DOWN.
      */
     @GetMapping
-    public Map<String, Object> health() {
-        Map<String, Object> status = new LinkedHashMap<>();
-        status.put("status", worldmindGraph != null ? "UP" : "DEGRADED");
+    public ResponseEntity<Map<String, Object>> health() {
+        Map<String, Object> result = new LinkedHashMap<>();
 
-        Map<String, String> components = new LinkedHashMap<>();
-        components.put("graph", worldmindGraph != null ? "UP" : "DOWN");
-        status.put("components", components);
+        if (healthCheckService == null) {
+            result.put("status", "DOWN");
+            result.put("components", Map.of());
+            return ResponseEntity.status(503).body(result);
+        }
 
-        return status;
+        var checks = healthCheckService.checkAll();
+        boolean anyDown = false;
+
+        Map<String, Object> components = new LinkedHashMap<>();
+        for (var check : checks) {
+            Map<String, String> componentInfo = new LinkedHashMap<>();
+            componentInfo.put("status", check.status().name());
+            componentInfo.put("detail", check.detail());
+            components.put(check.component(), componentInfo);
+
+            if (check.status() == HealthStatus.Status.DOWN) {
+                anyDown = true;
+            }
+        }
+
+        result.put("status", anyDown ? "DOWN" : "UP");
+        result.put("components", components);
+
+        return anyDown ? ResponseEntity.status(503).body(result)
+                       : ResponseEntity.ok(result);
     }
 }

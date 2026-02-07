@@ -3,6 +3,8 @@ package com.worldmind.core.engine;
 import com.worldmind.core.events.EventBus;
 import com.worldmind.core.events.WorldmindEvent;
 import com.worldmind.core.graph.WorldmindGraph;
+import com.worldmind.core.logging.MdcContext;
+import com.worldmind.core.metrics.WorldmindMetrics;
 import com.worldmind.core.model.InteractionMode;
 import com.worldmind.core.model.MissionStatus;
 import com.worldmind.core.state.WorldmindState;
@@ -29,10 +31,12 @@ public class MissionEngine {
 
     private final WorldmindGraph worldmindGraph;
     private final EventBus eventBus;
+    private final WorldmindMetrics metrics;
 
-    public MissionEngine(WorldmindGraph worldmindGraph, EventBus eventBus) {
+    public MissionEngine(WorldmindGraph worldmindGraph, EventBus eventBus, WorldmindMetrics metrics) {
         this.worldmindGraph = worldmindGraph;
         this.eventBus = eventBus;
+        this.metrics = metrics;
     }
 
     /**
@@ -45,30 +49,38 @@ public class MissionEngine {
      */
     public WorldmindState runMission(String request, InteractionMode mode) {
         String missionId = generateMissionId();
-        log.info("Starting mission {} with mode {} — request: {}", missionId, mode, request);
+        MdcContext.setMission(missionId);
+        try {
+            log.info("Starting mission {} with mode {} — request: {}", missionId, mode, request);
 
-        eventBus.publish(new WorldmindEvent(
-                "mission.created", missionId, null,
-                Map.of("mode", mode.name(), "request", request),
-                Instant.now()));
+            eventBus.publish(new WorldmindEvent(
+                    "mission.created", missionId, null,
+                    Map.of("mode", mode.name(), "request", request),
+                    Instant.now()));
 
-        Map<String, Object> initialState = Map.of(
-                "missionId", missionId,
-                "request", request,
-                "interactionMode", mode.name(),
-                "status", MissionStatus.CLASSIFYING.name()
-        );
+            Map<String, Object> initialState = Map.of(
+                    "missionId", missionId,
+                    "request", request,
+                    "interactionMode", mode.name(),
+                    "status", MissionStatus.CLASSIFYING.name()
+            );
 
-        // Configure graph invocation with thread ID for checkpointing
-        var config = RunnableConfig.builder()
-                .threadId(missionId)
-                .build();
+            // Configure graph invocation with thread ID for checkpointing
+            var config = RunnableConfig.builder()
+                    .threadId(missionId)
+                    .build();
 
-        var result = worldmindGraph.getCompiledGraph()
-                .invoke(initialState, config);
+            var result = worldmindGraph.getCompiledGraph()
+                    .invoke(initialState, config);
 
-        return result.orElseThrow(() ->
-                new RuntimeException("Graph execution returned empty state for mission " + missionId));
+            var state = result.orElseThrow(() ->
+                    new RuntimeException("Graph execution returned empty state for mission " + missionId));
+
+            metrics.recordMissionResult(state.status().name());
+            return state;
+        } finally {
+            MdcContext.clear();
+        }
     }
 
     /**

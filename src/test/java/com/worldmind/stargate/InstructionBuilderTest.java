@@ -204,6 +204,42 @@ class InstructionBuilderTest {
         assertTrue(instruction.contains("spring"));
     }
 
+    // --- Prism instruction tests ---
+
+    @Test
+    void prismIncludesRefactoringDirectiveHeader() {
+        var directive = forgeDirective("DIR-300", "Extract helper methods");
+        var context = sampleContext();
+        var baseline = new TestResult("DIR-300", true, 15, 0, "All passed", 1000L);
+
+        String instruction = InstructionBuilder.buildPrismInstruction(directive, context, baseline);
+
+        assertTrue(instruction.contains("Refactoring Directive: DIR-300"));
+        assertTrue(instruction.contains("BEHAVIORAL EQUIVALENCE"));
+    }
+
+    @Test
+    void prismIncludesBaselineTestInfo() {
+        var directive = forgeDirective("DIR-301", "Reduce duplication");
+        var context = sampleContext();
+        var baseline = new TestResult("DIR-301", true, 20, 2, "Some failures", 1500L);
+
+        String instruction = InstructionBuilder.buildPrismInstruction(directive, context, baseline);
+
+        assertTrue(instruction.contains("Tests passed: true"));
+        assertTrue(instruction.contains("Total: 20, Failed: 2"));
+    }
+
+    @Test
+    void prismHandlesNullBaseline() {
+        var directive = forgeDirective("DIR-302", "Improve naming");
+        var context = sampleContext();
+
+        String instruction = InstructionBuilder.buildPrismInstruction(directive, context, null);
+
+        assertTrue(instruction.contains("No baseline tests available"));
+    }
+
     // --- Test helpers ---
 
     private Directive forgeDirective(String id, String description) {

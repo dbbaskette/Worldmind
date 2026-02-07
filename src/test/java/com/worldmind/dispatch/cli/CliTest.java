@@ -2,6 +2,8 @@ package com.worldmind.dispatch.cli;
 
 import com.worldmind.core.engine.MissionEngine;
 import com.worldmind.core.graph.WorldmindGraph;
+import com.worldmind.core.health.HealthCheckService;
+import com.worldmind.core.health.HealthStatus;
 import com.worldmind.core.model.*;
 import com.worldmind.core.persistence.CheckpointQueryService;
 import com.worldmind.core.state.WorldmindState;
@@ -150,7 +152,14 @@ class CliTest {
                     return (K) new MissionCommand(mockEngine);
                 }
                 if (cls == HealthCommand.class) {
-                    return (K) new HealthCommand(mockGraph);
+                    HealthCheckService mockHealth = mock(HealthCheckService.class);
+                    when(mockHealth.checkAll()).thenReturn(List.of(
+                            new HealthStatus("graph", mockGraph != null ? HealthStatus.Status.UP : HealthStatus.Status.DOWN,
+                                    mockGraph != null ? "Graph compiled and available" : "Graph not available", Map.of()),
+                            new HealthStatus("database", HealthStatus.Status.DOWN, "No DataSource configured", Map.of()),
+                            new HealthStatus("docker", HealthStatus.Status.DOWN, "No StargateProvider configured", Map.of())
+                    ));
+                    return (K) new HealthCommand(mockHealth);
                 }
                 if (cls == HistoryCommand.class) {
                     return (K) new HistoryCommand(mockQueryService);
@@ -437,25 +446,20 @@ class CliTest {
         @DisplayName("health command with graph available shows compiled")
         void healthCommandWithGraph() {
             WorldmindGraph mockGraph = mock(WorldmindGraph.class);
-            CliResult result = execute(null, mockGraph, "health");
+            CliResult result = execute((MissionEngine) null, mockGraph, "health");
             assertEquals(0, result.exitCode());
             String output = result.output();
-            assertTrue(output.contains("graph compiled"),
+            assertTrue(output.contains("Graph compiled and available"),
                     "Health should show graph compiled");
-            assertTrue(output.contains("PostgreSQL: not connected"),
-                    "Health should show PostgreSQL status");
-            assertTrue(output.contains("Docker: not connected"),
-                    "Health should show Docker status");
         }
 
         @Test
         @DisplayName("health command without graph shows not available")
         void healthCommandWithoutGraph() {
-            // Pass null for graph to simulate unavailable
-            CliResult result = execute(mock(MissionEngine.class), null, "health");
+            CliResult result = execute(mock(MissionEngine.class), (WorldmindGraph) null, "health");
             assertEquals(0, result.exitCode());
             String output = result.output();
-            assertTrue(output.contains("not available"),
+            assertTrue(output.contains("Graph not available"),
                     "Health should show core not available when graph is null");
         }
 

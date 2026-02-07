@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Dev profile: standard text output -->
+    <springProfile name="default,dev">
+        <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} -- %msg%n</pattern>
+            </encoder>
+        </appender>
+        <root level="WARN">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+        <logger name="com.worldmind" level="INFO"/>
+    </springProfile>
+
+    <!-- Production profile: JSON structured output -->
+    <springProfile name="prod,production">
+        <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                <includeMdcKeyName>missionId</includeMdcKeyName>
+                <includeMdcKeyName>directiveId</includeMdcKeyName>
+                <includeMdcKeyName>centurionType</includeMdcKeyName>
+                <includeMdcKeyName>waveNumber</includeMdcKeyName>
+            </encoder>
+        </appender>
+        <root level="WARN">
+            <appender-ref ref="JSON"/>
+        </root>
+        <logger name="com.worldmind" level="INFO"/>
+    </springProfile>
+</configuration>
