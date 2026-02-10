@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useMission } from '../hooks/useMission'
 import { useSse } from '../hooks/useSse'
 import { StatusBadge } from './StatusBadge'
@@ -9,6 +10,41 @@ import { ApprovalPanel } from './ApprovalPanel'
 
 interface MissionDetailProps {
   missionId: string
+}
+
+function ErrorPanel({ errors, status }: { errors: string[]; status: string }) {
+  const isOldCompleted = status === 'COMPLETED'
+  const [expanded, setExpanded] = useState(!isOldCompleted)
+
+  return (
+    <div className={`mt-6 rounded-lg border p-4 ${
+      isOldCompleted ? 'bg-gray-50 border-gray-200' : 'bg-red-50 border-red-300'
+    }`}>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center justify-between w-full text-left"
+      >
+        <h3 className={`text-sm font-semibold ${isOldCompleted ? 'text-gray-600' : 'text-red-900'}`}>
+          Errors ({errors.length})
+        </h3>
+        <svg
+          className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''} ${
+            isOldCompleted ? 'text-gray-400' : 'text-red-400'
+          }`}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {expanded && (
+        <ul className={`mt-2 space-y-1 text-sm ${isOldCompleted ? 'text-gray-600' : 'text-red-700'}`}>
+          {errors.map((error, idx) => (
+            <li key={idx}>{error}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
 }
 
 export function MissionDetail({ missionId }: MissionDetailProps) {
@@ -109,16 +145,9 @@ export function MissionDetail({ missionId }: MissionDetailProps) {
       {/* Event Log */}
       <EventLog events={events} connectionStatus={connectionStatus} />
 
-      {/* Errors */}
+      {/* Errors — expanded for active missions, collapsed for terminal ones */}
       {mission.errors.length > 0 && (
-        <div className="mt-6 bg-red-50 border border-red-300 rounded-lg p-4">
-          <h3 className="text-sm font-semibold text-red-900 mb-2">Errors</h3>
-          <ul className="space-y-1 text-sm text-red-700">
-            {mission.errors.map((error, idx) => (
-              <li key={idx}>{error}</li>
-            ))}
-          </ul>
-        </div>
+        <ErrorPanel errors={mission.errors} status={mission.status} />
       )}
     </div>
   )

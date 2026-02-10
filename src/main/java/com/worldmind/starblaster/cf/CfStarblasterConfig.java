@@ -1,5 +1,6 @@
 package com.worldmind.starblaster.cf;
 
+import com.worldmind.starblaster.InstructionStore;
 import com.worldmind.starblaster.StarblasterProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -28,7 +29,8 @@ public class CfStarblasterConfig {
     @Bean
     public StarblasterProvider cloudFoundryStarblasterProvider(CloudFoundryProperties cfProperties,
                                                          GitWorkspaceManager gitWorkspaceManager,
-                                                         CfApiClient cfApiClient) {
-        return new CloudFoundryStarblasterProvider(cfProperties, gitWorkspaceManager, cfApiClient);
+                                                         CfApiClient cfApiClient,
+                                                         InstructionStore instructionStore) {
+        return new CloudFoundryStarblasterProvider(cfProperties, gitWorkspaceManager, cfApiClient, instructionStore);
     }
 }

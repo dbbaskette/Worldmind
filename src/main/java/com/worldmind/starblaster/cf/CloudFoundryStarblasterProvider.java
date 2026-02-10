@@ -1,12 +1,11 @@
 package com.worldmind.starblaster.cf;
 
+import com.worldmind.starblaster.InstructionStore;
 import com.worldmind.starblaster.StarblasterProvider;
 import com.worldmind.starblaster.StarblasterRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Base64;
-import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -23,6 +22,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>This class uses {@link CfApiClient} to call the CF Cloud Controller
  * API v3 directly over HTTP, rather than shelling out to the {@code cf} CLI
  * (which is not available in the Java buildpack container).
+ *
+ * <p>Instruction text is stored in {@link InstructionStore} and fetched by
+ * the CF task via HTTP, since CF task commands are limited to 4096 characters.
  */
 public class CloudFoundryStarblasterProvider implements StarblasterProvider {
 
@@ -33,6 +35,7 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
     private final CloudFoundryProperties cfProperties;
     private final GitWorkspaceManager gitWorkspaceManager;
     private final CfApiClient cfApiClient;
+    private final InstructionStore instructionStore;
 
     /**
      * Tracks starblasterId to app name mapping so waitForCompletion/captureOutput/teardown
@@ -42,10 +45,12 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
 
     public CloudFoundryStarblasterProvider(CloudFoundryProperties cfProperties,
                                            GitWorkspaceManager gitWorkspaceManager,
-                                           CfApiClient cfApiClient) {
+                                           CfApiClient cfApiClient,
+                                           InstructionStore instructionStore) {
         this.cfProperties = cfProperties;
         this.gitWorkspaceManager = gitWorkspaceManager;
         this.cfApiClient = cfApiClient;
+        this.instructionStore = instructionStore;
     }
 
     @Override
@@ -65,19 +70,23 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
                 : cfProperties.getTaskMemoryMb();
         var diskMb = cfProperties.getTaskDiskMb();
 
-        // Base64-encode the instruction so it survives shell escaping
-        var instructionB64 = Base64.getEncoder().encodeToString(
-                request.instructionText().getBytes(StandardCharsets.UTF_8));
+        // Store instruction text for HTTP retrieval by the task.
+        // CF task commands are limited to 4096 chars, so we can't inline the instruction.
+        var instructionKey = taskName;
+        instructionStore.put(instructionKey, request.instructionText());
+
+        var orchestratorUrl = cfProperties.getOrchestratorUrl();
+        var instructionUrl = orchestratorUrl + "/api/internal/instructions/" + instructionKey;
 
         // Build the task command that runs inside the CF app container.
-        // Clone from default branch, create a directive branch, write the
-        // instruction file (from base64), run Goose, commit, and push.
+        // Clone from default branch, create a directive branch, fetch the
+        // instruction from the orchestrator, run Goose, commit, and push.
         var taskCommand = String.join(" && ",
                 "git clone %s /workspace".formatted(gitRemoteUrl),
                 "cd /workspace",
                 "git checkout -b %s".formatted(branchName),
                 "mkdir -p .worldmind/directives",
-                "echo '%s' | base64 -d > .worldmind/directives/%s.md".formatted(instructionB64, directiveId),
+                "curl -sf '%s' > .worldmind/directives/%s.md".formatted(instructionUrl, directiveId),
                 "goose run .worldmind/directives/%s.md".formatted(directiveId),
                 "git add -A",
                 "git commit -m 'DIR-%s'".formatted(directiveId),
@@ -163,6 +172,7 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
                     starblasterId, e.getMessage());
         } finally {
             starblasterAppNames.remove(starblasterId);
+            instructionStore.remove(starblasterId);
         }
     }
 

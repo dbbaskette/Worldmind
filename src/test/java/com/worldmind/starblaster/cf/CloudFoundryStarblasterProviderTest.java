@@ -1,5 +1,6 @@
 package com.worldmind.starblaster.cf;
 
+import com.worldmind.starblaster.InstructionStore;
 import com.worldmind.starblaster.StarblasterRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,10 +39,12 @@ class CloudFoundryStarblasterProviderTest {
         cfProperties.setTaskMemoryMb(2048);
         cfProperties.setTaskDiskMb(4096);
         cfProperties.setTaskTimeoutSeconds(600);
+        cfProperties.setOrchestratorUrl("https://worldmind.example.com");
 
         var gitWorkspaceManager = new GitWorkspaceManager(cfProperties.getGitRemoteUrl());
         stubApiClient = new StubCfApiClient(cfProperties);
-        provider = new CloudFoundryStarblasterProvider(cfProperties, gitWorkspaceManager, stubApiClient);
+        var instructionStore = new InstructionStore();
+        provider = new CloudFoundryStarblasterProvider(cfProperties, gitWorkspaceManager, stubApiClient, instructionStore);
     }
 
     // --- openStarblaster tests ---
@@ -60,6 +63,7 @@ class CloudFoundryStarblasterProviderTest {
         assertEquals("starblaster-forge-DIR-001", call.taskName);
         assertTrue(call.command.contains("git clone"), "Should contain git clone: " + call.command);
         assertTrue(call.command.contains("worldmind/DIR-001"), "Should contain branch name: " + call.command);
+        assertTrue(call.command.contains("curl"), "Should contain curl: " + call.command);
         assertTrue(call.command.contains("goose run"), "Should contain goose run: " + call.command);
         assertTrue(call.command.contains("git push"), "Should contain git push: " + call.command);
     }

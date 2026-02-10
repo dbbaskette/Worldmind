@@ -29,6 +29,7 @@ worldmind:
     space: ${CF_SPACE:}
     cf-username: ${CF_USERNAME:}
     cf-password: ${CF_PASSWORD:}
+    orchestrator-url: https://${vcap.application.uris[0]:localhost:8080}
     centurion-apps:
       forge: ${CENTURION_FORGE_APP:centurion-forge}
       gauntlet: ${CENTURION_GAUNTLET_APP:centurion-gauntlet}

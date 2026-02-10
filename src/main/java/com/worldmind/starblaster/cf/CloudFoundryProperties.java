@@ -58,6 +58,9 @@ public class CloudFoundryProperties {
     /** CF password for API authentication */
     private String cfPassword = "";
 
+    /** Orchestrator base URL, used by CF tasks to fetch instructions via HTTP */
+    private String orchestratorUrl = "";
+
     // -- Getters and Setters --
 
     public String getApiUrl() {
@@ -138,5 +141,13 @@ public class CloudFoundryProperties {
 
     public void setCfPassword(String cfPassword) {
         this.cfPassword = cfPassword;
+    }
+
+    public String getOrchestratorUrl() {
+        return orchestratorUrl;
+    }
+
+    public void setOrchestratorUrl(String orchestratorUrl) {
+        this.orchestratorUrl = orchestratorUrl;
     }
 }
