@@ -84,6 +84,8 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
         var taskCommand = String.join(" && ",
                 "git clone %s /workspace".formatted(gitRemoteUrl),
                 "cd /workspace",
+                "git config user.name 'Worldmind Centurion'",
+                "git config user.email 'centurion@worldmind.local'",
                 "git checkout -b %s".formatted(branchName),
                 "mkdir -p .worldmind/directives",
                 "curl -sfk '%s' > .worldmind/directives/%s.md".formatted(instructionUrl, directiveId),
