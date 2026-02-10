@@ -32,7 +32,7 @@ class ForgeIntegrationTest {
                 .build();
         var dockerClient = DockerClientImpl.getInstance(dockerConfig, httpClient);
 
-        var provider = new DockerStarblasterProvider(dockerClient);
+        var provider = new DockerStarblasterProvider(dockerClient, "ghcr.io/dbbaskette");
         var properties = new StarblasterProperties();
         var manager = new StarblasterManager(provider, properties);
 

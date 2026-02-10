@@ -28,7 +28,7 @@ usage() {
   echo "  timeline <id>       Show checkpoint history"
   echo "  up                  Start everything in Docker (Postgres + Worldmind)"
   echo "  down                Stop all Docker services"
-  echo "  cf-push             Build and push to Cloud Foundry"
+  echo "  cf-push [vars-file] Build and push to Cloud Foundry (default: cf-vars.yml)"
   echo ""
   echo "Environment:"
   echo "  WORLDMIND_PROFILE   Spring profile (default: local)"
@@ -60,9 +60,10 @@ case "$1" in
     exit 0
     ;;
   cf-push)
-    echo "Building and pushing to Cloud Foundry..."
+    VARS_FILE="${2:-cf-vars.yml}"
+    echo "Building and pushing to Cloud Foundry (vars: $VARS_FILE)..."
     ./mvnw -q clean package -DskipTests
-    cf push
+    cf push --vars-file "$VARS_FILE"
     exit 0
     ;;
 esac

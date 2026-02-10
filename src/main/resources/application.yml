@@ -62,7 +62,8 @@ worldmind:
     wave-cooldown-seconds: ${WAVE_COOLDOWN_SECONDS:60}
     memory-limit-mb: 4096
     cpu-count: 2
-    image: worldmind/centurion-forge:latest
+    image-registry: ${CENTURION_IMAGE_REGISTRY:ghcr.io/dbbaskette}
+    image: ${CENTURION_IMAGE_REGISTRY:ghcr.io/dbbaskette}/centurion-forge:latest
   security:
     jwt:
       secret: ${WORLDMIND_JWT_SECRET:worldmind-dev-secret-change-in-production}

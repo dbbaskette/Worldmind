@@ -30,7 +30,8 @@ public class StarblasterConfig {
 
     @Bean
     @ConditionalOnProperty(name = "worldmind.starblaster.provider", havingValue = "docker", matchIfMissing = true)
-    public StarblasterProvider dockerStarblasterProvider(DockerClient dockerClient) {
-        return new DockerStarblasterProvider(dockerClient);
+    public StarblasterProvider dockerStarblasterProvider(DockerClient dockerClient,
+                                                            StarblasterProperties properties) {
+        return new DockerStarblasterProvider(dockerClient, properties.getImageRegistry());
     }
 }

@@ -1,0 +1,19 @@
+# Cloud Foundry deployment variables
+# Copy to cf-vars-local.yml and fill in your values.
+# Usage: ./run.sh cf-push  (reads cf-vars.yml by default)
+
+# CF API and org/space
+cf-api-url: https://api.sys.example.com
+cf-org: my-org
+cf-space: my-space
+
+# Git remote for workspace sharing between centurions
+git-remote-url: https://github.com/your-org/your-repo.git
+
+# Centurion image registry (no trailing slash)
+centurion-image-registry: ghcr.io/dbbaskette
+
+# Centurion CF app names
+centurion-forge-app: centurion-forge
+centurion-gauntlet-app: centurion-gauntlet
+centurion-vigil-app: centurion-vigil

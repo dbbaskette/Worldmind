@@ -1,4 +1,4 @@
-FROM worldmind/centurion-base:latest
+FROM ghcr.io/dbbaskette/centurion-base:latest
 
 LABEL com.worldmind.centurion="prism"
 LABEL com.worldmind.description="Refactoring centurion with before/after test verification"

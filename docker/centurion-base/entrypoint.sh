@@ -14,59 +14,57 @@ mkdir -p "$GOOSE_CONFIG_DIR"
 if [ -n "$VCAP_SERVICES" ]; then
     echo "[entrypoint] Cloud Foundry environment detected, parsing VCAP_SERVICES..."
 
-    # Extract GenAI service credentials
-    # VCAP_SERVICES structure for GenAI tile:
-    # { "genai": [{ "credentials": { "model_provider": "anthropic", "model_name": "claude-sonnet-4-20250514", "api_key": "sk-..." } }] }
-    # OR it might be under a different service label
-
-    # Try all service labels, looking for GenAI credentials
-    PROVIDER=$(echo "$VCAP_SERVICES" | python3 -c "
-import sys, json
+    # Parse credentials from the bound worldmind-model service.
+    # Supports two formats:
+    #   1. GenAI tile: { "model_provider": "anthropic", "model_name": "...", "api_key": "..." }
+    #   2. OpenAI-compatible: { "uri": "https://...", "api_key": "...", "model": "..." }
+    eval "$(echo "$VCAP_SERVICES" | python3 -c "
+import sys, json, os
 vcap = json.load(sys.stdin)
 for label in vcap:
     for svc in vcap[label]:
         creds = svc.get('credentials', {})
+        # Detect provider
         if 'model_provider' in creds:
-            print(creds['model_provider'])
-            sys.exit(0)
-        if 'api_key' in creds and 'anthropic' in str(creds).lower():
-            print('anthropic')
-            sys.exit(0)
-print('anthropic')
-" 2>/dev/null || echo "anthropic")
+            print('PROVIDER=' + creds['model_provider'])
+        elif any(k in creds for k in ('uri', 'url', 'api_url', 'api_base')):
+            print('PROVIDER=openai')
+        else:
+            continue
+        # Model name
+        model = creds.get('model_name') or creds.get('model') or os.environ.get('GOOSE_MODEL', '')
+        if model:
+            print('MODEL=' + model)
+        # API key
+        api_key = creds.get('api_key') or creds.get('apiKey') or creds.get('key', '')
+        if api_key:
+            print('API_KEY=' + api_key)
+        # API URL (OpenAI-compatible endpoint)
+        api_url = creds.get('uri') or creds.get('url') or creds.get('api_url') or creds.get('api_base', '')
+        if api_url:
+            print('API_URL=' + api_url)
+        sys.exit(0)
+" 2>/dev/null)"
 
-    MODEL=$(echo "$VCAP_SERVICES" | python3 -c "
-import sys, json
-vcap = json.load(sys.stdin)
-for label in vcap:
-    for svc in vcap[label]:
-        creds = svc.get('credentials', {})
-        if 'model_name' in creds:
-            print(creds['model_name'])
-            sys.exit(0)
-print('claude-sonnet-4-20250514')
-" 2>/dev/null || echo "claude-sonnet-4-20250514")
+    PROVIDER="${PROVIDER:-openai}"
+    MODEL="${MODEL:-}"
+    API_KEY="${API_KEY:-}"
+    API_URL="${API_URL:-}"
 
-    API_KEY=$(echo "$VCAP_SERVICES" | python3 -c "
-import sys, json
-vcap = json.load(sys.stdin)
-for label in vcap:
-    for svc in vcap[label]:
-        creds = svc.get('credentials', {})
-        if 'api_key' in creds:
-            print(creds['api_key'])
-            sys.exit(0)
-print('')
-" 2>/dev/null || echo "")
-
-    # Set provider-specific API key env var
-    if [ "$PROVIDER" = "anthropic" ] && [ -n "$API_KEY" ]; then
-        export ANTHROPIC_API_KEY="$API_KEY"
-    elif [ "$PROVIDER" = "openai" ] && [ -n "$API_KEY" ]; then
-        export OPENAI_API_KEY="$API_KEY"
+    # Set provider-specific env vars for Goose
+    if [ "$PROVIDER" = "openai" ]; then
+        [ -n "$API_KEY" ] && export OPENAI_API_KEY="$API_KEY"
+        if [ -n "$API_URL" ]; then
+            # Goose uses OPENAI_HOST for custom endpoints
+            export OPENAI_HOST="$API_URL"
+        fi
+    elif [ "$PROVIDER" = "anthropic" ]; then
+        [ -n "$API_KEY" ] && export ANTHROPIC_API_KEY="$API_KEY"
+    elif [ "$PROVIDER" = "google" ]; then
+        [ -n "$API_KEY" ] && export GOOGLE_API_KEY="$API_KEY"
     fi
 
-    echo "[entrypoint] CF config: provider=$PROVIDER, model=$MODEL"
+    echo "[entrypoint] CF config: provider=$PROVIDER, model=$MODEL, api_url=${API_URL:-N/A}"
 else
     # --- Local/Docker environment (existing logic) ---
     PROVIDER="${GOOSE_PROVIDER:-openai}"

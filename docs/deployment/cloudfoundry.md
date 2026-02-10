@@ -1,13 +1,30 @@
 # Deploying Worldmind on Cloud Foundry
 
+## Component Overview
+
+| Component | Type | Runtime | Model | Database | Description |
+|-----------|------|---------|:-----:|:--------:|-------------|
+| **worldmind** | CF app (Java buildpack) | Long-running process, 1 instance | Yes | Yes | Spring Boot orchestrator — classifies requests, plans missions, dispatches centurions, evaluates results |
+| **centurion-forge** | CF app (Docker image) | 0 instances; runs as CF tasks | Yes | No | Code generation — Goose agent writes implementation code |
+| **centurion-gauntlet** | CF app (Docker image) | 0 instances; runs as CF tasks | Yes | No | Test execution — Goose agent writes and runs tests |
+| **centurion-vigil** | CF app (Docker image) | 0 instances; runs as CF tasks | Yes | No | Code review — Goose agent reviews code for quality |
+| **worldmind-postgres** | CF service | Managed by marketplace tile | -- | -- | PostgreSQL for checkpoint state and mission persistence |
+| **worldmind-model** | CF service | Managed by marketplace tile | -- | -- | OpenAI-compatible LLM endpoint, bound to orchestrator + all centurions |
+
+**How centurions run:** The orchestrator calls `cf run-task centurion-forge` (or gauntlet/vigil) to launch a short-lived CF task on the Docker-based app. The task clones the mission git branch, runs Goose with the directive, commits results, and exits. The app itself has 0 long-running instances — it only exists as a task host.
+
+**How the model is consumed:**
+- **Orchestrator** — Spring AI `ChatClient` for classify, plan, and seal evaluation nodes. Credentials are auto-mapped from the `worldmind-model` binding via `CfModelServiceProcessor` (java-cfenv).
+- **Centurions** — Goose CLI reads `VCAP_SERVICES` at container startup (`entrypoint.sh`) and configures itself with the `worldmind-model` binding credentials (API URL + key).
+
 ## Prerequisites
 
 - **CF CLI v8+** installed and authenticated (`cf login`)
 - **Java 21** and **Maven** installed locally (for building the orchestrator JAR)
-- **Docker images** for centurions pushed to a registry accessible by the CF foundation:
-  - `worldmind/centurion-forge:latest`
-  - `worldmind/centurion-gauntlet:latest`
-  - `worldmind/centurion-vigil:latest`
+- **Docker images** for centurions pushed to a registry accessible by the CF foundation (registry is configurable via `cf-vars.yml`):
+  - `{registry}/centurion-forge:latest`
+  - `{registry}/centurion-gauntlet:latest`
+  - `{registry}/centurion-vigil:latest`
 - CF foundation must have **Diego Docker support enabled**:
   ```bash
   cf feature-flag diego_docker
@@ -43,11 +60,27 @@ On Cloud Foundry, centurions share work through git branches rather than shared 
 
 1. Create or identify a git repository for workspace coordination
 2. Add a deploy key with read/write access
-3. Provide the remote URL via either:
-   - Config property: `worldmind.cf.git-remote-url`
-   - Per-mission API parameter: `git_remote_url`
+3. Provide the remote URL in `cf-vars.yml` (or per-mission via the `git_remote_url` API parameter)
 
-## 3. Deploy
+## 3. Configure Variables
+
+All CF-specific properties are supplied via a vars file that `cf push` reads with `--vars-file`. Copy and edit `cf-vars.yml`:
+
+```yaml
+# cf-vars.yml
+cf-api-url: https://api.sys.example.com
+cf-org: my-org
+cf-space: my-space
+git-remote-url: https://github.com/your-org/your-repo.git
+centurion-image-registry: ghcr.io/dbbaskette
+centurion-forge-app: centurion-forge
+centurion-gauntlet-app: centurion-gauntlet
+centurion-vigil-app: centurion-vigil
+```
+
+The `manifest.yml` uses `((variable))` substitution syntax. All values in this file flow into the manifest at deploy time — no `cf set-env` needed.
+
+## 4. Deploy
 
 Build and push all applications:
 
@@ -55,15 +88,26 @@ Build and push all applications:
 ./run.sh cf-push
 ```
 
-This runs `./mvnw clean package -DskipTests` then `cf push`, deploying:
-- **worldmind** -- the Spring Boot orchestrator (1 instance)
-- **centurion-forge** -- code generation (0 instances, task host)
-- **centurion-gauntlet** -- testing (0 instances, task host)
-- **centurion-vigil** -- code review (0 instances, task host)
+This runs `./mvnw clean package -DskipTests` then `cf push --vars-file cf-vars.yml`, deploying all components listed in the Component Overview above.
 
-The `manifest.yml` binds `worldmind-postgres` and `worldmind-model` to the orchestrator, and `worldmind-model` to each centurion.
+To use a different vars file (e.g., for production):
 
-## 4. How java-cfenv Auto-Binds Services
+```bash
+./run.sh cf-push cf-vars-production.yml
+```
+
+## 5. How Services Are Bound
+
+The `manifest.yml` binds services as follows:
+
+| App | `worldmind-postgres` | `worldmind-model` |
+|-----|:--------------------:|:-----------------:|
+| worldmind (orchestrator) | Yes | Yes |
+| centurion-forge | -- | Yes |
+| centurion-gauntlet | -- | Yes |
+| centurion-vigil | -- | Yes |
+
+### Orchestrator service binding (java-cfenv)
 
 The orchestrator includes `java-cfenv-boot` which automatically parses `VCAP_SERVICES` at startup:
 
@@ -74,7 +118,18 @@ The orchestrator includes `java-cfenv-boot` which automatically parses `VCAP_SER
   - `spring.ai.openai.api-key` from the service API key
   - `spring.ai.openai.chat.options.model` from service metadata or `GOOSE_MODEL` env var
 
-## 5. Architecture: Git-Based Workspace Pattern
+### Centurion service binding (entrypoint.sh)
+
+Centurion Docker containers parse `VCAP_SERVICES` at startup via `entrypoint.sh`. Two credential formats are supported:
+
+| Format | Fields | Provider |
+|--------|--------|----------|
+| GenAI tile | `model_provider`, `model_name`, `api_key` | Detected from `model_provider` |
+| OpenAI-compatible | `uri`/`url`, `api_key`, `model` | Defaults to `openai` |
+
+The entrypoint sets `OPENAI_HOST` + `OPENAI_API_KEY` (or `ANTHROPIC_API_KEY` / `GOOGLE_API_KEY` depending on provider) and writes a Goose `profiles.yaml` with the detected model configuration.
+
+## 6. Architecture: Git-Based Workspace Pattern
 
 On Cloud Foundry, centurions cannot share a local filesystem the way Docker volumes allow on a single host. Instead, Worldmind uses a git-based workspace pattern:
 
@@ -88,31 +143,27 @@ On Cloud Foundry, centurions cannot share a local filesystem the way Docker volu
 
 This gives each centurion an isolated working copy while maintaining a shared, ordered view of changes through git history.
 
-## 6. Configuration
+## 7. Configuration Reference
 
-Set CF-specific properties so the orchestrator can locate the centurion apps and invoke tasks:
+### Vars file properties (cf-vars.yml)
 
-```bash
-cf set-env worldmind worldmind.cf.api-url https://api.sys.example.com
-cf set-env worldmind worldmind.cf.org my-org
-cf set-env worldmind worldmind.cf.space my-space
-cf set-env worldmind worldmind.cf.centurion-apps.forge centurion-forge
-cf set-env worldmind worldmind.cf.centurion-apps.gauntlet centurion-gauntlet
-cf set-env worldmind worldmind.cf.centurion-apps.vigil centurion-vigil
-cf set-env worldmind worldmind.cf.git-remote-url https://github.com/your-org/your-repo.git
-```
+| Variable | Description |
+|----------|-------------|
+| `cf-api-url` | CF API endpoint (e.g., `https://api.sys.example.com`) |
+| `cf-org` | CF org name |
+| `cf-space` | CF space name |
+| `git-remote-url` | Git remote for workspace sharing between centurions |
+| `centurion-image-registry` | Docker image registry prefix (e.g., `ghcr.io/dbbaskette`) |
+| `centurion-forge-app` | CF app name for Forge centurion |
+| `centurion-gauntlet-app` | CF app name for Gauntlet centurion |
+| `centurion-vigil-app` | CF app name for Vigil centurion |
 
-Restage after setting environment variables:
-
-```bash
-cf restage worldmind
-```
-
-### Environment Variable Reference
+### Application properties
 
 | Property                                  | Env Var Override       | Description                                 | Default          |
 |-------------------------------------------|------------------------|---------------------------------------------|------------------|
 | `worldmind.starblaster.provider`          | `STARBLASTER_PROVIDER` | Provider type                               | `docker`         |
+| `worldmind.starblaster.image-registry`    | `CENTURION_IMAGE_REGISTRY` | Docker image registry for centurions    | `ghcr.io/dbbaskette` |
 | `worldmind.starblaster.max-parallel`      | --                     | Max concurrent centurion tasks              | `3` (CF profile) |
 | `worldmind.starblaster.wave-cooldown-seconds` | --                | Delay between waves                         | `30` (CF profile)|
 | `worldmind.cf.api-url`                    | --                     | CF API endpoint                             | --               |
@@ -126,7 +177,7 @@ cf restage worldmind
 | `GOOSE_MODEL`                             | `GOOSE_MODEL`          | LLM model name (if not in service metadata) | --               |
 | `SPRING_PROFILES_ACTIVE`                  | `SPRING_PROFILES_ACTIVE` | Must include `cf`                        | --               |
 
-## 7. API Usage with `git_remote_url`
+## 8. API Usage with `git_remote_url`
 
 The mission API accepts an optional `git_remote_url` parameter that overrides the configured `worldmind.cf.git-remote-url`:
 
@@ -143,7 +194,7 @@ curl -X POST https://worldmind.apps.example.com/api/v1/missions \
 
 The React dashboard also includes a "Git Remote URL" field in the mission submission form.
 
-## 8. Troubleshooting
+## 9. Troubleshooting
 
 ### Check task status
 

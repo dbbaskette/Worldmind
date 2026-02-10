@@ -220,6 +220,7 @@ Worldmind uses five specialized Centurion agents, each with distinct capabilitie
 | `GOOSE_MODEL` | Model for Goose worker agents | `qwen2.5-coder-32b` | No |
 | `GOOSE_PROVIDER` | LLM provider (`openai`, `anthropic`) | `openai` | No |
 | `LM_STUDIO_URL` | OpenAI-compatible endpoint URL | `http://host.docker.internal:1234/v1` | No |
+| `CENTURION_IMAGE_REGISTRY` | Docker image registry for centurions | `ghcr.io/dbbaskette` | No |
 | `STARBLASTER_PROVIDER` | Container provider (`docker`, `cloudfoundry`) | `docker` | No |
 | `WORLDMIND_PROFILE` | Spring profile | `local` | No |
 | `WORLDMIND_PORT` | Server port | `8080` | No |

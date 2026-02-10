@@ -352,7 +352,7 @@ docker run -d \
   -e MCP_CHRONICLE_URL=http://host.docker.internal:3002 \
   -e MCP_SPARK_URL=http://host.docker.internal:3003 \
   --memory=4g --cpus=2 \
-  worldmind/centurion-forge:latest \
+  ghcr.io/dbbaskette/centurion-forge:latest \
   goose run --instructions /instructions/directive.md
 ```
 

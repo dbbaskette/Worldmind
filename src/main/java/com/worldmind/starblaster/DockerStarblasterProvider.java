@@ -26,20 +26,21 @@ import java.util.concurrent.TimeUnit;
 public class DockerStarblasterProvider implements StarblasterProvider {
 
     private static final Logger log = LoggerFactory.getLogger(DockerStarblasterProvider.class);
-    private static final String IMAGE_PREFIX = "worldmind/centurion-";
     private static final String IMAGE_TAG = ":latest";
 
     private final DockerClient dockerClient;
+    private final String imageRegistry;
 
-    public DockerStarblasterProvider(DockerClient dockerClient) {
+    public DockerStarblasterProvider(DockerClient dockerClient, String imageRegistry) {
         this.dockerClient = dockerClient;
+        this.imageRegistry = imageRegistry;
     }
 
     @Override
     public String openStarblaster(StarblasterRequest request) {
         String type = request.centurionType().toLowerCase();
         String containerName = "starblaster-" + type + "-" + request.directiveId();
-        String imageName = IMAGE_PREFIX + type + IMAGE_TAG;
+        String imageName = imageRegistry + "/centurion-" + type + IMAGE_TAG;
         log.info("Opening Starblaster {} for directive {} (image: {})",
                 containerName, request.directiveId(), imageName);
 

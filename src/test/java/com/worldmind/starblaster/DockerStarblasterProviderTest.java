@@ -33,7 +33,7 @@ class DockerStarblasterProviderTest {
     @BeforeEach
     void setUp() {
         dockerClient = mock(DockerClient.class);
-        provider = new DockerStarblasterProvider(dockerClient);
+        provider = new DockerStarblasterProvider(dockerClient, "ghcr.io/dbbaskette");
     }
 
     // ── openStarblaster tests ──────────────────────────────────────────────
@@ -53,7 +53,7 @@ class DockerStarblasterProviderTest {
         String containerId = provider.openStarblaster(request);
 
         assertEquals("container-abc123", containerId);
-        verify(dockerClient).createContainerCmd("worldmind/centurion-forge:latest");
+        verify(dockerClient).createContainerCmd("ghcr.io/dbbaskette/centurion-forge:latest");
         verify(dockerClient).startContainerCmd("container-abc123");
         verify(startCmd).exec();
     }
@@ -71,7 +71,7 @@ class DockerStarblasterProviderTest {
 
         provider.openStarblaster(request);
 
-        verify(dockerClient).createContainerCmd("worldmind/centurion-vigil:latest");
+        verify(dockerClient).createContainerCmd("ghcr.io/dbbaskette/centurion-vigil:latest");
     }
 
     @Test

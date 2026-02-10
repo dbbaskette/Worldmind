@@ -1,4 +1,4 @@
-FROM worldmind/centurion-base:latest
+FROM ghcr.io/dbbaskette/centurion-base:latest
 
 # Gauntlet-specific label
 LABEL com.worldmind.centurion="gauntlet"
