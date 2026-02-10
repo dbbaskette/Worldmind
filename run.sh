@@ -63,6 +63,7 @@ case "$1" in
     VARS_FILE="${2:-cf-vars.yml}"
     if [ -z "${CF_DOCKER_PASSWORD:-}" ]; then
       echo "ERROR: CF_DOCKER_PASSWORD is not set."
+      echo "The CF CLI requires this exact variable name for Docker registry auth."
       echo "Set it to a GitHub PAT with read:packages scope (in .env or export it)."
       exit 1
     fi

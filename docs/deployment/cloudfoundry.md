@@ -80,9 +80,10 @@ centurion-gauntlet-app: centurion-gauntlet
 centurion-vigil-app: centurion-vigil
 ```
 
-The Docker password (GitHub PAT) is **not** in the vars file — it is read from `CF_DOCKER_PASSWORD` in the environment. Set it in your `.env`:
+The Docker password (GitHub PAT) is **not** in the vars file — the CF CLI reads it from `CF_DOCKER_PASSWORD` in the environment (this variable name is a CF CLI requirement, not ours). Set it in your `.env`:
 
 ```bash
+# GitHub PAT with read:packages scope — CF CLI requires this exact variable name
 CF_DOCKER_PASSWORD=ghp_yourGitHubPAThere
 ```
 
@@ -185,7 +186,7 @@ This gives each centurion an isolated working copy while maintaining a shared, o
 | `worldmind.cf.task-disk-mb`              | --                     | CF task disk limit                          | `4096`           |
 | `GOOSE_MODEL`                             | `GOOSE_MODEL`          | LLM model name (if not in service metadata) | --               |
 | `SPRING_PROFILES_ACTIVE`                  | `SPRING_PROFILES_ACTIVE` | Must include `cf`                        | --               |
-| `CF_DOCKER_PASSWORD`                      | `CF_DOCKER_PASSWORD`   | GitHub PAT with `read:packages` for GHCR    | --               |
+| `CF_DOCKER_PASSWORD`                      | `CF_DOCKER_PASSWORD`   | GitHub PAT with `read:packages` for GHCR (CF CLI convention) | --  |
 
 ## 8. API Usage with `git_remote_url`
 
