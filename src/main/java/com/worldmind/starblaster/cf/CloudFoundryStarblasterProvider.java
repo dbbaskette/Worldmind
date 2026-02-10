@@ -86,7 +86,7 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
                 "cd /workspace",
                 "git checkout -b %s".formatted(branchName),
                 "mkdir -p .worldmind/directives",
-                "curl -sf '%s' > .worldmind/directives/%s.md".formatted(instructionUrl, directiveId),
+                "curl -sfk '%s' > .worldmind/directives/%s.md".formatted(instructionUrl, directiveId),
                 "goose run .worldmind/directives/%s.md".formatted(directiveId),
                 "git add -A",
                 "git commit -m 'DIR-%s'".formatted(directiveId),
