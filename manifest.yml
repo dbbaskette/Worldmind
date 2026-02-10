@@ -17,7 +17,6 @@ applications:
       worldmind.cf.api-url: ((cf-api-url))
       worldmind.cf.org: ((cf-org))
       worldmind.cf.space: ((cf-space))
-      worldmind.cf.git-remote-url: ((git-remote-url))
       worldmind.cf.centurion-apps.forge: ((centurion-forge-app))
       worldmind.cf.centurion-apps.gauntlet: ((centurion-gauntlet-app))
       worldmind.cf.centurion-apps.vigil: ((centurion-vigil-app))

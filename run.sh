@@ -63,7 +63,7 @@ case "$1" in
     # Validate required CF variables
     missing=""
     for var in CF_DOCKER_PASSWORD CENTURION_IMAGE_REGISTRY DOCKER_USERNAME \
-               CF_API_URL CF_ORG CF_SPACE GIT_REMOTE_URL; do
+               CF_API_URL CF_ORG CF_SPACE; do
       if [ -z "${!var:-}" ]; then missing="$missing $var"; fi
     done
     if [ -n "$missing" ]; then
@@ -79,7 +79,6 @@ case "$1" in
 cf-api-url: ${CF_API_URL}
 cf-org: ${CF_ORG}
 cf-space: ${CF_SPACE}
-git-remote-url: ${GIT_REMOTE_URL}
 centurion-image-registry: ${CENTURION_IMAGE_REGISTRY}
 docker-username: ${DOCKER_USERNAME}
 centurion-forge-app: ${CENTURION_FORGE_APP:-centurion-forge}

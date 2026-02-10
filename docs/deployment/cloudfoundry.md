@@ -61,7 +61,7 @@ On Cloud Foundry, centurions share work through git branches rather than shared 
 
 1. Create or identify a git repository for workspace coordination
 2. Add a deploy key with read/write access
-3. Set `GIT_REMOTE_URL` in `.env` (or provide per-mission via the `git_remote_url` API parameter)
+3. Provide the remote URL per-mission via the `git_remote_url` field in the REST API or the "Git Remote URL" input in the React dashboard
 
 ## 3. Configure Variables
 
@@ -84,7 +84,6 @@ CF_DOCKER_PASSWORD=ghp_yourGitHubPAThere
 CF_API_URL=https://api.sys.example.com
 CF_ORG=my-org
 CF_SPACE=my-space
-GIT_REMOTE_URL=https://github.com/your-org/your-repo.git
 CENTURION_FORGE_APP=centurion-forge
 CENTURION_GAUNTLET_APP=centurion-gauntlet
 CENTURION_VIGIL_APP=centurion-vigil
@@ -158,7 +157,6 @@ This gives each centurion an isolated working copy while maintaining a shared, o
 | `CF_API_URL` | CF API endpoint (e.g., `https://api.sys.example.com`) | Yes |
 | `CF_ORG` | CF org name | Yes |
 | `CF_SPACE` | CF space name | Yes |
-| `GIT_REMOTE_URL` | Git remote for workspace sharing between centurions | Yes |
 | `CENTURION_IMAGE_REGISTRY` | Docker image registry prefix (e.g., `ghcr.io/dbbaskette`) | Yes |
 | `DOCKER_USERNAME` | Registry username (GitHub username for GHCR) | Yes |
 | `CF_DOCKER_PASSWORD` | GitHub PAT with `read:packages` scope (CF CLI convention) | Yes |
@@ -178,7 +176,6 @@ This gives each centurion an isolated working copy while maintaining a shared, o
 | `worldmind.cf.org`                        | --                     | CF org name                                 | --               |
 | `worldmind.cf.space`                      | --                     | CF space name                               | --               |
 | `worldmind.cf.centurion-apps.*`           | --                     | Centurion role to CF app name mapping       | --               |
-| `worldmind.cf.git-remote-url`             | --                     | Git remote for workspace sharing            | --               |
 | `worldmind.cf.task-timeout-seconds`       | --                     | CF task timeout                             | `600`            |
 | `worldmind.cf.task-memory-mb`             | --                     | CF task memory limit                        | `2048`           |
 | `worldmind.cf.task-disk-mb`              | --                     | CF task disk limit                          | `4096`           |
@@ -188,7 +185,7 @@ This gives each centurion an isolated working copy while maintaining a shared, o
 
 ## 8. API Usage with `git_remote_url`
 
-The mission API accepts an optional `git_remote_url` parameter that overrides the configured `worldmind.cf.git-remote-url`:
+On CF, each mission must specify `git_remote_url` — the project repository that centurions will clone, branch, and push to:
 
 ```bash
 curl -X POST https://worldmind.apps.example.com/api/v1/missions \
