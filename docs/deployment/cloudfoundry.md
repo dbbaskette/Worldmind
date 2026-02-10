@@ -21,11 +21,11 @@
 
 - **CF CLI v8+** installed and authenticated (`cf login`)
 - **Java 21** and **Maven** installed locally (for building the orchestrator JAR)
-- **Docker images** for centurions pushed to a registry accessible by the CF foundation (registry is configurable via `cf-vars.yml`):
+- **Docker images** for centurions pushed to a registry accessible by the CF foundation (configured via `CENTURION_IMAGE_REGISTRY` in `.env`):
   - `{registry}/centurion-forge:latest`
   - `{registry}/centurion-gauntlet:latest`
   - `{registry}/centurion-vigil:latest`
-- **GitHub PAT** with `read:packages` scope for pulling images from GHCR. Set `CF_DOCKER_PASSWORD` in your `.env` file (or export it). The `docker-username` in `cf-vars.yml` must match the GitHub account.
+- **GitHub PAT** with `read:packages` scope for pulling images from GHCR. Set `CF_DOCKER_PASSWORD` and `DOCKER_USERNAME` in your `.env` file.
 - CF foundation must have **Diego Docker support enabled**:
   ```bash
   cf feature-flag diego_docker
@@ -61,33 +61,36 @@ On Cloud Foundry, centurions share work through git branches rather than shared 
 
 1. Create or identify a git repository for workspace coordination
 2. Add a deploy key with read/write access
-3. Provide the remote URL in `cf-vars.yml` (or per-mission via the `git_remote_url` API parameter)
+3. Set `GIT_REMOTE_URL` in `.env` (or provide per-mission via the `git_remote_url` API parameter)
 
 ## 3. Configure Variables
 
-All CF-specific properties are supplied via a vars file that `cf push` reads with `--vars-file`. Copy and edit `cf-vars.yml`:
-
-```yaml
-# cf-vars.yml
-cf-api-url: https://api.sys.example.com
-cf-org: my-org
-cf-space: my-space
-git-remote-url: https://github.com/your-org/your-repo.git
-centurion-image-registry: ghcr.io/dbbaskette
-docker-username: dbbaskette
-centurion-forge-app: centurion-forge
-centurion-gauntlet-app: centurion-gauntlet
-centurion-vigil-app: centurion-vigil
-```
-
-The Docker password (GitHub PAT) is **not** in the vars file — the CF CLI reads it from `CF_DOCKER_PASSWORD` in the environment (this variable name is a CF CLI requirement, not ours). Set it in your `.env`:
+All configuration lives in `.env`. Copy the example and fill in your values:
 
 ```bash
-# GitHub PAT with read:packages scope — CF CLI requires this exact variable name
-CF_DOCKER_PASSWORD=ghp_yourGitHubPAThere
+cp .env.example .env
 ```
 
-The `manifest.yml` uses `((variable))` substitution syntax. All values in this file flow into the manifest at deploy time — no `cf set-env` needed.
+The CF-specific variables:
+
+```bash
+# --- Centurion Images ---
+CENTURION_IMAGE_REGISTRY=ghcr.io/dbbaskette
+DOCKER_USERNAME=dbbaskette
+# CF CLI requires this exact variable name for Docker registry auth
+CF_DOCKER_PASSWORD=ghp_yourGitHubPAThere
+
+# --- Cloud Foundry ---
+CF_API_URL=https://api.sys.example.com
+CF_ORG=my-org
+CF_SPACE=my-space
+GIT_REMOTE_URL=https://github.com/your-org/your-repo.git
+CENTURION_FORGE_APP=centurion-forge
+CENTURION_GAUNTLET_APP=centurion-gauntlet
+CENTURION_VIGIL_APP=centurion-vigil
+```
+
+When you run `./run.sh cf-push`, it reads these from `.env`, generates a temporary vars file, and passes it to `cf push --vars-file`. No separate config file to manage.
 
 ## 4. Deploy
 
@@ -97,13 +100,7 @@ Build and push all applications:
 ./run.sh cf-push
 ```
 
-This runs `./mvnw clean package -DskipTests` then `cf push --vars-file cf-vars.yml`, deploying all components listed in the Component Overview above.
-
-To use a different vars file (e.g., for production):
-
-```bash
-./run.sh cf-push cf-vars-production.yml
-```
+This builds the JAR, generates a vars file from `.env`, and runs `cf push`, deploying all components listed in the Component Overview above.
 
 ## 5. How Services Are Bound
 
@@ -154,19 +151,20 @@ This gives each centurion an isolated working copy while maintaining a shared, o
 
 ## 7. Configuration Reference
 
-### Vars file properties (cf-vars.yml)
+### .env variables for CF deployment
 
-| Variable | Description |
-|----------|-------------|
-| `cf-api-url` | CF API endpoint (e.g., `https://api.sys.example.com`) |
-| `cf-org` | CF org name |
-| `cf-space` | CF space name |
-| `git-remote-url` | Git remote for workspace sharing between centurions |
-| `centurion-image-registry` | Docker image registry prefix (e.g., `ghcr.io/dbbaskette`) |
-| `docker-username` | Registry username (GitHub username for GHCR) |
-| `centurion-forge-app` | CF app name for Forge centurion |
-| `centurion-gauntlet-app` | CF app name for Gauntlet centurion |
-| `centurion-vigil-app` | CF app name for Vigil centurion |
+| Variable | Description | Required |
+|----------|-------------|:--------:|
+| `CF_API_URL` | CF API endpoint (e.g., `https://api.sys.example.com`) | Yes |
+| `CF_ORG` | CF org name | Yes |
+| `CF_SPACE` | CF space name | Yes |
+| `GIT_REMOTE_URL` | Git remote for workspace sharing between centurions | Yes |
+| `CENTURION_IMAGE_REGISTRY` | Docker image registry prefix (e.g., `ghcr.io/dbbaskette`) | Yes |
+| `DOCKER_USERNAME` | Registry username (GitHub username for GHCR) | Yes |
+| `CF_DOCKER_PASSWORD` | GitHub PAT with `read:packages` scope (CF CLI convention) | Yes |
+| `CENTURION_FORGE_APP` | CF app name for Forge centurion | No (default: `centurion-forge`) |
+| `CENTURION_GAUNTLET_APP` | CF app name for Gauntlet centurion | No (default: `centurion-gauntlet`) |
+| `CENTURION_VIGIL_APP` | CF app name for Vigil centurion | No (default: `centurion-vigil`) |
 
 ### Application properties
 

@@ -28,7 +28,7 @@ usage() {
   echo "  timeline <id>       Show checkpoint history"
   echo "  up                  Start everything in Docker (Postgres + Worldmind)"
   echo "  down                Stop all Docker services"
-  echo "  cf-push [vars-file] Build and push to Cloud Foundry (default: cf-vars.yml)"
+  echo "  cf-push             Build and push to Cloud Foundry (reads CF vars from .env)"
   echo ""
   echo "Environment:"
   echo "  WORLDMIND_PROFILE   Spring profile (default: local)"
@@ -60,14 +60,34 @@ case "$1" in
     exit 0
     ;;
   cf-push)
-    VARS_FILE="${2:-cf-vars.yml}"
-    if [ -z "${CF_DOCKER_PASSWORD:-}" ]; then
-      echo "ERROR: CF_DOCKER_PASSWORD is not set."
-      echo "The CF CLI requires this exact variable name for Docker registry auth."
-      echo "Set it to a GitHub PAT with read:packages scope (in .env or export it)."
+    # Validate required CF variables
+    missing=""
+    for var in CF_DOCKER_PASSWORD CENTURION_IMAGE_REGISTRY DOCKER_USERNAME \
+               CF_API_URL CF_ORG CF_SPACE GIT_REMOTE_URL; do
+      if [ -z "${!var:-}" ]; then missing="$missing $var"; fi
+    done
+    if [ -n "$missing" ]; then
+      echo "ERROR: Missing required variables:$missing"
+      echo "Set them in .env (see .env.example for reference)."
       exit 1
     fi
-    echo "Building and pushing to Cloud Foundry (vars: $VARS_FILE)..."
+
+    # Generate vars YAML from .env for cf push --vars-file
+    VARS_FILE=$(mktemp /tmp/cf-vars-XXXXXX.yml)
+    trap "rm -f $VARS_FILE" EXIT
+    cat > "$VARS_FILE" <<EOVARS
+cf-api-url: ${CF_API_URL}
+cf-org: ${CF_ORG}
+cf-space: ${CF_SPACE}
+git-remote-url: ${GIT_REMOTE_URL}
+centurion-image-registry: ${CENTURION_IMAGE_REGISTRY}
+docker-username: ${DOCKER_USERNAME}
+centurion-forge-app: ${CENTURION_FORGE_APP:-centurion-forge}
+centurion-gauntlet-app: ${CENTURION_GAUNTLET_APP:-centurion-gauntlet}
+centurion-vigil-app: ${CENTURION_VIGIL_APP:-centurion-vigil}
+EOVARS
+
+    echo "Building and pushing to Cloud Foundry..."
     ./mvnw -q clean package -DskipTests
     CF_DOCKER_PASSWORD="$CF_DOCKER_PASSWORD" cf push --vars-file "$VARS_FILE"
     exit 0
