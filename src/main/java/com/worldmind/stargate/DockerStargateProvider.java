@@ -43,23 +43,49 @@ public class DockerStargateProvider implements StargateProvider {
         log.info("Opening Stargate {} for directive {} (image: {})",
                 containerName, request.directiveId(), imageName);
 
+        // Clean up any stale container with the same name from a previous retry
+        try {
+            dockerClient.removeContainerCmd(containerName).withForce(true).exec();
+            log.debug("Removed stale container {}", containerName);
+        } catch (Exception ignored) {
+            // Container doesn't exist — normal case
+        }
+
         var envList = new ArrayList<String>();
         request.envVars().forEach((k, v) -> envList.add(k + "=" + v));
 
+        // When running inside Docker (WORKSPACE_VOLUME set):
+        //   - Bind-mount the HOST project path to /workspace (so files land on the host FS)
+        //   - Mount the shared Docker volume to /instructions (for instruction files
+        //     written by the server at <volume>/directives/<id>.md)
+        // When running locally: just bind-mount the host project path (covers both)
+        String workspaceVolume = System.getenv("WORKSPACE_VOLUME");
+        String hostProjectPath = request.projectPath().toString();
+
+        var binds = new ArrayList<Bind>();
+        binds.add(new Bind(hostProjectPath, new Volume("/workspace"), AccessMode.rw));
+        if (workspaceVolume != null) {
+            binds.add(new Bind(workspaceVolume, new Volume("/instructions"), AccessMode.rw));
+        }
+
         var hostConfig = HostConfig.newHostConfig()
-                .withBinds(
-                    new Bind(request.projectPath().toString(),
-                             new Volume("/workspace"), AccessMode.rw)
-                )
+                .withBinds(binds.toArray(new Bind[0]))
                 .withMemory((long) request.memoryLimitMb() * 1024 * 1024)
                 .withCpuCount((long) request.cpuCount())
-                .withExtraHosts("host.docker.internal:host-gateway");
+                .withExtraHosts("host.docker.internal:host-gateway")
+                .withDns("8.8.8.8", "8.8.4.4");
+
+        // Instruction file path: in Docker → /instructions/directives/<id>.md
+        //                         locally  → /workspace/.worldmind/directives/<id>.md
+        String instructionPath = workspaceVolume != null
+                ? "/instructions/directives/" + request.directiveId() + ".md"
+                : "/workspace/.worldmind/directives/" + request.directiveId() + ".md";
 
         var response = dockerClient.createContainerCmd(imageName)
                 .withName(containerName)
                 .withHostConfig(hostConfig)
                 .withEnv(envList)
-                .withCmd("/workspace/.worldmind/directives/" + request.directiveId() + ".md")
+                .withCmd(instructionPath)
                 .withWorkingDir("/workspace")
                 .exec();
 

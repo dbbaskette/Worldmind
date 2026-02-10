@@ -47,129 +47,133 @@ public class EvaluateWaveNode {
     public Map<String, Object> apply(WorldmindState state) {
         MdcContext.setWave(state.missionId(), state.waveCount());
         try {
-        var waveIds = state.waveDirectiveIds();
-        var directives = state.directives();
-        var waveResults = state.waveDispatchResults();
-        var projectContext = state.projectContext().orElse(null);
-        String projectPath = projectContext != null ? projectContext.rootPath() : ".";
+            var waveIds = state.waveDirectiveIds();
+            var directives = state.directives();
+            var waveResults = state.waveDispatchResults();
+            var projectContext = state.projectContext().orElse(null);
+            // Use the original user-supplied host path for centurion bind mounts.
+            String userPath = state.projectPath();
+            String projectPath = (userPath != null && !userPath.isBlank())
+                    ? userPath
+                    : (projectContext != null ? projectContext.rootPath() : ".");
 
-        // Build lookup maps
-        var directiveMap = new HashMap<String, Directive>();
-        for (var d : directives) directiveMap.put(d.id(), d);
+            // Build lookup maps
+            var directiveMap = new HashMap<String, Directive>();
+            for (var d : directives) directiveMap.put(d.id(), d);
 
-        var resultMap = new HashMap<String, WaveDispatchResult>();
-        for (var r : waveResults) resultMap.put(r.directiveId(), r);
+            var resultMap = new HashMap<String, WaveDispatchResult>();
+            for (var r : waveResults) resultMap.put(r.directiveId(), r);
 
-        var completedIds = new ArrayList<String>();
-        var testResultsList = new ArrayList<TestResult>();
-        var reviewFeedbackList = new ArrayList<ReviewFeedback>();
-        var stargateInfos = new ArrayList<StargateInfo>();
-        var errors = new ArrayList<String>();
-        String retryContext = null;
-        MissionStatus missionStatus = null;
+            var completedIds = new ArrayList<String>();
+            var testResultsList = new ArrayList<TestResult>();
+            var reviewFeedbackList = new ArrayList<ReviewFeedback>();
+            var stargateInfos = new ArrayList<StargateInfo>();
+            var errors = new ArrayList<String>();
+            String retryContext = null;
+            MissionStatus missionStatus = null;
 
-        for (var id : waveIds) {
-            var directive = directiveMap.get(id);
-            var dispatchResult = resultMap.get(id);
+            for (var id : waveIds) {
+                var directive = directiveMap.get(id);
+                var dispatchResult = resultMap.get(id);
 
-            if (directive == null || dispatchResult == null) {
-                log.warn("Missing directive or dispatch result for {}, skipping evaluation", id);
-                continue;
-            }
-
-            // Non-FORGE directives auto-pass
-            if (!"FORGE".equalsIgnoreCase(directive.centurion())) {
-                log.info("Auto-passing non-FORGE directive {} [{}]", id, directive.centurion());
-                completedIds.add(id);
-                continue;
-            }
-
-            // FORGE directive that failed at dispatch — apply failure strategy directly
-            if (dispatchResult.status() == DirectiveStatus.FAILED) {
-                log.info("FORGE directive {} failed at dispatch — applying failure strategy", id);
-                FailureStrategy action = directive.onFailure() != null ? directive.onFailure() : FailureStrategy.RETRY;
-                if (action == FailureStrategy.RETRY && directive.iteration() >= directive.maxIterations()) {
-                    action = FailureStrategy.ESCALATE;
+                if (directive == null || dispatchResult == null) {
+                    log.warn("Missing directive or dispatch result for {}, skipping evaluation", id);
+                    continue;
                 }
-                var outcome = applyFailureStrategy(id, directive, action,
-                        "FORGE directive failed during execution");
-                completedIds.addAll(outcome.completedIds);
-                if (outcome.retryContext != null) retryContext = outcome.retryContext;
-                if (outcome.missionFailed) missionStatus = MissionStatus.FAILED;
-                errors.addAll(outcome.errors);
-                continue;
+
+                // Non-FORGE directives auto-pass
+                if (!"FORGE".equalsIgnoreCase(directive.centurion())) {
+                    log.info("Auto-passing non-FORGE directive {} [{}]", id, directive.centurion());
+                    completedIds.add(id);
+                    continue;
+                }
+
+                // FORGE directive that failed at dispatch — apply failure strategy directly
+                if (dispatchResult.status() == DirectiveStatus.FAILED) {
+                    log.info("FORGE directive {} failed at dispatch — applying failure strategy", id);
+                    FailureStrategy action = directive.onFailure() != null ? directive.onFailure() : FailureStrategy.RETRY;
+                    if (action == FailureStrategy.RETRY && directive.iteration() >= directive.maxIterations()) {
+                        action = FailureStrategy.ESCALATE;
+                    }
+                    var outcome = applyFailureStrategy(id, directive, action,
+                            "FORGE directive failed during execution");
+                    completedIds.addAll(outcome.completedIds);
+                    if (outcome.retryContext != null) retryContext = outcome.retryContext;
+                    if (outcome.missionFailed) missionStatus = MissionStatus.FAILED;
+                    errors.addAll(outcome.errors);
+                    continue;
+                }
+
+                // FORGE directive that passed dispatch — run GAUNTLET + VIGIL
+                var fileChanges = dispatchResult.filesAffected() != null ? dispatchResult.filesAffected() : List.<FileRecord>of();
+
+                // Step 1: GAUNTLET
+                TestResult testResult;
+                try {
+                    var gauntletDirective = createGauntletDirective(directive);
+                    log.info("Dispatching GAUNTLET for directive {}", id);
+                    var gauntletResult = bridge.executeDirective(gauntletDirective, projectContext, Path.of(projectPath));
+                    stargateInfos.add(gauntletResult.stargateInfo());
+                    testResult = sealService.parseTestOutput(id, gauntletResult.output(),
+                            gauntletResult.directive().elapsedMs() != null ? gauntletResult.directive().elapsedMs() : 0L);
+                } catch (Exception e) {
+                    log.error("GAUNTLET dispatch failed for {}: {}", id, e.getMessage());
+                    testResult = new TestResult(id, false, 0, 0,
+                            "GAUNTLET infrastructure error: " + e.getMessage(), 0L);
+                }
+
+                // Step 2: VIGIL
+                ReviewFeedback reviewFeedback;
+                try {
+                    var vigilDirective = createVigilDirective(directive);
+                    log.info("Dispatching VIGIL for directive {}", id);
+                    var vigilResult = bridge.executeDirective(vigilDirective, projectContext, Path.of(projectPath));
+                    stargateInfos.add(vigilResult.stargateInfo());
+                    reviewFeedback = sealService.parseReviewOutput(id, vigilResult.output());
+                } catch (Exception e) {
+                    log.error("VIGIL dispatch failed for {}: {}", id, e.getMessage());
+                    reviewFeedback = new ReviewFeedback(id, false,
+                            "VIGIL infrastructure error: " + e.getMessage(),
+                            List.of(e.getMessage()), List.of(), 0);
+                }
+
+                testResultsList.add(testResult);
+                reviewFeedbackList.add(reviewFeedback);
+
+                // Step 3: Evaluate seal
+                var sealDecision = sealService.evaluateSeal(testResult, reviewFeedback, directive);
+                log.info("Seal evaluation for {}: {} — {}", id,
+                        sealDecision.sealGranted() ? "GRANTED" : "DENIED", sealDecision.reason());
+                metrics.recordSealResult(sealDecision.sealGranted());
+
+                if (sealDecision.sealGranted()) {
+                    completedIds.add(id);
+                } else {
+                    eventBus.publish(new WorldmindEvent("seal.denied",
+                            state.missionId(), id,
+                            Map.of("reason", sealDecision.reason(),
+                                   "action", sealDecision.action() != null ? sealDecision.action().name() : "UNKNOWN"),
+                            Instant.now()));
+                    var outcome = applyFailureStrategy(id, directive, sealDecision.action(),
+                            sealDecision.reason());
+                    completedIds.addAll(outcome.completedIds);
+                    if (outcome.retryContext != null) retryContext = outcome.retryContext;
+                    if (outcome.missionFailed) missionStatus = MissionStatus.FAILED;
+                    errors.addAll(outcome.errors);
+                }
             }
 
-            // FORGE directive that passed dispatch — run GAUNTLET + VIGIL
-            var fileChanges = dispatchResult.filesAffected() != null ? dispatchResult.filesAffected() : List.<FileRecord>of();
+            // Build state updates
+            var updates = new HashMap<String, Object>();
+            updates.put("completedDirectiveIds", completedIds);
+            if (!testResultsList.isEmpty()) updates.put("testResults", testResultsList);
+            if (!reviewFeedbackList.isEmpty()) updates.put("reviewFeedback", reviewFeedbackList);
+            if (!stargateInfos.isEmpty()) updates.put("stargates", stargateInfos);
+            if (!errors.isEmpty()) updates.put("errors", errors);
+            if (retryContext != null) updates.put("retryContext", retryContext);
+            if (missionStatus != null) updates.put("status", missionStatus.name());
 
-            // Step 1: GAUNTLET
-            TestResult testResult;
-            try {
-                var gauntletDirective = createGauntletDirective(directive);
-                log.info("Dispatching GAUNTLET for directive {}", id);
-                var gauntletResult = bridge.executeDirective(gauntletDirective, projectContext, Path.of(projectPath));
-                stargateInfos.add(gauntletResult.stargateInfo());
-                testResult = sealService.parseTestOutput(id, gauntletResult.output(),
-                        gauntletResult.directive().elapsedMs() != null ? gauntletResult.directive().elapsedMs() : 0L);
-            } catch (Exception e) {
-                log.error("GAUNTLET dispatch failed for {}: {}", id, e.getMessage());
-                testResult = new TestResult(id, false, 0, 0,
-                        "GAUNTLET infrastructure error: " + e.getMessage(), 0L);
-            }
-
-            // Step 2: VIGIL
-            ReviewFeedback reviewFeedback;
-            try {
-                var vigilDirective = createVigilDirective(directive);
-                log.info("Dispatching VIGIL for directive {}", id);
-                var vigilResult = bridge.executeDirective(vigilDirective, projectContext, Path.of(projectPath));
-                stargateInfos.add(vigilResult.stargateInfo());
-                reviewFeedback = sealService.parseReviewOutput(id, vigilResult.output());
-            } catch (Exception e) {
-                log.error("VIGIL dispatch failed for {}: {}", id, e.getMessage());
-                reviewFeedback = new ReviewFeedback(id, false,
-                        "VIGIL infrastructure error: " + e.getMessage(),
-                        List.of(e.getMessage()), List.of(), 0);
-            }
-
-            testResultsList.add(testResult);
-            reviewFeedbackList.add(reviewFeedback);
-
-            // Step 3: Evaluate seal
-            var sealDecision = sealService.evaluateSeal(testResult, reviewFeedback, directive);
-            log.info("Seal evaluation for {}: {} — {}", id,
-                    sealDecision.sealGranted() ? "GRANTED" : "DENIED", sealDecision.reason());
-            metrics.recordSealResult(sealDecision.sealGranted());
-
-            if (sealDecision.sealGranted()) {
-                completedIds.add(id);
-            } else {
-                eventBus.publish(new WorldmindEvent("seal.denied",
-                        state.missionId(), id,
-                        Map.of("reason", sealDecision.reason(),
-                               "action", sealDecision.action() != null ? sealDecision.action().name() : "UNKNOWN"),
-                        Instant.now()));
-                var outcome = applyFailureStrategy(id, directive, sealDecision.action(),
-                        sealDecision.reason());
-                completedIds.addAll(outcome.completedIds);
-                if (outcome.retryContext != null) retryContext = outcome.retryContext;
-                if (outcome.missionFailed) missionStatus = MissionStatus.FAILED;
-                errors.addAll(outcome.errors);
-            }
-        }
-
-        // Build state updates
-        var updates = new HashMap<String, Object>();
-        updates.put("completedDirectiveIds", completedIds);
-        if (!testResultsList.isEmpty()) updates.put("testResults", testResultsList);
-        if (!reviewFeedbackList.isEmpty()) updates.put("reviewFeedback", reviewFeedbackList);
-        if (!stargateInfos.isEmpty()) updates.put("stargates", stargateInfos);
-        if (!errors.isEmpty()) updates.put("errors", errors);
-        if (retryContext != null) updates.put("retryContext", retryContext);
-        if (missionStatus != null) updates.put("status", missionStatus.name());
-
-        return updates;
+            return updates;
         } finally {
             MdcContext.clear();
         }
@@ -179,7 +183,11 @@ public class EvaluateWaveNode {
                                                   FailureStrategy action, String reason) {
         if (action == FailureStrategy.RETRY) {
             oscillationDetector.recordFailure(id, reason);
-            if (oscillationDetector.isOscillating(id)) {
+            int failureCount = oscillationDetector.failureCount(id);
+            if (failureCount >= directive.maxIterations()) {
+                log.warn("Max retries ({}) exhausted for directive {} — escalating", directive.maxIterations(), id);
+                action = FailureStrategy.ESCALATE;
+            } else if (oscillationDetector.isOscillating(id)) {
                 log.warn("Oscillation detected for directive {} — overriding RETRY to ESCALATE", id);
                 action = FailureStrategy.ESCALATE;
             }

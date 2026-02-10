@@ -28,8 +28,18 @@ public class UploadContextNode {
     }
 
     public Map<String, Object> apply(WorldmindState state) {
-        // Default to current directory; could be configured via state later
-        Path projectRoot = Path.of(System.getProperty("user.dir"));
+        // When running inside Docker, always use /workspace regardless of the
+        // client-supplied path (host paths don't exist inside the container).
+        String workspaceVolume = System.getenv("WORKSPACE_VOLUME");
+        Path projectRoot;
+        if (workspaceVolume != null) {
+            projectRoot = Path.of("/workspace");
+        } else {
+            String explicitPath = state.projectPath();
+            projectRoot = (explicitPath != null && !explicitPath.isBlank())
+                    ? Path.of(explicitPath)
+                    : Path.of(System.getProperty("user.dir"));
+        }
         try {
             ProjectContext context = scanner.scan(projectRoot);
             return Map.of(

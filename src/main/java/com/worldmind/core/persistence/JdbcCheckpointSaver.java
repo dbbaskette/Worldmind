@@ -3,6 +3,8 @@ package com.worldmind.core.persistence;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.bsc.langgraph4j.RunnableConfig;
 import org.bsc.langgraph4j.checkpoint.BaseCheckpointSaver;
 import org.bsc.langgraph4j.checkpoint.Checkpoint;
@@ -86,7 +88,9 @@ public class JdbcCheckpointSaver implements BaseCheckpointSaver {
 
     public JdbcCheckpointSaver(DataSource dataSource) {
         this.dataSource = Objects.requireNonNull(dataSource, "DataSource must not be null");
-        this.objectMapper = new ObjectMapper();
+        this.objectMapper = new ObjectMapper()
+                .registerModule(new JavaTimeModule())
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
 
     /**

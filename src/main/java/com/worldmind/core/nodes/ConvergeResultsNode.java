@@ -91,15 +91,10 @@ public class ConvergeResultsNode {
             aggregateDurationMs
         );
 
-        // Final status: COMPLETED if any directives passed, FAILED if all failed
-        MissionStatus finalStatus;
-        if (completed > 0) {
-            finalStatus = MissionStatus.COMPLETED;
-        } else if (directives.isEmpty()) {
-            finalStatus = MissionStatus.COMPLETED; // no directives = nothing to fail
-        } else {
-            finalStatus = MissionStatus.FAILED;
-        }
+        // COMPLETED if any directives passed or none exist; FAILED if all failed
+        MissionStatus finalStatus = (completed > 0 || directives.isEmpty())
+                ? MissionStatus.COMPLETED
+                : MissionStatus.FAILED;
 
         log.info("Mission converged — {} completed, {} failed, {} tests ({} passed), {} files changed",
                 completed, failed, testsRun, testsPassed, filesCreated + filesModified);

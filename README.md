@@ -1,10 +1,14 @@
-# Worldmind
+<p align="center">
+  <img src="docs/images/header.jpg" alt="Worldmind" width="700">
+</p>
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Java](https://img.shields.io/badge/Java-21-orange.svg)
-![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4-green.svg)
+<p align="center">
+  <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License">
+  <img src="https://img.shields.io/badge/Java-21-orange.svg" alt="Java">
+  <img src="https://img.shields.io/badge/Spring%20Boot-3.4-green.svg" alt="Spring Boot">
+</p>
 
-An agentic code assistant that accepts natural language development requests and autonomously plans, implements, tests, and reviews code.
+<p align="center">An agentic code assistant that accepts natural language development requests and autonomously plans, implements, tests, and reviews code.</p>
 
 ## About
 
@@ -23,6 +27,11 @@ The project uses Xandarian Worldmind / Nova Corps nomenclature from Marvel Comic
 - **Sandboxed execution (Stargates)** — Each agent runs in an isolated Docker container with constrained permissions
 - **Crash-resilient state** — PostgreSQL-backed checkpointing enables recovery and time-travel debugging
 - **Flexible interaction modes** — Full auto, approve-plan, or step-by-step execution
+- **Real-time dashboard** — React web UI with SSE-powered live updates, plan approval, and event logs
+- **REST API** — Full mission lifecycle via HTTP with SSE event streaming
+- **Security hardening** — JWT authentication, command allowlists per centurion type, path restrictions
+- **Observability** — Structured JSON logging, Prometheus metrics, component health checks
+- **Cloud Foundry ready** — Deploy with `cf push` using git-based workspaces and CF task provider
 
 ## Architecture
 
@@ -70,6 +79,7 @@ flowchart TB
 
 ## Built With
 
+**Backend:**
 - [Java 21](https://openjdk.org/projects/jdk/21/) — Virtual threads for parallel agent execution
 - [Spring Boot 3.4](https://spring.io/projects/spring-boot) — Application framework and REST API
 - [Spring AI 1.0](https://spring.io/projects/spring-ai) — Anthropic Claude integration for LLM calls
@@ -78,6 +88,12 @@ flowchart TB
 - [picocli](https://picocli.info/) — CLI framework with ANSI colors and GraalVM support
 - [Docker](https://www.docker.com/) — Container isolation for worker agents
 - [PostgreSQL 16](https://www.postgresql.org/) — State checkpointing and persistence
+
+**Frontend:**
+- [React 18](https://react.dev/) — UI framework with hooks and functional components
+- [TypeScript](https://www.typescriptlang.org/) — Type-safe JavaScript
+- [Vite](https://vite.dev/) — Fast build tool and dev server
+- [Tailwind CSS](https://tailwindcss.com/) — Utility-first CSS framework
 
 ## Getting Started
 
@@ -132,12 +148,65 @@ worldmind mission --mode APPROVE_PLAN "Refactor the payment service to use the s
 worldmind mission --mode STEP_BY_STEP "Migrate the database schema to support multi-tenancy"
 ```
 
+### Web UI Dashboard
+
+Access the real-time mission monitoring dashboard:
+
+```bash
+# Start the server in web mode
+worldmind serve
+
+# Or with Spring Boot directly
+java -jar target/worldmind-0.1.0-SNAPSHOT.jar serve
+```
+
+Then navigate to `http://localhost:8080` in your browser.
+
+**Features:**
+- **Real-time monitoring** — Live directive status updates via SSE
+- **Plan approval** — Review and approve/cancel plans before execution
+- **Directive details** — View files affected, iterations, elapsed time
+- **Event log** — Color-coded event stream with timestamps
+- **Mission timeline** — Checkpoint history and state transitions
+
+### Centurion Types
+
+Worldmind uses five specialized Centurion agents, each with distinct capabilities:
+
+**FORGE** — Code generation and implementation
+```bash
+worldmind mission "Add user authentication with JWT tokens"
+```
+
+**GAUNTLET** — Test writing and execution (auto-triggered after FORGE)
+```bash
+# Automatically runs tests after FORGE completes
+```
+
+**VIGIL** — Code review and quality assessment (auto-triggered after FORGE)
+```bash
+# Automatically reviews code after FORGE completes
+```
+
+**PULSE** — Read-only research and context gathering
+```bash
+worldmind mission "Analyze the security vulnerabilities in our authentication module"
+```
+
+**PRISM** — Code refactoring with behavioral equivalence verification
+```bash
+worldmind mission "Refactor the InstructionBuilder class to reduce code duplication while maintaining all tests"
+```
+
 ### Other Commands
 
 ```bash
 worldmind status          # Show current mission status
 worldmind health          # Check system health (DB, Docker, LLM)
 worldmind history         # List past missions
+worldmind inspect <id>    # View detailed mission state
+worldmind log             # View mission execution logs
+worldmind timeline <id>   # Show checkpoint history for a mission
 ```
 
 ## Environment Variables
@@ -150,21 +219,68 @@ worldmind history         # List past missions
 | `DB_PASSWORD` | Database password | `worldmind` | No |
 | `GOOSE_MODEL` | Model for Goose worker agents | `claude-sonnet-4-5-20250929` | No |
 
+## REST API
+
+All endpoints are under `/api/v1`.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/missions` | Submit a new mission (async) |
+| `GET` | `/missions/{id}` | Get mission status and directives |
+| `GET` | `/missions/{id}/events` | SSE stream of real-time events |
+| `POST` | `/missions/{id}/approve` | Approve a planned mission |
+| `POST` | `/missions/{id}/edit` | Submit plan modifications |
+| `POST` | `/missions/{id}/cancel` | Cancel a running mission |
+| `GET` | `/missions/{id}/timeline` | Checkpoint state history |
+| `GET` | `/missions/{id}/directives/{did}` | Detailed directive result |
+| `GET` | `/stargates` | List active stargates |
+| `GET` | `/health` | Component health status |
+
 ## Project Structure
 
 ```
 src/main/java/com/worldmind/
-├── WorldmindApplication.java          # Spring Boot entry point
+├── WorldmindApplication.java              # Spring Boot entry point
 ├── core/
-│   ├── engine/MissionEngine.java      # Orchestration bridge
-│   ├── graph/WorldmindGraph.java      # LangGraph4j StateGraph definition
-│   ├── llm/LlmService.java           # Spring AI ChatClient wrapper
-│   ├── model/                         # Domain records (Classification, Directive, MissionPlan, ...)
-│   ├── nodes/                         # Graph nodes (Classify, Upload, Plan)
-│   ├── persistence/                   # JdbcCheckpointSaver for state persistence
-│   ├── scanner/ProjectScanner.java    # Codebase analysis and context extraction
-│   └── state/WorldmindState.java      # LangGraph4j AgentState definition
-└── dispatch/cli/                      # picocli CLI commands (mission, status, health, history)
+│   ├── engine/MissionEngine.java          # Orchestration bridge to LangGraph4j
+│   ├── events/                            # EventBus pub/sub and WorldmindEvent
+│   ├── graph/WorldmindGraph.java          # LangGraph4j StateGraph definition
+│   ├── health/                            # Component health checks (DB, Docker, LLM)
+│   ├── llm/                               # Spring AI ChatClient wrapper
+│   ├── logging/MdcContext.java            # SLF4J MDC context helper
+│   ├── metrics/WorldmindMetrics.java      # Micrometer/Prometheus metrics
+│   ├── model/                             # Domain records (16 records and enums)
+│   ├── nodes/                             # Graph nodes (9 — Classify through Converge)
+│   ├── persistence/                       # JdbcCheckpointSaver + CheckpointQueryService
+│   ├── scanner/ProjectScanner.java        # Codebase analysis and context extraction
+│   ├── scheduler/                         # Wave scheduling + oscillation detection
+│   ├── seal/SealEvaluationService.java    # Quality gate (tests + review score)
+│   ├── security/                          # JWT auth, command allowlists, path restrictions
+│   └── state/WorldmindState.java          # LangGraph4j AgentState definition
+├── dispatch/
+│   ├── api/                               # REST controllers + SSE streaming
+│   └── cli/                               # picocli commands (11 commands)
+└── stargate/
+    ├── DockerStargateProvider.java         # Docker container lifecycle
+    ├── InstructionBuilder.java            # Centurion instruction templating
+    ├── StargateBridge.java                # Dispatch orchestration
+    └── cf/                                # Cloud Foundry task provider
+
+worldmind-ui/                              # React 18 + TypeScript + Vite + Tailwind
+├── src/
+│   ├── api/                               # REST client and SSE hooks
+│   ├── components/                        # 9 React components (MissionForm, EventLog, ...)
+│   ├── hooks/                             # useMission, useSse custom hooks
+│   └── utils/                             # Constants and formatting helpers
+└── dist/                                  # Production build output
+
+docker/                                    # Centurion container images
+├── centurion-base/                        # Shared base with Goose + entrypoint
+├── centurion-forge/                       # Code generation
+├── centurion-gauntlet/                    # Test execution
+├── centurion-vigil/                       # Code review
+├── centurion-pulse/                       # Research (read-only)
+└── centurion-prism/                       # Refactoring
 ```
 
 ## Roadmap
@@ -173,11 +289,17 @@ src/main/java/com/worldmind/
 - [x] Planning pipeline (classify → upload → plan)
 - [x] PostgreSQL checkpointing
 - [x] CLI with mission submission
-- [ ] First Centurion (Forge) in Docker with Goose
-- [ ] Build-test-fix loop (Gauntlet, Vigil, seal evaluation)
-- [ ] Parallel fan-out for independent directives
-- [ ] REST API with SSE streaming and watch mode
-- [ ] MCP auth, allowlists, metrics, and logging
+- [x] Centurions (Forge, Gauntlet, Vigil, Pulse, Prism) in Docker with Goose
+- [x] Build-test-fix loop with Seal of Approval quality gate
+- [x] Wave-based parallel fan-out with dependency-aware scheduling
+- [x] REST API with SSE streaming and watch mode
+- [x] Security hardening (JWT auth, command allowlists, path restrictions)
+- [x] Structured logging, Prometheus metrics, health checks
+- [x] React-based web UI dashboard with real-time monitoring
+- [x] Cloud Foundry deployment support
+- [ ] MCP server integration (Terrain, Chronicle, Spark)
+- [ ] Multi-project workspace support
+- [ ] GraalVM native image compilation
 
 ## Contributing
 

@@ -16,6 +16,7 @@ public class StargateProperties {
     public int getMemoryLimitMb() { return stargate.memoryLimitMb; }
     public int getCpuCount() { return stargate.cpuCount; }
     public int getMaxParallel() { return stargate.maxParallel; }
+    public int getWaveCooldownSeconds() { return stargate.waveCooldownSeconds; }
     public String getImage() { return stargate.image; }
 
     // -- Goose accessors (delegate to nested) --
@@ -30,8 +31,9 @@ public class StargateProperties {
 
     public static class Stargate {
         private String provider = "docker";
-        private int maxParallel = 10;
+        private int maxParallel = 1;
         private int timeoutSeconds = 300;
+        private int waveCooldownSeconds = 60;
         private int memoryLimitMb = 4096;
         private int cpuCount = 2;
         private String image = "worldmind/centurion-forge:latest";
@@ -42,6 +44,8 @@ public class StargateProperties {
         public void setMaxParallel(int maxParallel) { this.maxParallel = maxParallel; }
         public int getTimeoutSeconds() { return timeoutSeconds; }
         public void setTimeoutSeconds(int timeoutSeconds) { this.timeoutSeconds = timeoutSeconds; }
+        public int getWaveCooldownSeconds() { return waveCooldownSeconds; }
+        public void setWaveCooldownSeconds(int waveCooldownSeconds) { this.waveCooldownSeconds = waveCooldownSeconds; }
         public int getMemoryLimitMb() { return memoryLimitMb; }
         public void setMemoryLimitMb(int memoryLimitMb) { this.memoryLimitMb = memoryLimitMb; }
         public int getCpuCount() { return cpuCount; }

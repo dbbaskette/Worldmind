@@ -7,6 +7,7 @@ import org.bsc.langgraph4j.state.Channels;
 import org.bsc.langgraph4j.state.Reducer;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -34,6 +35,7 @@ public class WorldmindState extends AgentState {
         Map.entry("sealGranted",           Channels.base(() -> false)),
         Map.entry("retryContext",          Channels.base(() -> "")),
         Map.entry("metrics",               Channels.base((Reducer<MissionMetrics>) null)),
+        Map.entry("projectPath",           Channels.base(() -> "")),
 
         // ── Wave execution channels (Phase 4) ────────────────────────
         Map.entry("waveDirectiveIds",      Channels.base((Supplier<List<String>>) List::of)),
@@ -73,8 +75,21 @@ public class WorldmindState extends AgentState {
         return MissionStatus.valueOf(raw);
     }
 
+    @SuppressWarnings("unchecked")
     public Optional<Classification> classification() {
-        return value("classification");
+        Optional<Object> raw = value("classification");
+        return raw.map(obj -> {
+            if (obj instanceof Classification c) return c;
+            if (obj instanceof Map<?, ?> m) {
+                var map = (Map<String, Object>) m;
+                return new Classification(
+                        (String) map.get("category"),
+                        map.get("complexity") instanceof Number n ? n.intValue() : 0,
+                        map.get("affectedComponents") instanceof List<?> l ? (List<String>) l : List.of(),
+                        (String) map.get("planningStrategy"));
+            }
+            return (Classification) obj;
+        });
     }
 
     public Optional<ProjectContext> projectContext() {
@@ -98,8 +113,31 @@ public class WorldmindState extends AgentState {
         return this.<String>value("retryContext").orElse("");
     }
 
+    public String projectPath() {
+        return this.<String>value("projectPath").orElse("");
+    }
+
+    @SuppressWarnings("unchecked")
     public Optional<MissionMetrics> metrics() {
-        return value("metrics");
+        Optional<Object> raw = value("metrics");
+        return raw.map(obj -> {
+            if (obj instanceof MissionMetrics m) return m;
+            if (obj instanceof Map<?, ?> m) {
+                var map = (Map<String, Object>) m;
+                return new MissionMetrics(
+                        numLong(map.get("totalDurationMs")),
+                        numInt(map.get("directivesCompleted")),
+                        numInt(map.get("directivesFailed")),
+                        numInt(map.get("totalIterations")),
+                        numInt(map.get("filesCreated")),
+                        numInt(map.get("filesModified")),
+                        numInt(map.get("testsRun")),
+                        numInt(map.get("testsPassed")),
+                        numInt(map.get("wavesExecuted")),
+                        numLong(map.get("aggregateDurationMs")));
+            }
+            return (MissionMetrics) obj;
+        });
     }
 
     // ── Wave execution accessors (Phase 4) ────────────────────────────
@@ -127,7 +165,22 @@ public class WorldmindState extends AgentState {
 
     @SuppressWarnings("unchecked")
     public List<Directive> directives() {
-        return this.<List<Directive>>value("directives").orElse(List.of());
+        List<?> raw = this.<List<?>>value("directives").orElse(List.of());
+        if (raw.isEmpty()) return List.of();
+        List<Directive> all;
+        if (raw.getFirst() instanceof Directive) {
+            all = (List<Directive>) raw;
+        } else {
+            // Checkpoint deserialization may produce raw Maps instead of records
+            all = raw.stream()
+                    .map(item -> item instanceof Map<?, ?> m ? directiveFromMap((Map<String, Object>) m) : (Directive) item)
+                    .toList();
+        }
+        // Appender channel may accumulate duplicates across graph re-invocations.
+        // Keep only the last occurrence of each directive ID (from the latest planning run).
+        var seen = new java.util.LinkedHashMap<String, Directive>();
+        for (var d : all) seen.put(d.id(), d);
+        return List.copyOf(seen.values());
     }
 
     @SuppressWarnings("unchecked")
@@ -148,5 +201,55 @@ public class WorldmindState extends AgentState {
     @SuppressWarnings("unchecked")
     public List<String> errors() {
         return this.<List<String>>value("errors").orElse(List.of());
+    }
+
+    // ── Map-to-record converters (checkpoint deserialization) ──────
+
+    @SuppressWarnings("unchecked")
+    private static Directive directiveFromMap(Map<String, Object> m) {
+        List<FileRecord> files = Collections.emptyList();
+        Object rawFiles = m.get("filesAffected");
+        if (rawFiles instanceof List<?> fl && !fl.isEmpty()) {
+            files = fl.stream()
+                    .map(f -> f instanceof FileRecord fr ? fr : fileRecordFromMap((Map<String, Object>) f))
+                    .toList();
+        }
+        return new Directive(
+                (String) m.get("id"),
+                (String) m.get("centurion"),
+                (String) m.get("description"),
+                (String) m.get("inputContext"),
+                (String) m.get("successCriteria"),
+                m.get("dependencies") instanceof List<?> deps ? (List<String>) deps : List.of(),
+                enumOrNull(DirectiveStatus.class, m.get("status")),
+                m.get("iteration") instanceof Number n ? n.intValue() : 0,
+                m.get("maxIterations") instanceof Number n ? n.intValue() : 3,
+                enumOrNull(FailureStrategy.class, m.get("onFailure")),
+                files,
+                m.get("elapsedMs") instanceof Number n ? n.longValue() : null
+        );
+    }
+
+    private static FileRecord fileRecordFromMap(Map<String, Object> m) {
+        return new FileRecord(
+                (String) m.get("path"),
+                (String) m.get("action"),
+                m.get("linesChanged") instanceof Number n ? n.intValue() : 0
+        );
+    }
+
+    private static <E extends Enum<E>> E enumOrNull(Class<E> type, Object value) {
+        if (value == null) return null;
+        if (type.isInstance(value)) return type.cast(value);
+        try { return Enum.valueOf(type, value.toString()); }
+        catch (IllegalArgumentException e) { return null; }
+    }
+
+    private static int numInt(Object v) {
+        return v instanceof Number n ? n.intValue() : 0;
+    }
+
+    private static long numLong(Object v) {
+        return v instanceof Number n ? n.longValue() : 0L;
     }
 }

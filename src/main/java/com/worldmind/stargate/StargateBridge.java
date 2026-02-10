@@ -78,7 +78,10 @@ public class StargateBridge {
         );
 
         Instant completedAt = Instant.now();
-        boolean success = execResult.exitCode() == 0;
+        // Goose may exit with code 1 even after successfully creating files
+        // (e.g., rate limit hit during session cleanup). Treat as success if files were changed.
+        boolean success = execResult.exitCode() == 0
+                || !execResult.fileChanges().isEmpty();
 
         var updatedDirective = new Directive(
             directive.id(),

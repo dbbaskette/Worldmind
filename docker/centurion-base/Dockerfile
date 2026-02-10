@@ -17,15 +17,10 @@ RUN goose --version && python -c "import langfuse.decorators; print('langfuse OK
 # Install MCP servers
 RUN npm install -g @modelcontextprotocol/server-filesystem
 
-# Create non-root user
-RUN useradd -m -s /bin/bash centurion
-
 # Copy entrypoint script (generates profiles.yaml from env vars, then runs goose)
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 
 # Working directory
 WORKDIR /workspace
-
-USER centurion
 
 ENTRYPOINT ["entrypoint.sh"]

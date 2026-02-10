@@ -15,5 +15,34 @@ services:
       timeout: 5s
       retries: 5
 
+  worldmind:
+    build: .
+    ports:
+      - "${WORLDMIND_PORT:-8080}:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - workspace:/workspace
+    environment:
+      SPRING_PROFILES_ACTIVE: ${WORLDMIND_PROFILE:-local}
+      DATABASE_URL: jdbc:postgresql://postgres:5432/worldmind
+      DB_USER: worldmind
+      DB_PASSWORD: worldmind
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-not-set}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-not-set}
+      LOCAL_LLM_URL: ${LOCAL_LLM_URL:-http://host.docker.internal:1234}
+      LOCAL_LLM_MODEL: ${LOCAL_LLM_MODEL:-qwen/qwen3-coder-30b}
+      GOOSE_PROVIDER: ${GOOSE_PROVIDER:-openai}
+      GOOSE_MODEL: ${GOOSE_MODEL:-qwen2.5-coder-32b}
+      WORKSPACE_VOLUME: worldmind-workspace
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Only used with `docker compose up worldmind`
+    # For local dev, run.sh starts the JAR directly
+    profiles:
+      - full
+
 volumes:
   pgdata:
+  workspace:
+    name: worldmind-workspace

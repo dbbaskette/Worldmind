@@ -40,6 +40,11 @@ public class OscillationDetector {
         return false;
     }
 
+    public int failureCount(String directiveId) {
+        var history = errorHistory.get(directiveId);
+        return history != null ? history.size() : 0;
+    }
+
     public void clearHistory(String directiveId) {
         errorHistory.remove(directiveId);
     }

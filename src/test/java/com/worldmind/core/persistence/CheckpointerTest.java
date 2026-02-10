@@ -237,7 +237,7 @@ class CheckpointerTest {
     @DisplayName("CheckpointerConfig creates MemorySaver as fallback")
     void configCreatesMemorySaverFallback() {
         var config = new CheckpointerConfig();
-        BaseCheckpointSaver saver = config.memoryCheckpointSaver();
+        BaseCheckpointSaver saver = config.checkpointSaver(java.util.Optional.empty());
 
         assertNotNull(saver, "Fallback saver should not be null");
         assertInstanceOf(MemorySaver.class, saver,
@@ -255,7 +255,7 @@ class CheckpointerTest {
         when(mockDataSource.getConnection()).thenReturn(mockConnection);
         when(mockConnection.prepareStatement(anyString())).thenReturn(mockStatement);
 
-        BaseCheckpointSaver saver = config.jdbcCheckpointSaver(mockDataSource);
+        BaseCheckpointSaver saver = config.checkpointSaver(java.util.Optional.of(mockDataSource));
 
         assertNotNull(saver, "JDBC saver should not be null");
         assertInstanceOf(JdbcCheckpointSaver.class, saver,

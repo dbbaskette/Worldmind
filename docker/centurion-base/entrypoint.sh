@@ -5,7 +5,7 @@
 # In Cloud Foundry: parses VCAP_SERVICES for GenAI tile credentials.
 # Locally: uses GOOSE_PROVIDER, GOOSE_MODEL, and provider-specific env vars.
 
-GOOSE_CONFIG_DIR="/home/centurion/.config/goose"
+GOOSE_CONFIG_DIR="${HOME}/.config/goose"
 PROFILES_FILE="$GOOSE_CONFIG_DIR/profiles.yaml"
 
 mkdir -p "$GOOSE_CONFIG_DIR"
@@ -82,9 +82,10 @@ default:
   provider: $PROVIDER
   processor: $MODEL
   accelerator: $MODEL
-  moderator: synopsis
+  moderator: passive
   toolkits:
-    - name: synopsis
+    - name: developer
+      requires: {}
 EOF
 
 echo "[entrypoint] Goose config written: provider=$PROVIDER, model=$MODEL"

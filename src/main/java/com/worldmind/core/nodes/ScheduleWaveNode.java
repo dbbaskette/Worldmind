@@ -6,6 +6,7 @@ import com.worldmind.core.state.WorldmindState;
 import com.worldmind.stargate.StargateProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.HashSet;
@@ -22,14 +23,21 @@ public class ScheduleWaveNode {
 
     private final DirectiveScheduler scheduler;
     private final int maxParallel;
+    private final int waveCooldownSeconds;
 
+    @Autowired
     public ScheduleWaveNode(DirectiveScheduler scheduler, StargateProperties properties) {
-        this(scheduler, properties.getMaxParallel());
+        this(scheduler, properties.getMaxParallel(), properties.getWaveCooldownSeconds());
     }
 
     ScheduleWaveNode(DirectiveScheduler scheduler, int maxParallel) {
+        this(scheduler, maxParallel, 0);
+    }
+
+    ScheduleWaveNode(DirectiveScheduler scheduler, int maxParallel, int waveCooldownSeconds) {
         this.scheduler = scheduler;
         this.maxParallel = maxParallel;
+        this.waveCooldownSeconds = waveCooldownSeconds;
     }
 
     public Map<String, Object> apply(WorldmindState state) {
@@ -37,6 +45,17 @@ public class ScheduleWaveNode {
         var completedIds = new HashSet<>(state.completedDirectiveIds());
         var strategy = state.executionStrategy();
         int currentWaveCount = state.waveCount();
+
+        // Rate-limit cooldown: wait between waves to avoid API token budget exhaustion.
+        // The first wave starts immediately; subsequent waves wait to let the token window reset.
+        if (currentWaveCount > 0 && waveCooldownSeconds > 0) {
+            log.info("Rate-limit cooldown: waiting {}s before wave {}", waveCooldownSeconds, currentWaveCount + 1);
+            try {
+                Thread.sleep(waveCooldownSeconds * 1000L);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
 
         var waveIds = scheduler.computeNextWave(directives, completedIds, strategy, maxParallel);
         int nextWaveCount = currentWaveCount + 1;

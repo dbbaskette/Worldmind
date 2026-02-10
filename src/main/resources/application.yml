@@ -29,6 +29,9 @@ spring:
       - org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration
       - org.springframework.ai.model.anthropic.autoconfigure.AnthropicChatAutoConfiguration
       - org.springframework.ai.model.openai.autoconfigure.OpenAiChatAutoConfiguration
+      - org.springframework.ai.model.google.genai.autoconfigure.chat.GoogleGenAiChatAutoConfiguration
+      - org.springframework.ai.model.google.genai.autoconfigure.embedding.GoogleGenAiTextEmbeddingAutoConfiguration
+      - org.springframework.ai.model.google.genai.autoconfigure.embedding.GoogleGenAiEmbeddingConnectionAutoConfiguration
 
 logging:
   level:
@@ -54,8 +57,9 @@ worldmind:
     lm-studio-url: ${LM_STUDIO_URL:http://host.docker.internal:1234/v1}
   stargate:
     provider: ${STARGATE_PROVIDER:docker}
-    max-parallel: 10
+    max-parallel: 1
     timeout-seconds: 300
+    wave-cooldown-seconds: ${WAVE_COOLDOWN_SECONDS:60}
     memory-limit-mb: 4096
     cpu-count: 2
     image: worldmind/centurion-forge:latest

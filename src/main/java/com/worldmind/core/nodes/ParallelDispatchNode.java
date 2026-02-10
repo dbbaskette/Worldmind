@@ -10,6 +10,7 @@ import com.worldmind.stargate.StargateBridge;
 import com.worldmind.stargate.StargateProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
@@ -32,6 +33,7 @@ public class ParallelDispatchNode {
     private final EventBus eventBus;
     private final WorldmindMetrics metrics;
 
+    @Autowired
     public ParallelDispatchNode(StargateBridge bridge, StargateProperties properties,
                                 EventBus eventBus, WorldmindMetrics metrics) {
         this(bridge, properties.getMaxParallel(), eventBus, metrics);
@@ -53,7 +55,12 @@ public class ParallelDispatchNode {
         var directives = state.directives();
         String retryContext = state.retryContext();
         var projectContext = state.projectContext().orElse(null);
-        String projectPath = projectContext != null ? projectContext.rootPath() : ".";
+        // Use the original user-supplied host path for centurion bind mounts.
+        // projectContext.rootPath() may be /workspace (container-internal) when running in Docker.
+        String userPath = state.projectPath();
+        String projectPath = (userPath != null && !userPath.isBlank())
+                ? userPath
+                : (projectContext != null ? projectContext.rootPath() : ".");
 
         if (waveIds.isEmpty()) {
             return Map.of(

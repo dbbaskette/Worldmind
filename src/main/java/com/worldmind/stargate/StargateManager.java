@@ -73,16 +73,33 @@ public class StargateManager {
             String instructionText,
             Map<String, String> extraEnv) {
 
+        // When running inside Docker, use the shared workspace volume path
+        // instead of the host project path for directive files and snapshots
+        String workspaceVolume = System.getenv("WORKSPACE_VOLUME");
+        Path effectivePath = workspaceVolume != null ? Path.of("/workspace") : projectPath;
+
         var envVars = new HashMap<>(extraEnv);
         envVars.put("GOOSE_PROVIDER", properties.getGooseProvider());
         envVars.put("GOOSE_MODEL", properties.getGooseModel());
-        if ("openai".equals(properties.getGooseProvider())) {
-            envVars.put("OPENAI_HOST", properties.getLmStudioUrl());
-            envVars.put("OPENAI_API_KEY", "not-needed-for-local");
-        } else if ("anthropic".equals(properties.getGooseProvider())) {
-            String apiKey = System.getenv("ANTHROPIC_API_KEY");
-            if (apiKey != null && !apiKey.isBlank()) {
-                envVars.put("ANTHROPIC_API_KEY", apiKey);
+        switch (properties.getGooseProvider()) {
+            case "openai" -> {
+                // Goose appends "v1" to OPENAI_HOST — ensure trailing slash so it forms ".../v1"
+                String lmUrl = properties.getLmStudioUrl();
+                if (!lmUrl.endsWith("/")) lmUrl += "/";
+                envVars.put("OPENAI_HOST", lmUrl);
+                envVars.put("OPENAI_API_KEY", "not-needed-for-local");
+            }
+            case "anthropic" -> {
+                String apiKey = System.getenv("ANTHROPIC_API_KEY");
+                if (apiKey != null && !apiKey.isBlank()) {
+                    envVars.put("ANTHROPIC_API_KEY", apiKey);
+                }
+            }
+            case "google" -> {
+                String apiKey = System.getenv("GOOGLE_API_KEY");
+                if (apiKey != null && !apiKey.isBlank()) {
+                    envVars.put("GOOGLE_API_KEY", apiKey);
+                }
             }
         }
 
@@ -92,8 +109,13 @@ public class StargateManager {
             properties.getMemoryLimitMb(), properties.getCpuCount()
         );
 
-        // Write instruction file for Goose CLI (expects a markdown file path, not inline text)
-        Path directiveDir = projectPath.resolve(".worldmind/directives");
+        // Write instruction file for Goose CLI (expects a markdown file path, not inline text).
+        // When in Docker, write to the volume root (/workspace/directives/) so centurion
+        // containers can read them at /instructions/directives/ via a separate volume mount.
+        // When running locally, write under the project directory.
+        Path directiveDir = workspaceVolume != null
+                ? Path.of("/workspace/directives")
+                : effectivePath.resolve(".worldmind/directives");
         Path instructionFile = directiveDir.resolve(directiveId + ".md");
         try {
             Files.createDirectories(directiveDir);
@@ -102,7 +124,7 @@ public class StargateManager {
             throw new RuntimeException("Failed to write instruction file for " + directiveId, e);
         }
 
-        Map<String, Long> beforeSnapshot = snapshotFiles(projectPath);
+        Map<String, Long> beforeSnapshot = snapshotFiles(effectivePath);
 
         long startMs = System.currentTimeMillis();
         String stargateId = provider.openStargate(request);
@@ -112,7 +134,7 @@ public class StargateManager {
             String output = provider.captureOutput(stargateId);
             long elapsedMs = System.currentTimeMillis() - startMs;
 
-            List<FileRecord> changes = detectChanges(beforeSnapshot, projectPath);
+            List<FileRecord> changes = detectChanges(beforeSnapshot, effectivePath);
 
             log.info("Stargate {} completed with exit code {} in {}ms — {} file changes",
                     stargateId, exitCode, elapsedMs, changes.size());

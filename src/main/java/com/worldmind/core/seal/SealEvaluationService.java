@@ -86,18 +86,11 @@ public class SealEvaluationService {
         // Try pytest style: "8 passed, 2 failed"
         Matcher passedMatcher = PYTEST_PASSED_PATTERN.matcher(gauntletOutput);
         Matcher failedMatcher = PYTEST_FAILED_PATTERN.matcher(gauntletOutput);
-        if (passedMatcher.find() || failedMatcher.find()) {
-            int passedCount = 0;
-            int failedCount = 0;
-            // Re-create matchers since find() advances the position
-            passedMatcher = PYTEST_PASSED_PATTERN.matcher(gauntletOutput);
-            failedMatcher = PYTEST_FAILED_PATTERN.matcher(gauntletOutput);
-            if (passedMatcher.find()) {
-                passedCount = Integer.parseInt(passedMatcher.group(1));
-            }
-            if (failedMatcher.find()) {
-                failedCount = Integer.parseInt(failedMatcher.group(1));
-            }
+        boolean foundPassed = passedMatcher.find();
+        boolean foundFailed = failedMatcher.find();
+        if (foundPassed || foundFailed) {
+            int passedCount = foundPassed ? Integer.parseInt(passedMatcher.group(1)) : 0;
+            int failedCount = foundFailed ? Integer.parseInt(failedMatcher.group(1)) : 0;
             int totalTests = passedCount + failedCount;
             boolean passed = failedCount == 0;
             log.info("Parsed pytest-style output for {}: {}/{} tests passed", directiveId, passedCount, totalTests);

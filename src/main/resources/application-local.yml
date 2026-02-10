@@ -1,6 +1,7 @@
 ## Profile: local
 ## Connects to a local OpenAI-compatible server (LM Studio, Ollama, etc.)
-## Usage: ./run.sh local
+## PostgreSQL is expected to be running (run.sh starts it automatically)
+## Usage: ./run.sh serve
 
 spring:
   http:
@@ -17,7 +18,7 @@ spring:
           max-tokens: 8192
   autoconfigure:
     exclude:
-      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
       - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration
       - org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration
       - org.springframework.ai.model.anthropic.autoconfigure.AnthropicChatAutoConfiguration

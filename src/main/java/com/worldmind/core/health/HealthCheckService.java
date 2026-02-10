@@ -72,19 +72,9 @@ public class HealthCheckService {
             return new HealthStatus("docker", HealthStatus.Status.DOWN,
                     "No StargateProvider configured", Map.of());
         }
-        if (stargateProvider instanceof DockerStargateProvider) {
-            try {
-                // Attempt a lightweight check — provider is available
-                return new HealthStatus("docker", HealthStatus.Status.UP,
-                        "Docker provider available", Map.of());
-            } catch (Exception e) {
-                log.warn("Docker health check failed: {}", e.getMessage());
-                return new HealthStatus("docker", HealthStatus.Status.DOWN,
-                        "Docker error: " + e.getMessage(), Map.of());
-            }
-        }
-        return new HealthStatus("docker", HealthStatus.Status.UP,
-                "StargateProvider available (" + stargateProvider.getClass().getSimpleName() + ")",
-                Map.of());
+        String detail = stargateProvider instanceof DockerStargateProvider
+                ? "Docker provider available"
+                : "StargateProvider available (" + stargateProvider.getClass().getSimpleName() + ")";
+        return new HealthStatus("docker", HealthStatus.Status.UP, detail, Map.of());
     }
 }

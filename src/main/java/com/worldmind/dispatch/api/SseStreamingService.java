@@ -4,6 +4,7 @@ import com.worldmind.core.events.EventBus;
 import com.worldmind.core.events.WorldmindEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -34,6 +35,7 @@ public class SseStreamingService {
     /** Tracks active emitter registrations for monitoring/cleanup. */
     private final CopyOnWriteArrayList<EmitterRegistration> activeRegistrations = new CopyOnWriteArrayList<>();
 
+    @Autowired
     public SseStreamingService(EventBus eventBus) {
         this(eventBus, DEFAULT_TIMEOUT_MS);
     }

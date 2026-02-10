@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -40,15 +41,26 @@ public class MissionEngine {
     }
 
     /**
-     * Runs the full planning pipeline for a mission request.
+     * Runs the full planning pipeline for a mission request, generating a new mission ID.
+     */
+    public WorldmindState runMission(String request, InteractionMode mode) {
+        return runMission(generateMissionId(), request, mode);
+    }
+
+    /**
+     * Runs the full planning pipeline for a mission request with a pre-generated mission ID.
      *
-     * @param request the natural-language mission request
-     * @param mode    the interaction mode (FULL_AUTO, APPROVE_PLAN, STEP_BY_STEP)
+     * @param missionId the mission ID to use (e.g. from the REST controller)
+     * @param request   the natural-language mission request
+     * @param mode      the interaction mode (FULL_AUTO, APPROVE_PLAN, STEP_BY_STEP)
      * @return the final graph state after all nodes have executed
      * @throws RuntimeException if the graph execution returns empty state
      */
-    public WorldmindState runMission(String request, InteractionMode mode) {
-        String missionId = generateMissionId();
+    public WorldmindState runMission(String missionId, String request, InteractionMode mode) {
+        return runMission(missionId, request, mode, null);
+    }
+
+    public WorldmindState runMission(String missionId, String request, InteractionMode mode, String projectPath) {
         MdcContext.setMission(missionId);
         try {
             log.info("Starting mission {} with mode {} — request: {}", missionId, mode, request);
@@ -58,12 +70,15 @@ public class MissionEngine {
                     Map.of("mode", mode.name(), "request", request),
                     Instant.now()));
 
-            Map<String, Object> initialState = Map.of(
-                    "missionId", missionId,
-                    "request", request,
-                    "interactionMode", mode.name(),
-                    "status", MissionStatus.CLASSIFYING.name()
-            );
+            var stateMap = new HashMap<String, Object>();
+            stateMap.put("missionId", missionId);
+            stateMap.put("request", request);
+            stateMap.put("interactionMode", mode.name());
+            stateMap.put("status", MissionStatus.CLASSIFYING.name());
+            if (projectPath != null && !projectPath.isBlank()) {
+                stateMap.put("projectPath", projectPath);
+            }
+            Map<String, Object> initialState = Map.copyOf(stateMap);
 
             // Configure graph invocation with thread ID for checkpointing
             var config = RunnableConfig.builder()

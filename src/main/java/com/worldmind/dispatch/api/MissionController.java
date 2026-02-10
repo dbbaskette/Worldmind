@@ -4,9 +4,9 @@ import com.worldmind.core.engine.MissionEngine;
 import com.worldmind.core.model.Directive;
 import com.worldmind.core.model.InteractionMode;
 import com.worldmind.core.model.MissionStatus;
-import com.worldmind.core.persistence.JdbcCheckpointSaver;
 import com.worldmind.core.state.WorldmindState;
 import org.bsc.langgraph4j.RunnableConfig;
+import org.bsc.langgraph4j.checkpoint.BaseCheckpointSaver;
 import org.bsc.langgraph4j.checkpoint.Checkpoint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,7 +29,7 @@ public class MissionController {
     private static final Logger log = LoggerFactory.getLogger(MissionController.class);
 
     private final MissionEngine missionEngine;
-    private final JdbcCheckpointSaver checkpointSaver;
+    private final BaseCheckpointSaver checkpointSaver;
     private final SseStreamingService sseStreamingService;
 
     /** In-memory store of running/completed mission states, keyed by missionId. */
@@ -39,7 +39,7 @@ public class MissionController {
     private final ConcurrentHashMap<String, CompletableFuture<WorldmindState>> missionFutures = new ConcurrentHashMap<>();
 
     public MissionController(MissionEngine missionEngine,
-                             JdbcCheckpointSaver checkpointSaver,
+                             BaseCheckpointSaver checkpointSaver,
                              SseStreamingService sseStreamingService) {
         this.missionEngine = missionEngine;
         this.checkpointSaver = checkpointSaver;
@@ -81,7 +81,7 @@ public class MissionController {
         // Run mission asynchronously
         CompletableFuture<WorldmindState> future = CompletableFuture.supplyAsync(() -> {
             try {
-                WorldmindState result = missionEngine.runMission(request.request(), mode);
+                WorldmindState result = missionEngine.runMission(missionId, request.request(), mode, request.projectPath());
                 if (result != null) {
                     missionStates.put(missionId, result);
                 }
@@ -147,16 +147,40 @@ public class MissionController {
                     Map.of("error", "Mission is not awaiting approval; current status: " + state.status()));
         }
 
-        log.info("Approving mission {}", id);
+        log.info("Approving mission {} — launching execution", id);
 
-        // Transition to EXECUTING and kick off the execution phase asynchronously
+        // Transition to EXECUTING immediately so the UI sees the status change
         WorldmindState executingState = new WorldmindState(Map.of(
-                "missionId", state.missionId(),
+                "missionId", id,
                 "request", state.request(),
-                "interactionMode", state.interactionMode().name(),
+                "interactionMode", InteractionMode.FULL_AUTO.name(),
                 "status", MissionStatus.EXECUTING.name()
         ));
         missionStates.put(id, executingState);
+
+        // Re-invoke the graph with FULL_AUTO so it runs all the way through
+        CompletableFuture<WorldmindState> future = CompletableFuture.supplyAsync(() -> {
+            try {
+                WorldmindState result = missionEngine.runMission(id, state.request(), InteractionMode.FULL_AUTO);
+                if (result != null) {
+                    missionStates.put(id, result);
+                }
+                return result;
+            } catch (Exception e) {
+                log.error("Mission {} execution failed after approval", id, e);
+                WorldmindState failedState = new WorldmindState(Map.of(
+                        "missionId", id,
+                        "request", state.request(),
+                        "status", MissionStatus.FAILED.name(),
+                        "errors", List.of(e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName())
+                ));
+                missionStates.put(id, failedState);
+                return failedState;
+            } finally {
+                missionFutures.remove(id);
+            }
+        });
+        missionFutures.put(id, future);
 
         return ResponseEntity.ok(Map.of(
                 "mission_id", id,

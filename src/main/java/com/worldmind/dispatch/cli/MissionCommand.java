@@ -109,8 +109,7 @@ public class MissionCommand implements Runnable {
         }
 
         // Display file changes from directives
-        var allDirectives = finalState.directives();
-        for (var d : allDirectives) {
+        for (var d : directives) {
             if (d.filesAffected() != null) {
                 for (var f : d.filesAffected()) {
                     ConsoleOutput.fileChange(f.action(), f.path());

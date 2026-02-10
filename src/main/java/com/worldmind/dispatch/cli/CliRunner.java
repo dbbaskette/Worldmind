@@ -24,6 +24,14 @@ public class CliRunner implements CommandLineRunner, ExitCodeGenerator {
 
     @Override
     public void run(String... args) throws Exception {
+        // In serve mode, Spring Boot's embedded web server handles everything.
+        // Skip picocli — its execute() returns immediately which can cause the
+        // main thread to complete and the JVM to exit before Tomcat is ready.
+        for (String arg : args) {
+            if ("serve".equals(arg)) {
+                return;
+            }
+        }
         exitCode = new CommandLine(worldmindCommand, factory).execute(args);
     }
 
