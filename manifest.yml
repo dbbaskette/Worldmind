@@ -29,6 +29,7 @@ applications:
   - name: ((centurion-forge-app))
     docker:
       image: ((centurion-image-registry))/centurion-forge:latest
+      username: ((docker-username))
     memory: 2G
     disk_quota: 4G
     instances: 0
@@ -41,6 +42,7 @@ applications:
   - name: ((centurion-gauntlet-app))
     docker:
       image: ((centurion-image-registry))/centurion-gauntlet:latest
+      username: ((docker-username))
     memory: 2G
     disk_quota: 4G
     instances: 0
@@ -53,6 +55,7 @@ applications:
   - name: ((centurion-vigil-app))
     docker:
       image: ((centurion-image-registry))/centurion-vigil:latest
+      username: ((docker-username))
     memory: 2G
     disk_quota: 4G
     instances: 0

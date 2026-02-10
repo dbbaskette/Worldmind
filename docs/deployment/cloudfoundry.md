@@ -25,6 +25,7 @@
   - `{registry}/centurion-forge:latest`
   - `{registry}/centurion-gauntlet:latest`
   - `{registry}/centurion-vigil:latest`
+- **GitHub PAT** with `read:packages` scope for pulling images from GHCR. Set `CF_DOCKER_PASSWORD` in your `.env` file (or export it). The `docker-username` in `cf-vars.yml` must match the GitHub account.
 - CF foundation must have **Diego Docker support enabled**:
   ```bash
   cf feature-flag diego_docker
@@ -73,9 +74,16 @@ cf-org: my-org
 cf-space: my-space
 git-remote-url: https://github.com/your-org/your-repo.git
 centurion-image-registry: ghcr.io/dbbaskette
+docker-username: dbbaskette
 centurion-forge-app: centurion-forge
 centurion-gauntlet-app: centurion-gauntlet
 centurion-vigil-app: centurion-vigil
+```
+
+The Docker password (GitHub PAT) is **not** in the vars file — it is read from `CF_DOCKER_PASSWORD` in the environment. Set it in your `.env`:
+
+```bash
+CF_DOCKER_PASSWORD=ghp_yourGitHubPAThere
 ```
 
 The `manifest.yml` uses `((variable))` substitution syntax. All values in this file flow into the manifest at deploy time — no `cf set-env` needed.
@@ -154,6 +162,7 @@ This gives each centurion an isolated working copy while maintaining a shared, o
 | `cf-space` | CF space name |
 | `git-remote-url` | Git remote for workspace sharing between centurions |
 | `centurion-image-registry` | Docker image registry prefix (e.g., `ghcr.io/dbbaskette`) |
+| `docker-username` | Registry username (GitHub username for GHCR) |
 | `centurion-forge-app` | CF app name for Forge centurion |
 | `centurion-gauntlet-app` | CF app name for Gauntlet centurion |
 | `centurion-vigil-app` | CF app name for Vigil centurion |
@@ -176,6 +185,7 @@ This gives each centurion an isolated working copy while maintaining a shared, o
 | `worldmind.cf.task-disk-mb`              | --                     | CF task disk limit                          | `4096`           |
 | `GOOSE_MODEL`                             | `GOOSE_MODEL`          | LLM model name (if not in service metadata) | --               |
 | `SPRING_PROFILES_ACTIVE`                  | `SPRING_PROFILES_ACTIVE` | Must include `cf`                        | --               |
+| `CF_DOCKER_PASSWORD`                      | `CF_DOCKER_PASSWORD`   | GitHub PAT with `read:packages` for GHCR    | --               |
 
 ## 8. API Usage with `git_remote_url`
 

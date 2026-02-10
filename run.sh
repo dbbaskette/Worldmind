@@ -61,9 +61,14 @@ case "$1" in
     ;;
   cf-push)
     VARS_FILE="${2:-cf-vars.yml}"
+    if [ -z "${CF_DOCKER_PASSWORD:-}" ]; then
+      echo "ERROR: CF_DOCKER_PASSWORD is not set."
+      echo "Set it to a GitHub PAT with read:packages scope (in .env or export it)."
+      exit 1
+    fi
     echo "Building and pushing to Cloud Foundry (vars: $VARS_FILE)..."
     ./mvnw -q clean package -DskipTests
-    cf push --vars-file "$VARS_FILE"
+    CF_DOCKER_PASSWORD="$CF_DOCKER_PASSWORD" cf push --vars-file "$VARS_FILE"
     exit 0
     ;;
 esac

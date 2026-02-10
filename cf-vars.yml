@@ -13,6 +13,10 @@ git-remote-url: https://github.com/your-org/your-repo.git
 # Centurion image registry (no trailing slash)
 centurion-image-registry: ghcr.io/dbbaskette
 
+# GitHub username for GHCR authentication
+# CF_DOCKER_PASSWORD must be set to a GitHub PAT with read:packages scope
+docker-username: dbbaskette
+
 # Centurion CF app names
 centurion-forge-app: centurion-forge
 centurion-gauntlet-app: centurion-gauntlet
