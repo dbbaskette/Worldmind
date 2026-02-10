@@ -98,11 +98,11 @@ public class MissionCommand implements Runnable {
         }
 
         // Display execution results
-        var stargates = finalState.stargates();
-        if (!stargates.isEmpty()) {
+        var starblasters = finalState.starblasters();
+        if (!starblasters.isEmpty()) {
             System.out.println();
-            for (var sg : stargates) {
-                ConsoleOutput.stargate(String.format(
+            for (var sg : starblasters) {
+                ConsoleOutput.starblaster(String.format(
                     "Centurion %s — %s (%s)",
                     sg.centurionType(), sg.directiveId(), sg.status()));
             }

@@ -185,10 +185,10 @@ class ModelTest {
         }
 
         @Test
-        @DisplayName("StargateInfo record construction and accessors")
-        void stargateInfoRecord() {
+        @DisplayName("StarblasterInfo record construction and accessors")
+        void starblasterInfoRecord() {
             Instant now = Instant.now();
-            var si = new StargateInfo("ctr-abc", "code-writer", "d-001", "running", now, null);
+            var si = new StarblasterInfo("ctr-abc", "code-writer", "d-001", "running", now, null);
             assertEquals("ctr-abc", si.containerId());
             assertEquals("code-writer", si.centurionType());
             assertEquals("running", si.status());
@@ -267,9 +267,9 @@ class ModelTest {
             var expected = List.of(
                 "missionId", "request", "interactionMode", "status",
                 "classification", "projectContext", "executionStrategy",
-                "directives", "currentDirectiveIndex", "stargates",
+                "directives", "currentDirectiveIndex", "starblasters",
                 "testResults", "reviewFeedback", "sealGranted",
-                "retryContext", "metrics", "errors",
+                "retryContext", "metrics", "errors", "projectPath", "gitRemoteUrl",
                 "completedDirectiveIds", "waveDirectiveIds", "waveCount", "waveDispatchResults"
             );
             for (String key : expected) {
@@ -393,7 +393,7 @@ class ModelTest {
         void listFieldsDefaultEmpty() {
             var state = new WorldmindState(Map.of());
             assertTrue(state.directives().isEmpty());
-            assertTrue(state.stargates().isEmpty());
+            assertTrue(state.starblasters().isEmpty());
             assertTrue(state.testResults().isEmpty());
             assertTrue(state.reviewFeedback().isEmpty());
             assertTrue(state.errors().isEmpty());

@@ -4,7 +4,7 @@
 
 **Goal:** Build an agentic code assistant that accepts natural language requests and autonomously plans, implements, tests, and reviews code using a LangGraph4j control plane (on Spring Boot) orchestrating Goose worker agents in Docker containers.
 
-**Architecture:** A hybrid system where LangGraph4j (Java) manages state, planning, routing, and persistence (the "nervous system") while Goose instances running in Docker containers (Stargates) perform actual code generation and file manipulation via MCP tools (the "hands"). Spring AI provides Anthropic Claude integration with structured output. Spring Boot provides REST API, DI, and observability.
+**Architecture:** A hybrid system where LangGraph4j (Java) manages state, planning, routing, and persistence (the "nervous system") while Goose instances running in Docker containers (Starblasters) perform actual code generation and file manipulation via MCP tools (the "hands"). Spring AI provides Anthropic Claude integration with structured output. Spring Boot provides REST API, DI, and observability.
 
 **Tech Stack:** Java 21, Maven, Spring Boot 3.4, Spring AI 1.1, LangGraph4j 1.8, Goose CLI (headless), picocli, PostgreSQL, Docker, MCP servers, Anthropic Claude, Micrometer.
 
@@ -97,7 +97,7 @@ spring:
 worldmind:
   goose:
     model: ${GOOSE_MODEL:claude-sonnet-4-5-20250929}
-  stargate:
+  starblaster:
     max-parallel: 10
     timeout-seconds: 300
     memory-limit: 4g
@@ -126,7 +126,7 @@ After creating all files: `./mvnw clean package -DskipTests` should produce a ru
 - Create: `src/main/java/com/worldmind/core/model/FileRecord.java`
 - Create: `src/main/java/com/worldmind/core/model/TestResult.java`
 - Create: `src/main/java/com/worldmind/core/model/ReviewFeedback.java`
-- Create: `src/main/java/com/worldmind/core/model/StargateInfo.java`
+- Create: `src/main/java/com/worldmind/core/model/StarblasterInfo.java`
 - Create: `src/main/java/com/worldmind/core/model/MissionMetrics.java`
 - Create: `src/main/java/com/worldmind/core/state/WorldmindState.java`
 - Test: `src/test/java/com/worldmind/core/model/ModelTest.java`
@@ -415,11 +415,11 @@ DIRECTIVES:
 
 Proceed? [Y/n] y
 
-[STARGATE] Opening for Centurion Forge...
+[STARBLASTER] Opening for Centurion Forge...
 [CENTURION FORGE] Directive 001: Create hello.py
-[STARGATE] Container stargate-forge-001 running
+[STARBLASTER] Container starblaster-forge-001 running
 [CENTURION FORGE] Directive complete. 1 file created.
-[STARGATE] Torn down.
+[STARBLASTER] Torn down.
 
 ✓ Mission complete. 1 file created.
 
@@ -440,21 +440,21 @@ print("Hello, World!")
 
 ---
 
-### Task 2.2: Stargate Manager (Docker Java Client)
+### Task 2.2: Starblaster Manager (Docker Java Client)
 
 **Files:**
-- Create: `src/main/java/com/worldmind/stargate/StargateManager.java`
-- Create: `src/main/java/com/worldmind/stargate/StargateBridge.java`
-- Create: `src/main/java/com/worldmind/stargate/InstructionBuilder.java`
-- Test: `src/test/java/com/worldmind/stargate/StargateManagerTest.java`
+- Create: `src/main/java/com/worldmind/starblaster/StarblasterManager.java`
+- Create: `src/main/java/com/worldmind/starblaster/StarblasterBridge.java`
+- Create: `src/main/java/com/worldmind/starblaster/InstructionBuilder.java`
+- Test: `src/test/java/com/worldmind/starblaster/StarblasterManagerTest.java`
 
 **Key design:**
-- `StargateManager` is a Spring `@Service` using Docker Java client
+- `StarblasterManager` is a Spring `@Service` using Docker Java client
 - `InstructionBuilder` constructs Goose instruction markdown from a `Directive` record
-- `StargateBridge` orchestrates: build instruction → open stargate → wait → capture → teardown
+- `StarblasterBridge` orchestrates: build instruction → open starblaster → wait → capture → teardown
 - File change detection: snapshot before/after to find created/modified files
 
-**Commit:** `feat: Stargate Manager and Bridge for Docker-based Goose execution`
+**Commit:** `feat: Starblaster Manager and Bridge for Docker-based Goose execution`
 
 ---
 
@@ -466,11 +466,11 @@ print("Hello, World!")
 - Test: `src/test/java/com/worldmind/core/nodes/DispatchCenturionNodeTest.java`
 
 **Key design:**
-- Node finds next pending directive, calls `StargateBridge.executeDirective()`
+- Node finds next pending directive, calls `StarblasterBridge.executeDirective()`
 - Updates directive status and files_created in state
 - Graph wired: execute_directives → dispatch_centurion → conditional (more pending? loop : END)
 
-**Commit:** `feat: dispatch_centurion node with Stargate Bridge integration`
+**Commit:** `feat: dispatch_centurion node with Starblaster Bridge integration`
 
 ---
 
@@ -534,7 +534,7 @@ Dependency-aware `DirectiveScheduler.computeNextWave()` — filters directives b
 Graph node that calls `DirectiveScheduler`, writes `waveDirectiveIds` and increments `waveCount`. Empty wave signals all directives complete (routes to converge).
 
 ### Task 4.4: ParallelDispatchNode ✅
-Dispatches all directives in a wave concurrently via `CompletableFuture.supplyAsync()` on `Executors.newVirtualThreadPerTaskExecutor()`. Bounded by `Semaphore(maxParallel)`. Applies retry context augmentation. Collects `WaveDispatchResult`, `StargateInfo`, and errors.
+Dispatches all directives in a wave concurrently via `CompletableFuture.supplyAsync()` on `Executors.newVirtualThreadPerTaskExecutor()`. Bounded by `Semaphore(maxParallel)`. Applies retry context augmentation. Collects `WaveDispatchResult`, `StarblasterInfo`, and errors.
 
 ### Task 4.5: EvaluateWaveNode ✅
 Batch seal evaluation for all directives in a wave. Non-FORGE directives auto-pass. FORGE directives run GAUNTLET + VIGIL through `SealEvaluationService`. Handles RETRY (re-enter next wave), SKIP (mark complete), ESCALATE (mission failed). 9 unit tests.
@@ -543,7 +543,7 @@ Batch seal evaluation for all directives in a wave. Non-FORGE directives auto-pa
 Replaced `dispatch_centurion → evaluate_seal` index-based loop with wave-based loop: `schedule_wave → parallel_dispatch → evaluate_wave → schedule_wave`. New routing: `routeAfterSchedule` (empty wave → converge), `routeAfterWaveEval` (all done or failed → converge, else → next wave). Updated GraphTest, CheckpointerTest, MissionEngineTest.
 
 ### Task 4.7: Centurion Pulse Docker Image ✅
-Created `docker/centurion-pulse/Dockerfile` (FROM centurion-base). Added `InstructionBuilder.buildPulseInstruction()` with read-only constraints. Works through existing StargateBridge infrastructure.
+Created `docker/centurion-pulse/Dockerfile` (FROM centurion-base). Added `InstructionBuilder.buildPulseInstruction()` with read-only constraints. Works through existing StarblasterBridge infrastructure.
 
 ### Task 4.8: CLI Output & Metrics ✅
 Added `wavesExecuted` and `aggregateDurationMs` to `MissionMetrics`. Added `wave()`, `parallelProgress()`, `waveComplete()` to `ConsoleOutput`. Updated `ConvergeResultsNode` to compute wave metrics. Updated `MissionCommand` for wave-aware display.
@@ -603,7 +603,7 @@ Last centurion type. Runs tests before/after to verify behavioral equivalence.
 Monitor iterative cycles for alternating patterns. Escalate early if detected.
 
 ### Task 6.8: Health Command (Real Implementation)
-Check PostgreSQL, Docker, MCP servers, stargate pool status. Display with ANSI colors.
+Check PostgreSQL, Docker, MCP servers, starblaster pool status. Display with ANSI colors.
 
 ---
 
@@ -645,9 +645,9 @@ worldmind/
 │   │   │   │   ├── scheduler/      # DirectiveScheduler
 │   │   │   │   ├── events/         # EventBus, WorldmindEvent
 │   │   │   │   └── oscillation/    # OscillationDetector
-│   │   │   ├── stargate/
-│   │   │   │   ├── StargateManager.java
-│   │   │   │   ├── StargateBridge.java
+│   │   │   ├── starblaster/
+│   │   │   │   ├── StarblasterManager.java
+│   │   │   │   ├── StarblasterBridge.java
 │   │   │   │   └── InstructionBuilder.java
 │   │   │   ├── dispatch/
 │   │   │   │   ├── cli/            # picocli commands
@@ -669,7 +669,7 @@ worldmind/
 │           │   ├── engine/MissionEngineTest.java
 │           │   ├── scanner/ProjectScannerTest.java
 │           │   └── persistence/CheckpointerTest.java
-│           ├── stargate/StargateManagerTest.java
+│           ├── starblaster/StarblasterManagerTest.java
 │           ├── dispatch/cli/CliTest.java
 │           ├── dispatch/api/ApiTest.java
 │           └── integration/ForgeIntegrationTest.java

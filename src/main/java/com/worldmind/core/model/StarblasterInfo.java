@@ -4,9 +4,9 @@ import java.io.Serializable;
 import java.time.Instant;
 
 /**
- * Metadata about a Stargate container running a Centurion for a specific directive.
+ * Metadata about a Starblaster container running a Centurion for a specific directive.
  */
-public record StargateInfo(
+public record StarblasterInfo(
     String containerId,
     String centurionType,
     String directiveId,

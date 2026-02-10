@@ -1,8 +1,8 @@
 package com.worldmind.core.health;
 
 import com.worldmind.core.graph.WorldmindGraph;
-import com.worldmind.stargate.DockerStargateProvider;
-import com.worldmind.stargate.StargateProvider;
+import com.worldmind.starblaster.DockerStarblasterProvider;
+import com.worldmind.starblaster.StarblasterProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,15 +19,15 @@ public class HealthCheckService {
     private static final Logger log = LoggerFactory.getLogger(HealthCheckService.class);
 
     private final WorldmindGraph worldmindGraph;
-    private final StargateProvider stargateProvider;
+    private final StarblasterProvider starblasterProvider;
     private final DataSource dataSource;
 
     public HealthCheckService(
             @Autowired(required = false) WorldmindGraph worldmindGraph,
-            @Autowired(required = false) StargateProvider stargateProvider,
+            @Autowired(required = false) StarblasterProvider starblasterProvider,
             @Autowired(required = false) DataSource dataSource) {
         this.worldmindGraph = worldmindGraph;
-        this.stargateProvider = stargateProvider;
+        this.starblasterProvider = starblasterProvider;
         this.dataSource = dataSource;
     }
 
@@ -68,13 +68,13 @@ public class HealthCheckService {
     }
 
     private HealthStatus checkDocker() {
-        if (stargateProvider == null) {
+        if (starblasterProvider == null) {
             return new HealthStatus("docker", HealthStatus.Status.DOWN,
-                    "No StargateProvider configured", Map.of());
+                    "No StarblasterProvider configured", Map.of());
         }
-        String detail = stargateProvider instanceof DockerStargateProvider
+        String detail = starblasterProvider instanceof DockerStarblasterProvider
                 ? "Docker provider available"
-                : "StargateProvider available (" + stargateProvider.getClass().getSimpleName() + ")";
+                : "StarblasterProvider available (" + starblasterProvider.getClass().getSimpleName() + ")";
         return new HealthStatus("docker", HealthStatus.Status.UP, detail, Map.of());
     }
 }

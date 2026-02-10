@@ -1,4 +1,4 @@
-package com.worldmind.stargate;
+package com.worldmind.starblaster;
 
 import com.worldmind.core.model.*;
 import org.slf4j.Logger;
@@ -10,57 +10,57 @@ import java.time.Instant;
 import java.util.Map;
 
 /**
- * Thin translation layer between the LangGraph4j planning domain and Stargate execution.
+ * Thin translation layer between the LangGraph4j planning domain and Starblaster execution.
  *
  * <p>Responsibilities:
  * <ul>
  *   <li>Builds instruction markdown via {@link InstructionBuilder}</li>
- *   <li>Delegates execution to {@link StargateManager}</li>
- *   <li>Translates {@link StargateManager.ExecutionResult} into an updated {@link Directive}
- *       and {@link StargateInfo}</li>
+ *   <li>Delegates execution to {@link StarblasterManager}</li>
+ *   <li>Translates {@link StarblasterManager.ExecutionResult} into an updated {@link Directive}
+ *       and {@link StarblasterInfo}</li>
  * </ul>
  *
  * <p>Intentionally contains no business logic — just translation.
  */
 @Service
-public class StargateBridge {
+public class StarblasterBridge {
 
-    private static final Logger log = LoggerFactory.getLogger(StargateBridge.class);
+    private static final Logger log = LoggerFactory.getLogger(StarblasterBridge.class);
 
-    private final StargateManager manager;
+    private final StarblasterManager manager;
 
-    public StargateBridge(StargateManager manager) {
+    public StarblasterBridge(StarblasterManager manager) {
         this.manager = manager;
     }
 
     /**
-     * Composite result returned after executing a directive through a Stargate.
+     * Composite result returned after executing a directive through a Starblaster.
      *
      * @param directive    the directive with updated status, iteration count, file changes, and timing
-     * @param stargateInfo metadata about the Stargate container that executed the directive
+     * @param starblasterInfo metadata about the Starblaster container that executed the directive
      * @param output       captured stdout/stderr from the container
      */
     public record BridgeResult(
         Directive directive,
-        StargateInfo stargateInfo,
+        StarblasterInfo starblasterInfo,
         String output
     ) {}
 
     /**
-     * Executes a directive inside a Stargate container and returns the translated result.
+     * Executes a directive inside a Starblaster container and returns the translated result.
      *
      * <p>Flow:
      * <ol>
      *   <li>Build instruction markdown from directive + project context</li>
-     *   <li>Delegate to {@link StargateManager#executeDirective}</li>
+     *   <li>Delegate to {@link StarblasterManager#executeDirective}</li>
      *   <li>Map exit code to {@link DirectiveStatus#PASSED} or {@link DirectiveStatus#FAILED}</li>
-     *   <li>Construct updated directive and stargate info</li>
+     *   <li>Construct updated directive and starblaster info</li>
      * </ol>
      *
      * @param directive   the directive to execute
      * @param context     project context (may be null)
      * @param projectPath host path to the project directory
-     * @return bridge result containing updated directive, stargate info, and output
+     * @return bridge result containing updated directive, starblaster info, and output
      */
     public BridgeResult executeDirective(Directive directive, ProjectContext context, Path projectPath) {
         log.info("Executing directive {} [{}]: {}",
@@ -98,8 +98,8 @@ public class StargateBridge {
             execResult.elapsedMs()
         );
 
-        var stargateInfo = new StargateInfo(
-            execResult.stargateId(),
+        var starblasterInfo = new StarblasterInfo(
+            execResult.starblasterId(),
             directive.centurion(),
             directive.id(),
             success ? "completed" : "failed",
@@ -110,6 +110,6 @@ public class StargateBridge {
         log.info("Directive {} {} in {}ms",
                 directive.id(), success ? "PASSED" : "FAILED", execResult.elapsedMs());
 
-        return new BridgeResult(updatedDirective, stargateInfo, execResult.output());
+        return new BridgeResult(updatedDirective, starblasterInfo, execResult.output());
     }
 }

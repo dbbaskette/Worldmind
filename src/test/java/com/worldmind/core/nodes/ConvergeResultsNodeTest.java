@@ -53,7 +53,7 @@ class ConvergeResultsNodeTest {
         var state = new WorldmindState(Map.of(
             "directives", List.of(d1, d2, d3),
             "testResults", List.of(),
-            "stargates", List.of()
+            "starblasters", List.of()
         ));
 
         var result = node.apply(state);
@@ -84,7 +84,7 @@ class ConvergeResultsNodeTest {
         var state = new WorldmindState(Map.of(
             "directives", List.of(d1, d2),
             "testResults", List.of(),
-            "stargates", List.of()
+            "starblasters", List.of()
         ));
 
         var result = node.apply(state);
@@ -101,7 +101,7 @@ class ConvergeResultsNodeTest {
         var state = new WorldmindState(Map.of(
             "directives", List.of(),
             "testResults", List.of(),
-            "stargates", List.of()
+            "starblasters", List.of()
         ));
 
         var result = node.apply(state);
@@ -128,7 +128,7 @@ class ConvergeResultsNodeTest {
         var state = new WorldmindState(Map.of(
             "directives", List.of(),
             "testResults", List.of(tr1, tr2),
-            "stargates", List.of()
+            "starblasters", List.of()
         ));
 
         var result = node.apply(state);
@@ -168,7 +168,7 @@ class ConvergeResultsNodeTest {
         var state = new WorldmindState(Map.of(
             "directives", List.of(d1, d2),
             "testResults", List.of(),
-            "stargates", List.of()
+            "starblasters", List.of()
         ));
 
         var result = node.apply(state);
@@ -203,7 +203,7 @@ class ConvergeResultsNodeTest {
         var state = new WorldmindState(Map.of(
             "directives", List.of(d1, d2, d3),
             "testResults", List.of(),
-            "stargates", List.of()
+            "starblasters", List.of()
         ));
 
         var result = node.apply(state);
@@ -231,7 +231,7 @@ class ConvergeResultsNodeTest {
         var state = new WorldmindState(Map.of(
             "directives", List.of(d1, d2),
             "testResults", List.of(),
-            "stargates", List.of(),
+            "starblasters", List.of(),
             "waveCount", 2
         ));
 
@@ -243,22 +243,22 @@ class ConvergeResultsNodeTest {
     }
 
     @Test
-    @DisplayName("calculates duration from stargate start/completion times")
-    void calculatesDurationFromStargates() {
+    @DisplayName("calculates duration from starblaster start/completion times")
+    void calculatesDurationFromStarblasters() {
         var start1 = Instant.parse("2026-02-06T10:00:00Z");
         var end1 = Instant.parse("2026-02-06T10:00:05Z"); // 5000ms
         var start2 = Instant.parse("2026-02-06T10:01:00Z");
         var end2 = Instant.parse("2026-02-06T10:01:03Z"); // 3000ms
 
-        var sg1 = new StargateInfo("c-1", "FORGE", "DIR-001", "completed", start1, end1);
-        var sg2 = new StargateInfo("c-2", "FORGE", "DIR-002", "completed", start2, end2);
-        // Stargate with null timestamps should be excluded
-        var sg3 = new StargateInfo("c-3", "FORGE", "DIR-003", "failed", null, null);
+        var sg1 = new StarblasterInfo("c-1", "FORGE", "DIR-001", "completed", start1, end1);
+        var sg2 = new StarblasterInfo("c-2", "FORGE", "DIR-002", "completed", start2, end2);
+        // Starblaster with null timestamps should be excluded
+        var sg3 = new StarblasterInfo("c-3", "FORGE", "DIR-003", "failed", null, null);
 
         var state = new WorldmindState(Map.of(
             "directives", List.of(),
             "testResults", List.of(),
-            "stargates", List.of(sg1, sg2, sg3)
+            "starblasters", List.of(sg1, sg2, sg3)
         ));
 
         var result = node.apply(state);

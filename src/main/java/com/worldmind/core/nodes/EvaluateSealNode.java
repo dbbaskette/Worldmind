@@ -3,8 +3,8 @@ package com.worldmind.core.nodes;
 import com.worldmind.core.model.*;
 import com.worldmind.core.seal.SealEvaluationService;
 import com.worldmind.core.state.WorldmindState;
-import com.worldmind.stargate.InstructionBuilder;
-import com.worldmind.stargate.StargateBridge;
+import com.worldmind.starblaster.InstructionBuilder;
+import com.worldmind.starblaster.StarblasterBridge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -32,10 +32,10 @@ public class EvaluateSealNode {
 
     private static final Logger log = LoggerFactory.getLogger(EvaluateSealNode.class);
 
-    private final StargateBridge bridge;
+    private final StarblasterBridge bridge;
     private final SealEvaluationService sealService;
 
-    public EvaluateSealNode(StargateBridge bridge, SealEvaluationService sealService) {
+    public EvaluateSealNode(StarblasterBridge bridge, SealEvaluationService sealService) {
         this.bridge = bridge;
         this.sealService = sealService;
     }
@@ -76,7 +76,7 @@ public class EvaluateSealNode {
         var fileChanges = directive.filesAffected() != null ? directive.filesAffected() : List.<FileRecord>of();
 
         var updates = new HashMap<String, Object>();
-        var stargateInfos = new ArrayList<StargateInfo>();
+        var starblasterInfos = new ArrayList<StarblasterInfo>();
 
         // ── Step 1: Dispatch GAUNTLET (test runner) ────────────────
         TestResult testResult;
@@ -85,7 +85,7 @@ public class EvaluateSealNode {
             log.info("Dispatching GAUNTLET for directive {}", directive.id());
             var gauntletResult = bridge.executeDirective(
                     gauntletDirective, projectContext, Path.of(projectPath));
-            stargateInfos.add(gauntletResult.stargateInfo());
+            starblasterInfos.add(gauntletResult.starblasterInfo());
             testResult = sealService.parseTestOutput(
                     directive.id(), gauntletResult.output(),
                     gauntletResult.directive().elapsedMs() != null ? gauntletResult.directive().elapsedMs() : 0L);
@@ -102,7 +102,7 @@ public class EvaluateSealNode {
             log.info("Dispatching VIGIL for directive {}", directive.id());
             var vigilResult = bridge.executeDirective(
                     vigilDirective, projectContext, Path.of(projectPath));
-            stargateInfos.add(vigilResult.stargateInfo());
+            starblasterInfos.add(vigilResult.starblasterInfo());
             reviewFeedback = sealService.parseReviewOutput(
                     directive.id(), vigilResult.output());
         } catch (Exception e) {
@@ -120,7 +120,7 @@ public class EvaluateSealNode {
 
         updates.put("testResults", List.of(testResult));
         updates.put("reviewFeedback", List.of(reviewFeedback));
-        updates.put("stargates", stargateInfos);
+        updates.put("starblasters", starblasterInfos);
         updates.put("sealGranted", sealDecision.sealGranted());
 
         if (sealDecision.sealGranted()) {

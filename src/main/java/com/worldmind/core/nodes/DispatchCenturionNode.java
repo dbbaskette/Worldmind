@@ -4,7 +4,7 @@ import com.worldmind.core.model.Directive;
 import com.worldmind.core.model.DirectiveStatus;
 import com.worldmind.core.model.MissionStatus;
 import com.worldmind.core.state.WorldmindState;
-import com.worldmind.stargate.StargateBridge;
+import com.worldmind.starblaster.StarblasterBridge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -15,12 +15,12 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * LangGraph4j node that dispatches the next pending directive to a Stargate
- * container via the {@link StargateBridge}.
+ * LangGraph4j node that dispatches the next pending directive to a Starblaster
+ * container via the {@link StarblasterBridge}.
  *
  * <p>Reads {@code directives} and {@code currentDirectiveIndex} from the graph state,
  * finds the next {@link DirectiveStatus#PENDING} directive, executes it through the
- * bridge, and returns state updates including the stargate info, advanced index,
+ * bridge, and returns state updates including the starblaster info, advanced index,
  * mission status, and any errors.
  */
 @Component
@@ -28,9 +28,9 @@ public class DispatchCenturionNode {
 
     private static final Logger log = LoggerFactory.getLogger(DispatchCenturionNode.class);
 
-    private final StargateBridge bridge;
+    private final StarblasterBridge bridge;
 
-    public DispatchCenturionNode(StargateBridge bridge) {
+    public DispatchCenturionNode(StarblasterBridge bridge) {
         this.bridge = bridge;
     }
 
@@ -80,7 +80,7 @@ public class DispatchCenturionNode {
             );
 
             var updates = new HashMap<String, Object>();
-            updates.put("stargates", List.of(result.stargateInfo()));
+            updates.put("starblasters", List.of(result.starblasterInfo()));
             updates.put("currentDirectiveIndex", currentIndex + 1);
             updates.put("status", MissionStatus.EXECUTING.name());
 

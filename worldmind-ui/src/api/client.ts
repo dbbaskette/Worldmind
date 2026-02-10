@@ -6,7 +6,8 @@ class ApiClient {
   async submitMission(
     request: string,
     mode: string,
-    projectPath?: string
+    projectPath?: string,
+    gitRemoteUrl?: string
   ): Promise<{ mission_id: string; status: string }> {
     const response = await fetch(`${API_BASE}/missions`, {
       method: 'POST',
@@ -14,7 +15,8 @@ class ApiClient {
       body: JSON.stringify({
         request,
         mode,
-        project_path: projectPath || ''
+        project_path: projectPath || '',
+        git_remote_url: gitRemoteUrl || ''
       })
     })
 

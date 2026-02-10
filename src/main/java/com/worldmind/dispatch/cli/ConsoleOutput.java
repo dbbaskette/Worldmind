@@ -35,9 +35,9 @@ public class ConsoleOutput {
                 "@|fg(red) x|@ " + message));
     }
 
-    public static void stargate(String message) {
+    public static void starblaster(String message) {
         System.out.println(CommandLine.Help.Ansi.AUTO.string(
-                "@|fg(magenta) [STARGATE]|@ " + message));
+                "@|fg(magenta) [STARBLASTER]|@ " + message));
     }
 
     public static void centurion(String type, String message) {
@@ -123,7 +123,7 @@ public class ConsoleOutput {
     public static void watchEvent(String eventType, String data) {
         String prefix = switch (eventType) {
             case "mission.created" -> "@|fg(cyan) [MISSION]|@";
-            case "stargate.opened", "stargate.closed" -> "@|fg(magenta) [STARGATE]|@";
+            case "starblaster.opened", "starblaster.closed" -> "@|fg(magenta) [STARBLASTER]|@";
             case "directive.started", "directive.completed", "directive.failed" -> "@|fg(blue) [DIRECTIVE]|@";
             case "wave.started", "wave.completed" -> "@|bold,fg(yellow) [WAVE]|@";
             case "seal.granted" -> "@|fg(green),bold [SEAL]|@";

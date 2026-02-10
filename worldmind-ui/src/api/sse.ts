@@ -34,7 +34,7 @@ export class SseConnection {
       'directive.fulfilled',
       'directive.progress',
       'directive.failed',
-      'stargate.opened',
+      'starblaster.opened',
       'seal.denied',
       'seal.granted',
       'wave.scheduled',

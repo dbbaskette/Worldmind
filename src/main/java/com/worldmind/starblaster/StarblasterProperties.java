@@ -1,35 +1,35 @@
-package com.worldmind.stargate;
+package com.worldmind.starblaster;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
 @Component
 @ConfigurationProperties(prefix = "worldmind")
-public class StargateProperties {
+public class StarblasterProperties {
 
-    private Stargate stargate = new Stargate();
+    private Starblaster starblaster = new Starblaster();
     private Goose goose = new Goose();
 
-    // -- Stargate accessors (delegate to nested) --
-    public String getProvider() { return stargate.provider; }
-    public int getTimeoutSeconds() { return stargate.timeoutSeconds; }
-    public int getMemoryLimitMb() { return stargate.memoryLimitMb; }
-    public int getCpuCount() { return stargate.cpuCount; }
-    public int getMaxParallel() { return stargate.maxParallel; }
-    public int getWaveCooldownSeconds() { return stargate.waveCooldownSeconds; }
-    public String getImage() { return stargate.image; }
+    // -- Starblaster accessors (delegate to nested) --
+    public String getProvider() { return starblaster.provider; }
+    public int getTimeoutSeconds() { return starblaster.timeoutSeconds; }
+    public int getMemoryLimitMb() { return starblaster.memoryLimitMb; }
+    public int getCpuCount() { return starblaster.cpuCount; }
+    public int getMaxParallel() { return starblaster.maxParallel; }
+    public int getWaveCooldownSeconds() { return starblaster.waveCooldownSeconds; }
+    public String getImage() { return starblaster.image; }
 
     // -- Goose accessors (delegate to nested) --
     public String getGooseProvider() { return goose.provider; }
     public String getGooseModel() { return goose.model; }
     public String getLmStudioUrl() { return goose.lmStudioUrl; }
 
-    public Stargate getStargate() { return stargate; }
-    public void setStargate(Stargate stargate) { this.stargate = stargate; }
+    public Starblaster getStarblaster() { return starblaster; }
+    public void setStarblaster(Starblaster starblaster) { this.starblaster = starblaster; }
     public Goose getGoose() { return goose; }
     public void setGoose(Goose goose) { this.goose = goose; }
 
-    public static class Stargate {
+    public static class Starblaster {
         private String provider = "docker";
         private int maxParallel = 1;
         private int timeoutSeconds = 300;

@@ -1,4 +1,4 @@
-package com.worldmind.stargate.cf;
+package com.worldmind.starblaster.cf;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -9,7 +9,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * CF-specific configuration properties bound from {@code worldmind.cf.*}.
  * <p>
  * Not annotated with {@code @Component} — will be conditionally enabled
- * by {@code CfStargateConfig} when the CF provider is active.
+ * by {@code CfStarblasterConfig} when the CF provider is active.
  */
 @ConfigurationProperties(prefix = "worldmind.cf")
 public class CloudFoundryProperties {

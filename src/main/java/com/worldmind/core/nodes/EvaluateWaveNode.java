@@ -8,8 +8,8 @@ import com.worldmind.core.model.*;
 import com.worldmind.core.scheduler.OscillationDetector;
 import com.worldmind.core.seal.SealEvaluationService;
 import com.worldmind.core.state.WorldmindState;
-import com.worldmind.stargate.InstructionBuilder;
-import com.worldmind.stargate.StargateBridge;
+import com.worldmind.starblaster.InstructionBuilder;
+import com.worldmind.starblaster.StarblasterBridge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -28,13 +28,13 @@ public class EvaluateWaveNode {
 
     private static final Logger log = LoggerFactory.getLogger(EvaluateWaveNode.class);
 
-    private final StargateBridge bridge;
+    private final StarblasterBridge bridge;
     private final SealEvaluationService sealService;
     private final EventBus eventBus;
     private final WorldmindMetrics metrics;
     private final OscillationDetector oscillationDetector;
 
-    public EvaluateWaveNode(StargateBridge bridge, SealEvaluationService sealService,
+    public EvaluateWaveNode(StarblasterBridge bridge, SealEvaluationService sealService,
                             EventBus eventBus, WorldmindMetrics metrics,
                             OscillationDetector oscillationDetector) {
         this.bridge = bridge;
@@ -67,7 +67,7 @@ public class EvaluateWaveNode {
             var completedIds = new ArrayList<String>();
             var testResultsList = new ArrayList<TestResult>();
             var reviewFeedbackList = new ArrayList<ReviewFeedback>();
-            var stargateInfos = new ArrayList<StargateInfo>();
+            var starblasterInfos = new ArrayList<StarblasterInfo>();
             var errors = new ArrayList<String>();
             String retryContext = null;
             MissionStatus missionStatus = null;
@@ -113,7 +113,7 @@ public class EvaluateWaveNode {
                     var gauntletDirective = createGauntletDirective(directive);
                     log.info("Dispatching GAUNTLET for directive {}", id);
                     var gauntletResult = bridge.executeDirective(gauntletDirective, projectContext, Path.of(projectPath));
-                    stargateInfos.add(gauntletResult.stargateInfo());
+                    starblasterInfos.add(gauntletResult.starblasterInfo());
                     testResult = sealService.parseTestOutput(id, gauntletResult.output(),
                             gauntletResult.directive().elapsedMs() != null ? gauntletResult.directive().elapsedMs() : 0L);
                 } catch (Exception e) {
@@ -128,7 +128,7 @@ public class EvaluateWaveNode {
                     var vigilDirective = createVigilDirective(directive);
                     log.info("Dispatching VIGIL for directive {}", id);
                     var vigilResult = bridge.executeDirective(vigilDirective, projectContext, Path.of(projectPath));
-                    stargateInfos.add(vigilResult.stargateInfo());
+                    starblasterInfos.add(vigilResult.starblasterInfo());
                     reviewFeedback = sealService.parseReviewOutput(id, vigilResult.output());
                 } catch (Exception e) {
                     log.error("VIGIL dispatch failed for {}: {}", id, e.getMessage());
@@ -168,7 +168,7 @@ public class EvaluateWaveNode {
             updates.put("completedDirectiveIds", completedIds);
             if (!testResultsList.isEmpty()) updates.put("testResults", testResultsList);
             if (!reviewFeedbackList.isEmpty()) updates.put("reviewFeedback", reviewFeedbackList);
-            if (!stargateInfos.isEmpty()) updates.put("stargates", stargateInfos);
+            if (!starblasterInfos.isEmpty()) updates.put("starblasters", starblasterInfos);
             if (!errors.isEmpty()) updates.put("errors", errors);
             if (retryContext != null) updates.put("retryContext", retryContext);
             if (missionStatus != null) updates.put("status", missionStatus.name());

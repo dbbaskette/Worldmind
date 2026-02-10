@@ -36,6 +36,7 @@ public class WorldmindState extends AgentState {
         Map.entry("retryContext",          Channels.base(() -> "")),
         Map.entry("metrics",               Channels.base((Reducer<MissionMetrics>) null)),
         Map.entry("projectPath",           Channels.base(() -> "")),
+        Map.entry("gitRemoteUrl",          Channels.base(() -> "")),
 
         // ── Wave execution channels (Phase 4) ────────────────────────
         Map.entry("waveDirectiveIds",      Channels.base((Supplier<List<String>>) List::of)),
@@ -45,7 +46,7 @@ public class WorldmindState extends AgentState {
         // ── Appender channels (list accumulation) ────────────────────
         Map.entry("directives",            Channels.appender(ArrayList::new)),
         Map.entry("completedDirectiveIds", Channels.appender(ArrayList::new)),
-        Map.entry("stargates",             Channels.appender(ArrayList::new)),
+        Map.entry("starblasters",             Channels.appender(ArrayList::new)),
         Map.entry("testResults",           Channels.appender(ArrayList::new)),
         Map.entry("reviewFeedback",        Channels.appender(ArrayList::new)),
         Map.entry("errors",                Channels.appender(ArrayList::new))
@@ -117,6 +118,10 @@ public class WorldmindState extends AgentState {
         return this.<String>value("projectPath").orElse("");
     }
 
+    public String gitRemoteUrl() {
+        return this.<String>value("gitRemoteUrl").orElse("");
+    }
+
     @SuppressWarnings("unchecked")
     public Optional<MissionMetrics> metrics() {
         Optional<Object> raw = value("metrics");
@@ -184,8 +189,8 @@ public class WorldmindState extends AgentState {
     }
 
     @SuppressWarnings("unchecked")
-    public List<StargateInfo> stargates() {
-        return this.<List<StargateInfo>>value("stargates").orElse(List.of());
+    public List<StarblasterInfo> starblasters() {
+        return this.<List<StarblasterInfo>>value("starblasters").orElse(List.of());
     }
 
     @SuppressWarnings("unchecked")

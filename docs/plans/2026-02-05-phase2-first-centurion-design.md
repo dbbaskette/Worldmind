@@ -1,6 +1,6 @@
 # Phase 2: First Centurion — Design Document
 
-> Centurion Forge in a Docker Stargate with Goose, executing directives from the planning pipeline.
+> Centurion Forge in a Docker Starblaster with Goose, executing directives from the planning pipeline.
 
 ## Goal
 
@@ -17,11 +17,11 @@ DIRECTIVES:
 
 Proceed? [Y/n] y
 
-[STARGATE] Opening for Centurion Forge...
+[STARBLASTER] Opening for Centurion Forge...
 [CENTURION FORGE] Directive 001: Create hello.py
-[STARGATE] Container stargate-forge-001 running
+[STARBLASTER] Container starblaster-forge-001 running
 [CENTURION FORGE] Directive complete. 1 file created.
-[STARGATE] Torn down.
+[STARBLASTER] Torn down.
 
 Mission complete. 1 file created.
 
@@ -39,22 +39,22 @@ print("Hello, World!")
 - **Prod:** Anthropic API with `ANTHROPIC_API_KEY`
 - Selected via `GOOSE_PROVIDER` env var (`openai` or `anthropic`)
 
-### Stargate Provider Abstraction
+### Starblaster Provider Abstraction
 
-Container orchestration is behind a `StargateProvider` interface so Docker can be swapped for Cloud Foundry or other platforms:
+Container orchestration is behind a `StarblasterProvider` interface so Docker can be swapped for Cloud Foundry or other platforms:
 
 ```java
-public interface StargateProvider {
-    String openStargate(StargateRequest request);
-    int waitForCompletion(String stargateId, int timeoutSeconds);
-    String captureOutput(String stargateId);
-    void teardownStargate(String stargateId);
+public interface StarblasterProvider {
+    String openStarblaster(StarblasterRequest request);
+    int waitForCompletion(String starblasterId, int timeoutSeconds);
+    String captureOutput(String starblasterId);
+    void teardownStarblaster(String starblasterId);
 }
 ```
 
-- `DockerStargateProvider` — Phase 2 implementation (Docker Java client)
-- `CloudFoundryStargateProvider` — future production implementation
-- Active provider selected via `worldmind.stargate.provider` config property
+- `DockerStarblasterProvider` — Phase 2 implementation (Docker Java client)
+- `CloudFoundryStarblasterProvider` — future production implementation
+- Active provider selected via `worldmind.starblaster.provider` config property
 
 ### Instruction Format
 
@@ -99,15 +99,15 @@ Parallel fan-out deferred to Phase 4.
 - Adds `goose-config.yaml` template reading env vars for provider/model/URL
 - Entry point: `goose run --instructions /instructions/directive.md`
 
-### 2. StargateProvider Interface + DockerStargateProvider
+### 2. StarblasterProvider Interface + DockerStarblasterProvider
 
-- `StargateRequest` record: directive, projectPath, envVars, resourceLimits
-- `DockerStargateProvider`: creates container with bind mounts (project dir + instruction file), env vars, resource limits, extra host for `host.docker.internal`
+- `StarblasterRequest` record: directive, projectPath, envVars, resourceLimits
+- `DockerStarblasterProvider`: creates container with bind mounts (project dir + instruction file), env vars, resource limits, extra host for `host.docker.internal`
 - Wait for completion with timeout, capture stdout/stderr, teardown
 
-### 3. StargateManager
+### 3. StarblasterManager
 
-- Spring `@Service` delegating to active `StargateProvider`
+- Spring `@Service` delegating to active `StarblasterProvider`
 - File change detection: snapshot before/after, diff for created/modified files
 - Timeout enforcement, resource tracking
 
@@ -116,10 +116,10 @@ Parallel fan-out deferred to Phase 4.
 - Pure function: `Directive` + `ProjectContext` → markdown string
 - No Spring dependencies
 
-### 5. StargateBridge
+### 5. StarblasterBridge
 
-- Thin orchestrator: build instruction → write temp file → snapshot → open stargate → wait → capture → diff → build records → teardown
-- Returns updated `Directive` (status, filesAffected, elapsedMs) + `StargateInfo`
+- Thin orchestrator: build instruction → write temp file → snapshot → open starblaster → wait → capture → diff → build records → teardown
+- Returns updated `Directive` (status, filesAffected, elapsedMs) + `StarblasterInfo`
 
 ### 6. DispatchCenturionNode
 
@@ -130,7 +130,7 @@ Parallel fan-out deferred to Phase 4.
 
 ```yaml
 worldmind:
-  stargate:
+  starblaster:
     provider: docker           # docker | cloudfoundry
     max-parallel: 10
     timeout-seconds: 300
@@ -148,8 +148,8 @@ worldmind:
 
 | Level | What | Requires |
 |-------|------|----------|
-| Unit | InstructionBuilder, StargateManager (mocked provider), StargateBridge (mocked manager), DispatchCenturionNode (mocked bridge) | Nothing |
-| Docker integration | DockerStargateProviderTest — real container with simple command, verify file creation | Docker |
+| Unit | InstructionBuilder, StarblasterManager (mocked provider), StarblasterBridge (mocked manager), DispatchCenturionNode (mocked bridge) | Nothing |
+| Docker integration | DockerStarblasterProviderTest — real container with simple command, verify file creation | Docker |
 | End-to-end | ForgeIntegrationTest — full pipeline, real file generated | Docker + LM Studio (or API key) |
 
 Integration tests tagged `@Tag("integration")`, skipped in normal builds.
@@ -159,26 +159,26 @@ Integration tests tagged `@Tag("integration")`, skipped in normal builds.
 ## Files to Create/Modify
 
 **New files:**
-- `src/main/java/com/worldmind/stargate/StargateProvider.java`
-- `src/main/java/com/worldmind/stargate/StargateRequest.java`
-- `src/main/java/com/worldmind/stargate/DockerStargateProvider.java`
-- `src/main/java/com/worldmind/stargate/StargateManager.java`
-- `src/main/java/com/worldmind/stargate/StargateBridge.java`
-- `src/main/java/com/worldmind/stargate/InstructionBuilder.java`
-- `src/main/java/com/worldmind/stargate/StargateProperties.java`
+- `src/main/java/com/worldmind/starblaster/StarblasterProvider.java`
+- `src/main/java/com/worldmind/starblaster/StarblasterRequest.java`
+- `src/main/java/com/worldmind/starblaster/DockerStarblasterProvider.java`
+- `src/main/java/com/worldmind/starblaster/StarblasterManager.java`
+- `src/main/java/com/worldmind/starblaster/StarblasterBridge.java`
+- `src/main/java/com/worldmind/starblaster/InstructionBuilder.java`
+- `src/main/java/com/worldmind/starblaster/StarblasterProperties.java`
 - `src/main/java/com/worldmind/core/nodes/DispatchCenturionNode.java`
 - `docker/centurion-forge/Dockerfile`
 - `docker/centurion-forge/goose-config.yaml`
-- `src/test/java/com/worldmind/stargate/InstructionBuilderTest.java`
-- `src/test/java/com/worldmind/stargate/StargateManagerTest.java`
-- `src/test/java/com/worldmind/stargate/StargateBridgeTest.java`
+- `src/test/java/com/worldmind/starblaster/InstructionBuilderTest.java`
+- `src/test/java/com/worldmind/starblaster/StarblasterManagerTest.java`
+- `src/test/java/com/worldmind/starblaster/StarblasterBridgeTest.java`
 - `src/test/java/com/worldmind/core/nodes/DispatchCenturionNodeTest.java`
-- `src/test/java/com/worldmind/stargate/DockerStargateProviderTest.java`
+- `src/test/java/com/worldmind/starblaster/DockerStarblasterProviderTest.java`
 - `src/test/java/com/worldmind/integration/ForgeIntegrationTest.java`
 
 **Modified files:**
 - `src/main/java/com/worldmind/core/graph/WorldmindGraph.java` — add dispatch node + loop
-- `src/main/java/com/worldmind/dispatch/cli/MissionCommand.java` — show stargate activity
-- `src/main/java/com/worldmind/dispatch/cli/ConsoleOutput.java` — stargate display methods
+- `src/main/java/com/worldmind/dispatch/cli/MissionCommand.java` — show starblaster activity
+- `src/main/java/com/worldmind/dispatch/cli/ConsoleOutput.java` — starblaster display methods
 - `src/main/resources/application.yml` — goose provider config, LM Studio URL
 - `docker-compose.yml` — optionally add LM Studio service reference

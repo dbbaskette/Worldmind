@@ -1,4 +1,4 @@
-package com.worldmind.stargate;
+package com.worldmind.starblaster;
 
 import com.worldmind.core.model.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,15 +12,15 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-class StargateBridgeTest {
+class StarblasterBridgeTest {
 
-    private StargateManager manager;
-    private StargateBridge bridge;
+    private StarblasterManager manager;
+    private StarblasterBridge bridge;
 
     @BeforeEach
     void setUp() {
-        manager = mock(StargateManager.class);
-        bridge = new StargateBridge(manager);
+        manager = mock(StarblasterManager.class);
+        bridge = new StarblasterBridge(manager);
     }
 
     @Test
@@ -33,7 +33,7 @@ class StargateBridgeTest {
         );
         var context = new ProjectContext("/tmp/p", List.of(), "python", "none", Map.of(), 0, "");
         var fileChanges = List.of(new FileRecord("hello.py", "created", 1));
-        var execResult = new StargateManager.ExecutionResult(0, "done", "c-1", fileChanges, 5000L);
+        var execResult = new StarblasterManager.ExecutionResult(0, "done", "c-1", fileChanges, 5000L);
 
         when(manager.executeDirective(
             eq("FORGE"), eq("DIR-001"), any(), anyString(), any()))
@@ -44,7 +44,7 @@ class StargateBridgeTest {
         assertEquals(DirectiveStatus.PASSED, result.directive().status());
         assertEquals(5000L, result.directive().elapsedMs());
         assertEquals(1, result.directive().filesAffected().size());
-        assertNotNull(result.stargateInfo());
+        assertNotNull(result.starblasterInfo());
     }
 
     @Test
@@ -55,7 +55,7 @@ class StargateBridgeTest {
             List.of(), DirectiveStatus.PENDING, 0, 3,
             FailureStrategy.RETRY, List.of(), null
         );
-        var execResult = new StargateManager.ExecutionResult(1, "error", "c-2", List.of(), 3000L);
+        var execResult = new StarblasterManager.ExecutionResult(1, "error", "c-2", List.of(), 3000L);
 
         when(manager.executeDirective(any(), any(), any(), anyString(), any()))
             .thenReturn(execResult);
@@ -73,7 +73,7 @@ class StargateBridgeTest {
             List.of(), DirectiveStatus.PENDING, 1, 5,
             FailureStrategy.REPLAN, List.of(), null
         );
-        var execResult = new StargateManager.ExecutionResult(0, "ok", "c-3", List.of(), 1000L);
+        var execResult = new StarblasterManager.ExecutionResult(0, "ok", "c-3", List.of(), 1000L);
 
         when(manager.executeDirective(any(), any(), any(), anyString(), any()))
             .thenReturn(execResult);
@@ -84,26 +84,26 @@ class StargateBridgeTest {
     }
 
     @Test
-    void executeDirectivePopulatesStargateInfo() {
+    void executeDirectivePopulatesStarblasterInfo() {
         var directive = new Directive(
             "DIR-004", "GAUNTLET", "Run tests",
             "", "all pass",
             List.of(), DirectiveStatus.PENDING, 0, 3,
             FailureStrategy.RETRY, List.of(), null
         );
-        var execResult = new StargateManager.ExecutionResult(0, "tests passed", "container-42", List.of(), 8000L);
+        var execResult = new StarblasterManager.ExecutionResult(0, "tests passed", "container-42", List.of(), 8000L);
 
         when(manager.executeDirective(any(), any(), any(), anyString(), any()))
             .thenReturn(execResult);
 
         var result = bridge.executeDirective(directive, null, Path.of("/tmp"));
 
-        assertEquals("container-42", result.stargateInfo().containerId());
-        assertEquals("GAUNTLET", result.stargateInfo().centurionType());
-        assertEquals("DIR-004", result.stargateInfo().directiveId());
-        assertEquals("completed", result.stargateInfo().status());
-        assertNotNull(result.stargateInfo().startedAt());
-        assertNotNull(result.stargateInfo().completedAt());
+        assertEquals("container-42", result.starblasterInfo().containerId());
+        assertEquals("GAUNTLET", result.starblasterInfo().centurionType());
+        assertEquals("DIR-004", result.starblasterInfo().directiveId());
+        assertEquals("completed", result.starblasterInfo().status());
+        assertNotNull(result.starblasterInfo().startedAt());
+        assertNotNull(result.starblasterInfo().completedAt());
     }
 
     @Test
@@ -114,7 +114,7 @@ class StargateBridgeTest {
             List.of(), DirectiveStatus.PENDING, 0, 3,
             FailureStrategy.RETRY, List.of(), null
         );
-        var execResult = new StargateManager.ExecutionResult(0, "feature built successfully", "c-5", List.of(), 2000L);
+        var execResult = new StarblasterManager.ExecutionResult(0, "feature built successfully", "c-5", List.of(), 2000L);
 
         when(manager.executeDirective(any(), any(), any(), anyString(), any()))
             .thenReturn(execResult);
@@ -125,20 +125,20 @@ class StargateBridgeTest {
     }
 
     @Test
-    void executeDirectiveFailedStargateInfoStatusIsFailed() {
+    void executeDirectiveFailedStarblasterInfoStatusIsFailed() {
         var directive = new Directive(
             "DIR-006", "FORGE", "Failing task",
             "", "won't pass",
             List.of(), DirectiveStatus.PENDING, 0, 3,
             FailureStrategy.RETRY, List.of(), null
         );
-        var execResult = new StargateManager.ExecutionResult(1, "crashed", "c-6", List.of(), 500L);
+        var execResult = new StarblasterManager.ExecutionResult(1, "crashed", "c-6", List.of(), 500L);
 
         when(manager.executeDirective(any(), any(), any(), anyString(), any()))
             .thenReturn(execResult);
 
         var result = bridge.executeDirective(directive, null, Path.of("/tmp"));
 
-        assertEquals("failed", result.stargateInfo().status());
+        assertEquals("failed", result.starblasterInfo().status());
     }
 }

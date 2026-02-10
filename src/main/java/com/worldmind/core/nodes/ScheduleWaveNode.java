@@ -3,7 +3,7 @@ package com.worldmind.core.nodes;
 import com.worldmind.core.model.MissionStatus;
 import com.worldmind.core.scheduler.DirectiveScheduler;
 import com.worldmind.core.state.WorldmindState;
-import com.worldmind.stargate.StargateProperties;
+import com.worldmind.starblaster.StarblasterProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,7 +26,7 @@ public class ScheduleWaveNode {
     private final int waveCooldownSeconds;
 
     @Autowired
-    public ScheduleWaveNode(DirectiveScheduler scheduler, StargateProperties properties) {
+    public ScheduleWaveNode(DirectiveScheduler scheduler, StarblasterProperties properties) {
         this(scheduler, properties.getMaxParallel(), properties.getWaveCooldownSeconds());
     }
 

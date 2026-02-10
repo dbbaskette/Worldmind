@@ -1,4 +1,4 @@
-package com.worldmind.stargate.cf;
+package com.worldmind.starblaster.cf;
 
 import java.util.Map;
 

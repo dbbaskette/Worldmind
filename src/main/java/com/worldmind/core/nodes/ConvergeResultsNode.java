@@ -17,7 +17,7 @@ import java.util.Map;
 /**
  * LangGraph4j node that aggregates all directive results into final mission metrics.
  *
- * <p>Reads {@code directives}, {@code testResults}, and {@code stargates} from the
+ * <p>Reads {@code directives}, {@code testResults}, and {@code starblasters} from the
  * graph state, computes aggregate counts and durations, and returns state updates
  * including a {@link MissionMetrics} instance and the final {@link MissionStatus}.
  */
@@ -63,8 +63,8 @@ public class ConvergeResultsNode {
             testsPassed += tr.totalTests() - tr.failedTests();
         }
 
-        // Calculate total duration from stargates
-        long totalDurationMs = state.stargates().stream()
+        // Calculate total duration from starblasters
+        long totalDurationMs = state.starblasters().stream()
             .filter(s -> s.startedAt() != null && s.completedAt() != null)
             .mapToLong(s -> Duration.between(s.startedAt(), s.completedAt()).toMillis())
             .sum();

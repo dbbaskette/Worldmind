@@ -157,7 +157,7 @@ class CliTest {
                             new HealthStatus("graph", mockGraph != null ? HealthStatus.Status.UP : HealthStatus.Status.DOWN,
                                     mockGraph != null ? "Graph compiled and available" : "Graph not available", Map.of()),
                             new HealthStatus("database", HealthStatus.Status.DOWN, "No DataSource configured", Map.of()),
-                            new HealthStatus("docker", HealthStatus.Status.DOWN, "No StargateProvider configured", Map.of())
+                            new HealthStatus("docker", HealthStatus.Status.DOWN, "No StarblasterProvider configured", Map.of())
                     ));
                     return (K) new HealthCommand(mockHealth);
                 }

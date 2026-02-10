@@ -6,7 +6,7 @@ import com.worldmind.core.model.*;
 import com.worldmind.core.scheduler.OscillationDetector;
 import com.worldmind.core.seal.SealEvaluationService;
 import com.worldmind.core.state.WorldmindState;
-import com.worldmind.stargate.StargateBridge;
+import com.worldmind.starblaster.StarblasterBridge;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,13 +21,13 @@ import static org.mockito.Mockito.*;
 
 class EvaluateWaveNodeTest {
 
-    private StargateBridge mockBridge;
+    private StarblasterBridge mockBridge;
     private SealEvaluationService mockSealService;
     private EvaluateWaveNode node;
 
     @BeforeEach
     void setUp() {
-        mockBridge = mock(StargateBridge.class);
+        mockBridge = mock(StarblasterBridge.class);
         mockSealService = mock(SealEvaluationService.class);
         node = new EvaluateWaveNode(mockBridge, mockSealService, new EventBus(), mock(WorldmindMetrics.class), new OscillationDetector());
     }
@@ -51,11 +51,11 @@ class EvaluateWaveNodeTest {
         return new WaveDispatchResult(id, DirectiveStatus.FAILED, List.of(), "Failed output", 300L);
     }
 
-    private StargateBridge.BridgeResult bridgeResult(String id, String centurion) {
+    private StarblasterBridge.BridgeResult bridgeResult(String id, String centurion) {
         var d = new Directive(id, centurion, "sub", "", "", List.of(),
                 DirectiveStatus.PASSED, 1, 1, FailureStrategy.SKIP, List.of(), 100L);
-        return new StargateBridge.BridgeResult(d,
-                new StargateInfo("c-" + id, centurion, id, "completed", Instant.now(), Instant.now()),
+        return new StarblasterBridge.BridgeResult(d,
+                new StarblasterInfo("c-" + id, centurion, id, "completed", Instant.now(), Instant.now()),
                 "output");
     }
 

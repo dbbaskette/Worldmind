@@ -1,4 +1,4 @@
-package com.worldmind.stargate;
+package com.worldmind.starblaster;
 
 import com.worldmind.core.model.FileRecord;
 import org.slf4j.Logger;
@@ -13,50 +13,50 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * Orchestrates Centurion execution inside Stargate containers.
+ * Orchestrates Centurion execution inside Starblaster containers.
  *
  * <p>Responsibilities:
  * <ul>
- *   <li>Assembles environment variables from {@link StargateProperties}</li>
- *   <li>Delegates container lifecycle to {@link StargateProvider}</li>
+ *   <li>Assembles environment variables from {@link StarblasterProperties}</li>
+ *   <li>Delegates container lifecycle to {@link StarblasterProvider}</li>
  *   <li>Detects file changes via before/after directory snapshots</li>
  *   <li>Returns an {@link ExecutionResult} with exit code, output, and file changes</li>
  * </ul>
  */
 @Service
-public class StargateManager {
+public class StarblasterManager {
 
-    private static final Logger log = LoggerFactory.getLogger(StargateManager.class);
+    private static final Logger log = LoggerFactory.getLogger(StarblasterManager.class);
 
-    private final StargateProvider provider;
-    private final StargateProperties properties;
+    private final StarblasterProvider provider;
+    private final StarblasterProperties properties;
 
-    public StargateManager(StargateProvider provider, StargateProperties properties) {
+    public StarblasterManager(StarblasterProvider provider, StarblasterProperties properties) {
         this.provider = provider;
         this.properties = properties;
     }
 
     /**
-     * Result of executing a directive inside a Stargate container.
+     * Result of executing a directive inside a Starblaster container.
      *
      * @param exitCode    container exit code (0 = success)
      * @param output      captured stdout/stderr from the container
-     * @param stargateId  the container ID that ran this directive
+     * @param starblasterId  the container ID that ran this directive
      * @param fileChanges files created or modified during execution
      * @param elapsedMs   wall-clock time in milliseconds
      */
     public record ExecutionResult(
         int exitCode,
         String output,
-        String stargateId,
+        String starblasterId,
         List<FileRecord> fileChanges,
         long elapsedMs
     ) {}
 
     /**
-     * Executes a directive inside a Stargate container.
+     * Executes a directive inside a Starblaster container.
      *
-     * <p>Flow: snapshot files -> open stargate -> wait -> capture output ->
+     * <p>Flow: snapshot files -> open starblaster -> wait -> capture output ->
      * detect changes -> teardown -> return result.
      *
      * @param centurionType  e.g. "forge", "vigil", "gauntlet"
@@ -103,7 +103,7 @@ public class StargateManager {
             }
         }
 
-        var request = new StargateRequest(
+        var request = new StarblasterRequest(
             centurionType, directiveId, projectPath,
             instructionText, envVars,
             properties.getMemoryLimitMb(), properties.getCpuCount()
@@ -127,21 +127,21 @@ public class StargateManager {
         Map<String, Long> beforeSnapshot = snapshotFiles(effectivePath);
 
         long startMs = System.currentTimeMillis();
-        String stargateId = provider.openStargate(request);
+        String starblasterId = provider.openStarblaster(request);
 
         try {
-            int exitCode = provider.waitForCompletion(stargateId, properties.getTimeoutSeconds());
-            String output = provider.captureOutput(stargateId);
+            int exitCode = provider.waitForCompletion(starblasterId, properties.getTimeoutSeconds());
+            String output = provider.captureOutput(starblasterId);
             long elapsedMs = System.currentTimeMillis() - startMs;
 
             List<FileRecord> changes = detectChanges(beforeSnapshot, effectivePath);
 
-            log.info("Stargate {} completed with exit code {} in {}ms — {} file changes",
-                    stargateId, exitCode, elapsedMs, changes.size());
+            log.info("Starblaster {} completed with exit code {} in {}ms — {} file changes",
+                    starblasterId, exitCode, elapsedMs, changes.size());
 
-            return new ExecutionResult(exitCode, output, stargateId, changes, elapsedMs);
+            return new ExecutionResult(exitCode, output, starblasterId, changes, elapsedMs);
         } finally {
-            provider.teardownStargate(stargateId);
+            provider.teardownStarblaster(starblasterId);
             try {
                 Files.deleteIfExists(instructionFile);
             } catch (IOException e) {

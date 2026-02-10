@@ -1,4 +1,4 @@
-package com.worldmind.stargate;
+package com.worldmind.starblaster;
 
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
@@ -9,12 +9,12 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-public class StargateConfig {
+public class StarblasterConfig {
 
     private static final String DEFAULT_UNIX_SOCKET = "unix:///var/run/docker.sock";
 
     @Bean
-    @ConditionalOnProperty(name = "worldmind.stargate.provider", havingValue = "docker", matchIfMissing = true)
+    @ConditionalOnProperty(name = "worldmind.starblaster.provider", havingValue = "docker", matchIfMissing = true)
     public DockerClient dockerClient() {
         String dockerHost = System.getenv().getOrDefault("DOCKER_HOST", DEFAULT_UNIX_SOCKET);
         var config = DefaultDockerClientConfig.createDefaultConfigBuilder()
@@ -29,8 +29,8 @@ public class StargateConfig {
     }
 
     @Bean
-    @ConditionalOnProperty(name = "worldmind.stargate.provider", havingValue = "docker", matchIfMissing = true)
-    public StargateProvider dockerStargateProvider(DockerClient dockerClient) {
-        return new DockerStargateProvider(dockerClient);
+    @ConditionalOnProperty(name = "worldmind.starblaster.provider", havingValue = "docker", matchIfMissing = true)
+    public StarblasterProvider dockerStarblasterProvider(DockerClient dockerClient) {
+        return new DockerStarblasterProvider(dockerClient);
     }
 }

@@ -13,8 +13,8 @@ function App() {
     selectMission,
   } = useMissionList()
 
-  const handleSubmit = async (request: string, mode: string, projectPath?: string) => {
-    await submitMission(request, mode, projectPath)
+  const handleSubmit = async (request: string, mode: string, projectPath?: string, gitRemoteUrl?: string) => {
+    await submitMission(request, mode, projectPath, gitRemoteUrl)
   }
 
   return (

@@ -1,0 +1,24 @@
+## Cloud Foundry profile — activated via SPRING_PROFILES_ACTIVE=cf
+## java-cfenv auto-binds the PostgreSQL datasource from worldmind-postgres
+## CfModelServiceProcessor maps worldmind-model credentials to Spring AI OpenAI props
+
+spring:
+  ai:
+    openai:
+      enabled: true
+      chat:
+        options:
+          temperature: 0.0
+          max-tokens: 8192
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.model.anthropic.autoconfigure.AnthropicChatAutoConfiguration
+      - org.springframework.ai.model.google.genai.autoconfigure.chat.GoogleGenAiChatAutoConfiguration
+      - org.springframework.ai.model.google.genai.autoconfigure.embedding.GoogleGenAiTextEmbeddingAutoConfiguration
+      - org.springframework.ai.model.google.genai.autoconfigure.embedding.GoogleGenAiEmbeddingConnectionAutoConfiguration
+
+worldmind:
+  starblaster:
+    provider: cloudfoundry
+    max-parallel: 3
+    wave-cooldown-seconds: 30

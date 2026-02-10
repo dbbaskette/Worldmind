@@ -1,6 +1,6 @@
 package com.worldmind.integration;
 
-import com.worldmind.stargate.*;
+import com.worldmind.starblaster.*;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
 import com.github.dockerjava.core.DockerClientImpl;
 import com.github.dockerjava.zerodep.ZerodepDockerHttpClient;
@@ -15,7 +15,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * End-to-end integration test for Stargate execution.
+ * End-to-end integration test for Starblaster execution.
  * Requires Docker to be running and the centurion-forge image built.
  * Run with: mvn test -Dgroups=integration
  */
@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class ForgeIntegrationTest {
 
     @Test
-    void stargateExecutesGooseAndCreatesFile(@TempDir Path tempDir) throws Exception {
+    void starblasterExecutesGooseAndCreatesFile(@TempDir Path tempDir) throws Exception {
         // Setup Docker client
         var dockerConfig = DefaultDockerClientConfig.createDefaultConfigBuilder().build();
         var httpClient = new ZerodepDockerHttpClient.Builder()
@@ -32,9 +32,9 @@ class ForgeIntegrationTest {
                 .build();
         var dockerClient = DockerClientImpl.getInstance(dockerConfig, httpClient);
 
-        var provider = new DockerStargateProvider(dockerClient);
-        var properties = new StargateProperties();
-        var manager = new StargateManager(provider, properties);
+        var provider = new DockerStarblasterProvider(dockerClient);
+        var properties = new StarblasterProperties();
+        var manager = new StarblasterManager(provider, properties);
 
         // Execute a simple file creation task
         var result = manager.executeDirective(

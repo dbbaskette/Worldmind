@@ -28,7 +28,7 @@ export const EVENT_COLORS = {
   'directive.fulfilled': 'text-green-600',
   'directive.failed': 'text-red-600',
   'directive.progress': 'text-gray-600',
-  'stargate.opened': 'text-indigo-600',
+  'starblaster.opened': 'text-indigo-600',
   'seal.denied': 'text-orange-600',
   'seal.granted': 'text-green-600',
   'wave.scheduled': 'text-cyan-600',

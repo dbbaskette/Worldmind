@@ -57,10 +57,15 @@ public class MissionEngine {
      * @throws RuntimeException if the graph execution returns empty state
      */
     public WorldmindState runMission(String missionId, String request, InteractionMode mode) {
-        return runMission(missionId, request, mode, null);
+        return runMission(missionId, request, mode, null, null);
     }
 
     public WorldmindState runMission(String missionId, String request, InteractionMode mode, String projectPath) {
+        return runMission(missionId, request, mode, projectPath, null);
+    }
+
+    public WorldmindState runMission(String missionId, String request, InteractionMode mode,
+                                     String projectPath, String gitRemoteUrl) {
         MdcContext.setMission(missionId);
         try {
             log.info("Starting mission {} with mode {} — request: {}", missionId, mode, request);
@@ -77,6 +82,9 @@ public class MissionEngine {
             stateMap.put("status", MissionStatus.CLASSIFYING.name());
             if (projectPath != null && !projectPath.isBlank()) {
                 stateMap.put("projectPath", projectPath);
+            }
+            if (gitRemoteUrl != null && !gitRemoteUrl.isBlank()) {
+                stateMap.put("gitRemoteUrl", gitRemoteUrl);
             }
             Map<String, Object> initialState = Map.copyOf(stateMap);
 

@@ -1,15 +1,15 @@
-package com.worldmind.stargate;
+package com.worldmind.starblaster;
 
 import org.junit.jupiter.api.Test;
 import java.nio.file.Path;
 import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
-class StargateProviderTest {
+class StarblasterProviderTest {
 
     @Test
-    void stargateRequestBuildsWithAllFields() {
-        var request = new StargateRequest(
+    void starblasterRequestBuildsWithAllFields() {
+        var request = new StarblasterRequest(
             "forge",
             "directive-001",
             Path.of("/tmp/project"),
@@ -26,8 +26,8 @@ class StargateProviderTest {
     }
 
     @Test
-    void stargateRequestInstructionTextIsPreserved() {
-        var request = new StargateRequest(
+    void starblasterRequestInstructionTextIsPreserved() {
+        var request = new StarblasterRequest(
             "forge", "d-001", Path.of("/tmp"),
             "Build the feature",
             Map.of(), 2048, 1

@@ -1,4 +1,4 @@
-package com.worldmind.stargate;
+package com.worldmind.starblaster;
 
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.WaitContainerResultCallback;
@@ -11,36 +11,36 @@ import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Docker-based StargateProvider for local development.
+ * Docker-based StarblasterProvider for local development.
  * Creates Docker containers for each Centurion directive execution.
  *
  * <p>Each container is configured with:
  * <ul>
  *   <li>A bind mount mapping the host project directory to /workspace</li>
  *   <li>Environment variables for Goose configuration</li>
- *   <li>Memory and CPU limits from the StargateRequest</li>
+ *   <li>Memory and CPU limits from the StarblasterRequest</li>
  *   <li>Extra host entry for host.docker.internal (for LM Studio access)</li>
  *   <li>Command: goose run /workspace/.worldmind/directives/{directiveId}.md</li>
  * </ul>
  */
-public class DockerStargateProvider implements StargateProvider {
+public class DockerStarblasterProvider implements StarblasterProvider {
 
-    private static final Logger log = LoggerFactory.getLogger(DockerStargateProvider.class);
+    private static final Logger log = LoggerFactory.getLogger(DockerStarblasterProvider.class);
     private static final String IMAGE_PREFIX = "worldmind/centurion-";
     private static final String IMAGE_TAG = ":latest";
 
     private final DockerClient dockerClient;
 
-    public DockerStargateProvider(DockerClient dockerClient) {
+    public DockerStarblasterProvider(DockerClient dockerClient) {
         this.dockerClient = dockerClient;
     }
 
     @Override
-    public String openStargate(StargateRequest request) {
+    public String openStarblaster(StarblasterRequest request) {
         String type = request.centurionType().toLowerCase();
-        String containerName = "stargate-" + type + "-" + request.directiveId();
+        String containerName = "starblaster-" + type + "-" + request.directiveId();
         String imageName = IMAGE_PREFIX + type + IMAGE_TAG;
-        log.info("Opening Stargate {} for directive {} (image: {})",
+        log.info("Opening Starblaster {} for directive {} (image: {})",
                 containerName, request.directiveId(), imageName);
 
         // Clean up any stale container with the same name from a previous retry
@@ -91,28 +91,28 @@ public class DockerStargateProvider implements StargateProvider {
 
         String containerId = response.getId();
         dockerClient.startContainerCmd(containerId).exec();
-        log.info("Stargate {} started (container {})", containerName, containerId);
+        log.info("Starblaster {} started (container {})", containerName, containerId);
         return containerId;
     }
 
     @Override
-    public int waitForCompletion(String stargateId, int timeoutSeconds) {
+    public int waitForCompletion(String starblasterId, int timeoutSeconds) {
         try {
-            var callback = dockerClient.waitContainerCmd(stargateId)
+            var callback = dockerClient.waitContainerCmd(starblasterId)
                     .exec(new WaitContainerResultCallback());
             var result = callback.awaitStatusCode(timeoutSeconds, TimeUnit.SECONDS);
             return result != null ? result : -1;
         } catch (Exception e) {
-            log.error("Timeout or error waiting for stargate {}", stargateId, e);
+            log.error("Timeout or error waiting for starblaster {}", starblasterId, e);
             return -1;
         }
     }
 
     @Override
-    public String captureOutput(String stargateId) {
+    public String captureOutput(String starblasterId) {
         var sb = new StringBuilder();
         try {
-            dockerClient.logContainerCmd(stargateId)
+            dockerClient.logContainerCmd(starblasterId)
                     .withStdOut(true)
                     .withStdErr(true)
                     .withFollowStream(false)
@@ -124,23 +124,23 @@ public class DockerStargateProvider implements StargateProvider {
                     }).awaitCompletion(30, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            log.warn("Interrupted while capturing output from stargate {}", stargateId);
+            log.warn("Interrupted while capturing output from starblaster {}", starblasterId);
         }
         return sb.toString();
     }
 
     @Override
-    public void teardownStargate(String stargateId) {
+    public void teardownStarblaster(String starblasterId) {
         try {
-            dockerClient.stopContainerCmd(stargateId).exec();
+            dockerClient.stopContainerCmd(starblasterId).exec();
         } catch (Exception e) {
-            log.debug("Container {} may already be stopped: {}", stargateId, e.getMessage());
+            log.debug("Container {} may already be stopped: {}", starblasterId, e.getMessage());
         }
         try {
-            dockerClient.removeContainerCmd(stargateId).withForce(true).exec();
-            log.info("Stargate {} torn down", stargateId);
+            dockerClient.removeContainerCmd(starblasterId).withForce(true).exec();
+            log.info("Starblaster {} torn down", starblasterId);
         } catch (Exception e) {
-            log.warn("Failed to remove container {}", stargateId, e);
+            log.warn("Failed to remove container {}", starblasterId, e);
         }
     }
 }

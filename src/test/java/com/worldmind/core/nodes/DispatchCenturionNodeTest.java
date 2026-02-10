@@ -2,7 +2,7 @@ package com.worldmind.core.nodes;
 
 import com.worldmind.core.model.*;
 import com.worldmind.core.state.WorldmindState;
-import com.worldmind.stargate.StargateBridge;
+import com.worldmind.starblaster.StarblasterBridge;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,16 +20,16 @@ import static org.mockito.Mockito.*;
 /**
  * Unit tests for {@link DispatchCenturionNode}.
  * <p>
- * Uses Mockito to mock {@link StargateBridge} so that no real Docker containers are launched.
+ * Uses Mockito to mock {@link StarblasterBridge} so that no real Docker containers are launched.
  */
 class DispatchCenturionNodeTest {
 
-    private StargateBridge bridge;
+    private StarblasterBridge bridge;
     private DispatchCenturionNode node;
 
     @BeforeEach
     void setUp() {
-        bridge = mock(StargateBridge.class);
+        bridge = mock(StarblasterBridge.class);
         node = new DispatchCenturionNode(bridge);
     }
 
@@ -48,9 +48,9 @@ class DispatchCenturionNodeTest {
             List.of(), DirectiveStatus.PASSED, 1, 3,
             FailureStrategy.RETRY, List.of(new FileRecord("hello.py", "created", 1)), 5000L
         );
-        var stargateInfo = new StargateInfo("c-1", "FORGE", "DIR-001", "completed",
+        var starblasterInfo = new StarblasterInfo("c-1", "FORGE", "DIR-001", "completed",
             Instant.now(), Instant.now());
-        var bridgeResult = new StargateBridge.BridgeResult(updatedDirective, stargateInfo, "ok");
+        var bridgeResult = new StarblasterBridge.BridgeResult(updatedDirective, starblasterInfo, "ok");
 
         when(bridge.executeDirective(any(), any(), any())).thenReturn(bridgeResult);
 
@@ -64,7 +64,7 @@ class DispatchCenturionNodeTest {
         var result = node.apply(state);
 
         assertNotNull(result);
-        assertTrue(result.containsKey("stargates"));
+        assertTrue(result.containsKey("starblasters"));
         assertTrue(result.containsKey("currentDirectiveIndex"));
         assertEquals(1, result.get("currentDirectiveIndex"));
         assertEquals(MissionStatus.EXECUTING.name(), result.get("status"));
@@ -139,9 +139,9 @@ class DispatchCenturionNodeTest {
             List.of(), DirectiveStatus.FAILED, 1, 3,
             FailureStrategy.RETRY, List.of(), 3000L
         );
-        var stargateInfo = new StargateInfo("c-2", "FORGE", "DIR-001", "failed",
+        var starblasterInfo = new StarblasterInfo("c-2", "FORGE", "DIR-001", "failed",
             Instant.now(), Instant.now());
-        var bridgeResult = new StargateBridge.BridgeResult(failedDirective, stargateInfo, "compilation error");
+        var bridgeResult = new StarblasterBridge.BridgeResult(failedDirective, starblasterInfo, "compilation error");
 
         when(bridge.executeDirective(any(), any(), any())).thenReturn(bridgeResult);
 
@@ -163,7 +163,7 @@ class DispatchCenturionNodeTest {
     }
 
     @Test
-    @DisplayName("passes correct arguments to StargateBridge")
+    @DisplayName("passes correct arguments to StarblasterBridge")
     void applyPassesCorrectArgsToBridge() {
         var directive = new Directive(
             "DIR-001", "FORGE", "Create file",
@@ -177,9 +177,9 @@ class DispatchCenturionNodeTest {
             List.of(), DirectiveStatus.PASSED, 1, 3,
             FailureStrategy.RETRY, List.of(), 1000L
         );
-        var stargateInfo = new StargateInfo("c-3", "FORGE", "DIR-001", "completed",
+        var starblasterInfo = new StarblasterInfo("c-3", "FORGE", "DIR-001", "completed",
             Instant.now(), Instant.now());
-        var bridgeResult = new StargateBridge.BridgeResult(updatedDirective, stargateInfo, "ok");
+        var bridgeResult = new StarblasterBridge.BridgeResult(updatedDirective, starblasterInfo, "ok");
 
         when(bridge.executeDirective(any(), any(), any())).thenReturn(bridgeResult);
 
@@ -214,9 +214,9 @@ class DispatchCenturionNodeTest {
             List.of(), DirectiveStatus.PASSED, 1, 3,
             FailureStrategy.RETRY, List.of(), 500L
         );
-        var stargateInfo = new StargateInfo("c-4", "FORGE", "DIR-001", "completed",
+        var starblasterInfo = new StarblasterInfo("c-4", "FORGE", "DIR-001", "completed",
             Instant.now(), Instant.now());
-        var bridgeResult = new StargateBridge.BridgeResult(updatedDirective, stargateInfo, "ok");
+        var bridgeResult = new StarblasterBridge.BridgeResult(updatedDirective, starblasterInfo, "ok");
 
         when(bridge.executeDirective(any(), any(), any())).thenReturn(bridgeResult);
 
@@ -251,9 +251,9 @@ class DispatchCenturionNodeTest {
             List.of(), DirectiveStatus.PASSED, 2, 3,
             FailureStrategy.RETRY, List.of(new FileRecord("hello.py", "created", 1)), 3000L
         );
-        var stargateInfo = new StargateInfo("c-5", "FORGE", "DIR-001", "completed",
+        var starblasterInfo = new StarblasterInfo("c-5", "FORGE", "DIR-001", "completed",
             Instant.now(), Instant.now());
-        var bridgeResult = new StargateBridge.BridgeResult(updatedDirective, stargateInfo, "ok");
+        var bridgeResult = new StarblasterBridge.BridgeResult(updatedDirective, starblasterInfo, "ok");
 
         when(bridge.executeDirective(any(), any(), any())).thenReturn(bridgeResult);
 
@@ -270,7 +270,7 @@ class DispatchCenturionNodeTest {
         // Bridge should have been called (not skipped)
         verify(bridge).executeDirective(any(), any(), any());
         assertNotNull(result);
-        assertTrue(result.containsKey("stargates"));
+        assertTrue(result.containsKey("starblasters"));
         assertEquals(1, result.get("currentDirectiveIndex"));
         assertEquals(MissionStatus.EXECUTING.name(), result.get("status"));
         // retryContext should be cleared
@@ -313,9 +313,9 @@ class DispatchCenturionNodeTest {
             List.of(), DirectiveStatus.PASSED, 2, 3,
             FailureStrategy.RETRY, List.of(), 1500L
         );
-        var stargateInfo = new StargateInfo("c-6", "FORGE", "DIR-001", "completed",
+        var starblasterInfo = new StarblasterInfo("c-6", "FORGE", "DIR-001", "completed",
             Instant.now(), Instant.now());
-        var bridgeResult = new StargateBridge.BridgeResult(updatedDirective, stargateInfo, "ok");
+        var bridgeResult = new StarblasterBridge.BridgeResult(updatedDirective, starblasterInfo, "ok");
 
         when(bridge.executeDirective(any(), any(), any())).thenReturn(bridgeResult);
 
@@ -348,9 +348,9 @@ class DispatchCenturionNodeTest {
             List.of(), DirectiveStatus.PASSED, 2, 3,
             FailureStrategy.RETRY, List.of(), 1500L
         );
-        var stargateInfo = new StargateInfo("c-7", "FORGE", "DIR-001", "completed",
+        var starblasterInfo = new StarblasterInfo("c-7", "FORGE", "DIR-001", "completed",
             Instant.now(), Instant.now());
-        var bridgeResult = new StargateBridge.BridgeResult(updatedDirective, stargateInfo, "ok");
+        var bridgeResult = new StarblasterBridge.BridgeResult(updatedDirective, starblasterInfo, "ok");
 
         when(bridge.executeDirective(any(), any(), any())).thenReturn(bridgeResult);
 

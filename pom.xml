@@ -116,6 +116,13 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- Cloud Foundry service binding auto-configuration -->
+        <dependency>
+            <groupId>io.pivotal.cfenv</groupId>
+            <artifactId>java-cfenv-boot</artifactId>
+            <version>3.5.0</version>
+        </dependency>
+
         <!-- JWT Token Support (Phase 6 — MCP Auth) -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>

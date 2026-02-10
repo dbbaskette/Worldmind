@@ -52,7 +52,7 @@ class MissionControllerTest {
         when(missionEngine.generateMissionId()).thenReturn("WMND-2026-0001");
 
         String body = objectMapper.writeValueAsString(
-                new MissionRequest("Add a REST endpoint", "FULL_AUTO", "/tmp/project"));
+                new MissionRequest("Add a REST endpoint", "FULL_AUTO", "/tmp/project", null));
 
         mockMvc.perform(post("/api/v1/missions")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -121,7 +121,7 @@ class MissionControllerTest {
         when(missionEngine.generateMissionId()).thenReturn("WMND-2026-0003");
 
         String body = objectMapper.writeValueAsString(
-                new MissionRequest("Build feature X", "APPROVE_PLAN", "/tmp/project"));
+                new MissionRequest("Build feature X", "APPROVE_PLAN", "/tmp/project", null));
 
         // Submit the mission first
         mockMvc.perform(post("/api/v1/missions")
@@ -154,7 +154,7 @@ class MissionControllerTest {
                 .thenReturn(new SseEmitter(0L));
 
         String body = objectMapper.writeValueAsString(
-                new MissionRequest("Test SSE", "FULL_AUTO", "/tmp/project"));
+                new MissionRequest("Test SSE", "FULL_AUTO", "/tmp/project", null));
 
         mockMvc.perform(post("/api/v1/missions")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -189,7 +189,7 @@ class MissionControllerTest {
         when(missionEngine.generateMissionId()).thenReturn("WMND-2026-0005");
 
         String body = objectMapper.writeValueAsString(
-                new MissionRequest("Cancel me", "FULL_AUTO", "/tmp/project"));
+                new MissionRequest("Cancel me", "FULL_AUTO", "/tmp/project", null));
 
         mockMvc.perform(post("/api/v1/missions")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -217,7 +217,7 @@ class MissionControllerTest {
         when(checkpointSaver.list(any())).thenReturn(List.of());
 
         String body = objectMapper.writeValueAsString(
-                new MissionRequest("Timeline test", "FULL_AUTO", "/tmp/project"));
+                new MissionRequest("Timeline test", "FULL_AUTO", "/tmp/project", null));
 
         mockMvc.perform(post("/api/v1/missions")
                         .contentType(MediaType.APPLICATION_JSON)

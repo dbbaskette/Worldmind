@@ -2,7 +2,7 @@ package com.worldmind.core.nodes;
 
 import com.worldmind.core.model.*;
 import com.worldmind.core.state.WorldmindState;
-import com.worldmind.stargate.StargateBridge;
+import com.worldmind.starblaster.StarblasterBridge;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,12 +17,12 @@ import static org.mockito.Mockito.*;
 
 class ParallelDispatchNodeTest {
 
-    private StargateBridge mockBridge;
+    private StarblasterBridge mockBridge;
     private ParallelDispatchNode node;
 
     @BeforeEach
     void setUp() {
-        mockBridge = mock(StargateBridge.class);
+        mockBridge = mock(StarblasterBridge.class);
         node = new ParallelDispatchNode(mockBridge, 10);
     }
 
@@ -31,22 +31,22 @@ class ParallelDispatchNodeTest {
                 DirectiveStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of(), null);
     }
 
-    private StargateBridge.BridgeResult successResult(Directive d) {
+    private StarblasterBridge.BridgeResult successResult(Directive d) {
         var updated = new Directive(d.id(), d.centurion(), d.description(), d.inputContext(),
                 d.successCriteria(), d.dependencies(), DirectiveStatus.PASSED,
                 1, d.maxIterations(), d.onFailure(),
                 List.of(new FileRecord("test.java", "created", 10)), 500L);
-        return new StargateBridge.BridgeResult(updated,
-                new StargateInfo("c-" + d.id(), d.centurion(), d.id(), "completed", Instant.now(), Instant.now()),
+        return new StarblasterBridge.BridgeResult(updated,
+                new StarblasterInfo("c-" + d.id(), d.centurion(), d.id(), "completed", Instant.now(), Instant.now()),
                 "Success output");
     }
 
-    private StargateBridge.BridgeResult failureResult(Directive d) {
+    private StarblasterBridge.BridgeResult failureResult(Directive d) {
         var updated = new Directive(d.id(), d.centurion(), d.description(), d.inputContext(),
                 d.successCriteria(), d.dependencies(), DirectiveStatus.FAILED,
                 1, d.maxIterations(), d.onFailure(), List.of(), 300L);
-        return new StargateBridge.BridgeResult(updated,
-                new StargateInfo("c-" + d.id(), d.centurion(), d.id(), "failed", Instant.now(), Instant.now()),
+        return new StarblasterBridge.BridgeResult(updated,
+                new StarblasterInfo("c-" + d.id(), d.centurion(), d.id(), "failed", Instant.now(), Instant.now()),
                 "Failure output");
     }
 
@@ -69,8 +69,8 @@ class ParallelDispatchNodeTest {
         assertEquals("DIR-001", waveResults.get(0).directiveId());
         assertEquals(DirectiveStatus.PASSED, waveResults.get(0).status());
 
-        var stargates = (List<StargateInfo>) result.get("stargates");
-        assertEquals(1, stargates.size());
+        var starblasters = (List<StarblasterInfo>) result.get("starblasters");
+        assertEquals(1, starblasters.size());
     }
 
     @Test
@@ -98,14 +98,14 @@ class ParallelDispatchNodeTest {
         var waveResults = (List<WaveDispatchResult>) result.get("waveDispatchResults");
         assertEquals(3, waveResults.size());
 
-        var stargates = (List<StargateInfo>) result.get("stargates");
-        assertEquals(3, stargates.size());
+        var starblasters = (List<StarblasterInfo>) result.get("starblasters");
+        assertEquals(3, starblasters.size());
 
         verify(mockBridge, times(3)).executeDirective(any(), any(), any());
     }
 
     @Test
-    @DisplayName("One failure among successes: errors appended, stargates from all")
+    @DisplayName("One failure among successes: errors appended, starblasters from all")
     @SuppressWarnings("unchecked")
     void mixedSuccessAndFailure() {
         var d1 = directive("DIR-001");
@@ -130,8 +130,8 @@ class ParallelDispatchNodeTest {
         assertEquals(1, errors.size());
         assertTrue(errors.get(0).contains("DIR-002"));
 
-        var stargates = (List<StargateInfo>) result.get("stargates");
-        assertEquals(2, stargates.size());
+        var starblasters = (List<StarblasterInfo>) result.get("starblasters");
+        assertEquals(2, starblasters.size());
     }
 
     @Test

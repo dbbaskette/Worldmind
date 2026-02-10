@@ -28,6 +28,7 @@ usage() {
   echo "  timeline <id>       Show checkpoint history"
   echo "  up                  Start everything in Docker (Postgres + Worldmind)"
   echo "  down                Stop all Docker services"
+  echo "  cf-push             Build and push to Cloud Foundry"
   echo ""
   echo "Environment:"
   echo "  WORLDMIND_PROFILE   Spring profile (default: local)"
@@ -56,6 +57,12 @@ case "$1" in
   down)
     echo "Stopping all services..."
     docker compose --profile full down
+    exit 0
+    ;;
+  cf-push)
+    echo "Building and pushing to Cloud Foundry..."
+    ./mvnw -q clean package -DskipTests
+    cf push
     exit 0
     ;;
 esac

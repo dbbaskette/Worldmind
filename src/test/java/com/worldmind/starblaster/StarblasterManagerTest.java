@@ -1,4 +1,4 @@
-package com.worldmind.stargate;
+package com.worldmind.starblaster;
 
 import com.worldmind.core.model.FileRecord;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,22 +17,22 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.*;
 
-class StargateManagerTest {
+class StarblasterManagerTest {
 
-    private StargateProvider provider;
-    private StargateProperties properties;
-    private StargateManager manager;
+    private StarblasterProvider provider;
+    private StarblasterProperties properties;
+    private StarblasterManager manager;
 
     @BeforeEach
     void setUp() {
-        provider = mock(StargateProvider.class);
-        properties = new StargateProperties();
-        manager = new StargateManager(provider, properties);
+        provider = mock(StarblasterProvider.class);
+        properties = new StarblasterProperties();
+        manager = new StarblasterManager(provider, properties);
     }
 
     @Test
     void executeDirectiveCallsProviderLifecycle() {
-        when(provider.openStargate(any())).thenReturn("container-1");
+        when(provider.openStarblaster(any())).thenReturn("container-1");
         when(provider.waitForCompletion("container-1", 300)).thenReturn(0);
         when(provider.captureOutput("container-1")).thenReturn("done");
 
@@ -41,16 +41,16 @@ class StargateManagerTest {
             "Create file", Map.of()
         );
 
-        verify(provider).openStargate(any());
+        verify(provider).openStarblaster(any());
         verify(provider).waitForCompletion("container-1", 300);
         verify(provider).captureOutput("container-1");
-        verify(provider).teardownStargate("container-1");
+        verify(provider).teardownStarblaster("container-1");
         assertEquals(0, result.exitCode());
     }
 
     @Test
     void executeDirectiveReportsFailureOnNonZeroExit() {
-        when(provider.openStargate(any())).thenReturn("container-2");
+        when(provider.openStarblaster(any())).thenReturn("container-2");
         when(provider.waitForCompletion("container-2", 300)).thenReturn(1);
         when(provider.captureOutput("container-2")).thenReturn("error");
 
@@ -65,9 +65,9 @@ class StargateManagerTest {
 
     @Test
     void detectFileChangesFindsNewFiles(@TempDir Path tempDir) throws IOException {
-        var before = StargateManager.snapshotFiles(tempDir);
+        var before = StarblasterManager.snapshotFiles(tempDir);
         Files.writeString(tempDir.resolve("hello.py"), "print('hello')");
-        var changes = StargateManager.detectChanges(before, tempDir);
+        var changes = StarblasterManager.detectChanges(before, tempDir);
 
         assertEquals(1, changes.size());
         assertEquals("hello.py", changes.get(0).path());
@@ -80,9 +80,9 @@ class StargateManagerTest {
         Files.writeString(file, "old");
         // Set last-modified to the past so the re-write produces a different timestamp
         Files.setLastModifiedTime(file, FileTime.from(Instant.now().minusSeconds(60)));
-        var before = StargateManager.snapshotFiles(tempDir);
+        var before = StarblasterManager.snapshotFiles(tempDir);
         Files.writeString(file, "new content");
-        var changes = StargateManager.detectChanges(before, tempDir);
+        var changes = StarblasterManager.detectChanges(before, tempDir);
 
         assertEquals(1, changes.size());
         assertEquals("existing.py", changes.get(0).path());

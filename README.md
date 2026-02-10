@@ -24,7 +24,7 @@ The project uses Xandarian Worldmind / Nova Corps nomenclature from Marvel Comic
 - **Intelligent classification** — Automatically categorizes requests by complexity and determines execution strategy
 - **Project-aware planning** — Scans your codebase to generate context-aware directives with success criteria
 - **Specialized agents (Centurions)** — Purpose-built workers for code generation, review, testing, research, and refactoring
-- **Sandboxed execution (Stargates)** — Each agent runs in an isolated Docker container with constrained permissions
+- **Sandboxed execution (Starblasters)** — Each agent runs in an isolated Docker container with constrained permissions
 - **Crash-resilient state** — PostgreSQL-backed checkpointing enables recovery and time-travel debugging
 - **Flexible interaction modes** — Full auto, approve-plan, or step-by-step execution
 - **Real-time dashboard** — React web UI with SSE-powered live updates, plan approval, and event logs
@@ -51,7 +51,7 @@ flowchart TB
         Review[Review & Seal]
     end
 
-    subgraph Stargates["Stargates (Docker Containers)"]
+    subgraph Starblasters["Starblasters (Docker Containers)"]
         Forge["Forge (Code Gen)"]
         Vigil["Vigil (Review)"]
         Gauntlet["Gauntlet (Test)"]
@@ -233,7 +233,7 @@ All endpoints are under `/api/v1`.
 | `POST` | `/missions/{id}/cancel` | Cancel a running mission |
 | `GET` | `/missions/{id}/timeline` | Checkpoint state history |
 | `GET` | `/missions/{id}/directives/{did}` | Detailed directive result |
-| `GET` | `/stargates` | List active stargates |
+| `GET` | `/starblasters` | List active starblasters |
 | `GET` | `/health` | Component health status |
 
 ## Project Structure
@@ -260,10 +260,10 @@ src/main/java/com/worldmind/
 ├── dispatch/
 │   ├── api/                               # REST controllers + SSE streaming
 │   └── cli/                               # picocli commands (11 commands)
-└── stargate/
-    ├── DockerStargateProvider.java         # Docker container lifecycle
+└── starblaster/
+    ├── DockerStarblasterProvider.java         # Docker container lifecycle
     ├── InstructionBuilder.java            # Centurion instruction templating
-    ├── StargateBridge.java                # Dispatch orchestration
+    ├── StarblasterBridge.java                # Dispatch orchestration
     └── cf/                                # Cloud Foundry task provider
 
 worldmind-ui/                              # React 18 + TypeScript + Vite + Tailwind

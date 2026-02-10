@@ -90,7 +90,7 @@ class CheckpointerTest {
             }
             return Map.of(
                     "waveDispatchResults", results,
-                    "stargates", List.of(),
+                    "starblasters", List.of(),
                     "status", MissionStatus.EXECUTING.name()
             );
         });

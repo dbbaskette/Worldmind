@@ -6,8 +6,8 @@ import com.worldmind.core.logging.MdcContext;
 import com.worldmind.core.metrics.WorldmindMetrics;
 import com.worldmind.core.model.*;
 import com.worldmind.core.state.WorldmindState;
-import com.worldmind.stargate.StargateBridge;
-import com.worldmind.stargate.StargateProperties;
+import com.worldmind.starblaster.StarblasterBridge;
+import com.worldmind.starblaster.StarblasterProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,29 +21,29 @@ import java.util.concurrent.*;
 /**
  * Dispatches all directives in the current wave concurrently using virtual threads.
  * Bounded by a semaphore at maxParallel. Collects per-directive results into
- * {@code waveDispatchResults} and appends stargate infos and errors.
+ * {@code waveDispatchResults} and appends starblaster infos and errors.
  */
 @Component
 public class ParallelDispatchNode {
 
     private static final Logger log = LoggerFactory.getLogger(ParallelDispatchNode.class);
 
-    private final StargateBridge bridge;
+    private final StarblasterBridge bridge;
     private final int maxParallel;
     private final EventBus eventBus;
     private final WorldmindMetrics metrics;
 
     @Autowired
-    public ParallelDispatchNode(StargateBridge bridge, StargateProperties properties,
+    public ParallelDispatchNode(StarblasterBridge bridge, StarblasterProperties properties,
                                 EventBus eventBus, WorldmindMetrics metrics) {
         this(bridge, properties.getMaxParallel(), eventBus, metrics);
     }
 
-    ParallelDispatchNode(StargateBridge bridge, int maxParallel) {
+    ParallelDispatchNode(StarblasterBridge bridge, int maxParallel) {
         this(bridge, maxParallel, new EventBus(), null);
     }
 
-    ParallelDispatchNode(StargateBridge bridge, int maxParallel, EventBus eventBus, WorldmindMetrics metrics) {
+    ParallelDispatchNode(StarblasterBridge bridge, int maxParallel, EventBus eventBus, WorldmindMetrics metrics) {
         this.bridge = bridge;
         this.maxParallel = maxParallel;
         this.eventBus = eventBus;
@@ -65,7 +65,7 @@ public class ParallelDispatchNode {
         if (waveIds.isEmpty()) {
             return Map.of(
                     "waveDispatchResults", List.of(),
-                    "stargates", List.of(),
+                    "starblasters", List.of(),
                     "status", MissionStatus.EXECUTING.name()
             );
         }
@@ -121,10 +121,10 @@ public class ParallelDispatchNode {
                                            "centurion", directiveToDispatch.centurion()),
                                     Instant.now()));
 
-                            if (result.stargateInfo() != null) {
-                                eventBus.publish(new WorldmindEvent("stargate.opened",
+                            if (result.starblasterInfo() != null) {
+                                eventBus.publish(new WorldmindEvent("starblaster.opened",
                                         state.missionId(), directive.id(),
-                                        Map.of("containerId", result.stargateInfo().containerId(),
+                                        Map.of("containerId", result.starblasterInfo().containerId(),
                                                "centurion", directiveToDispatch.centurion()),
                                         Instant.now()));
                             }
@@ -135,7 +135,7 @@ public class ParallelDispatchNode {
                                             result.directive().filesAffected(),
                                             result.output(),
                                             result.directive().elapsedMs() != null ? result.directive().elapsedMs() : 0L),
-                                    result.stargateInfo(),
+                                    result.starblasterInfo(),
                                     result.directive().status() == DirectiveStatus.FAILED
                                             ? "Directive " + directive.id() + " failed: " + result.output()
                                             : null
@@ -158,15 +158,15 @@ public class ParallelDispatchNode {
 
             // Collect all results
             var waveResults = new ArrayList<WaveDispatchResult>();
-            var stargateInfos = new ArrayList<StargateInfo>();
+            var starblasterInfos = new ArrayList<StarblasterInfo>();
             var errors = new ArrayList<String>();
 
             for (var future : futures) {
                 try {
                     var outcome = future.join();
                     waveResults.add(outcome.result);
-                    if (outcome.stargateInfo != null) {
-                        stargateInfos.add(outcome.stargateInfo);
+                    if (outcome.starblasterInfo != null) {
+                        starblasterInfos.add(outcome.starblasterInfo);
                     }
                     if (outcome.error != null) {
                         errors.add(outcome.error);
@@ -178,7 +178,7 @@ public class ParallelDispatchNode {
 
             var updates = new HashMap<String, Object>();
             updates.put("waveDispatchResults", waveResults);
-            updates.put("stargates", stargateInfos);
+            updates.put("starblasters", starblasterInfos);
             updates.put("status", MissionStatus.EXECUTING.name());
             if (!errors.isEmpty()) {
                 updates.put("errors", errors);
@@ -211,5 +211,5 @@ public class ParallelDispatchNode {
         );
     }
 
-    private record DispatchOutcome(WaveDispatchResult result, StargateInfo stargateInfo, String error) {}
+    private record DispatchOutcome(WaveDispatchResult result, StarblasterInfo starblasterInfo, String error) {}
 }

@@ -4,34 +4,34 @@
 
 **Goal:** Execute directives by spinning up Docker containers running Goose (Centurion Forge) that generate code in the user's project directory.
 
-**Architecture:** A `StargateProvider` interface abstracts container orchestration (Docker for dev, Cloud Foundry for prod). `StargateManager` handles file change detection and delegates to the provider. `StargateBridge` translates between domain records and the stargate infrastructure. `DispatchCenturionNode` plugs into the LangGraph4j graph as a sequential loop after plan approval. Goose runs headlessly via `goose run -t "<instruction>"` inside containers, connecting to LM Studio on the host (dev) or Anthropic API (prod).
+**Architecture:** A `StarblasterProvider` interface abstracts container orchestration (Docker for dev, Cloud Foundry for prod). `StarblasterManager` handles file change detection and delegates to the provider. `StarblasterBridge` translates between domain records and the starblaster infrastructure. `DispatchCenturionNode` plugs into the LangGraph4j graph as a sequential loop after plan approval. Goose runs headlessly via `goose run -t "<instruction>"` inside containers, connecting to LM Studio on the host (dev) or Anthropic API (prod).
 
 **Tech Stack:** Java 21, Docker Java client 3.4.1, Goose CLI (headless), LM Studio (OpenAI-compatible), LangGraph4j 1.8
 
 ---
 
-## Task 2.1: StargateProvider Interface & StargateRequest Record
+## Task 2.1: StarblasterProvider Interface & StarblasterRequest Record
 
 **Files:**
-- Create: `src/main/java/com/worldmind/stargate/StargateProvider.java`
-- Create: `src/main/java/com/worldmind/stargate/StargateRequest.java`
-- Test: `src/test/java/com/worldmind/stargate/StargateProviderTest.java`
+- Create: `src/main/java/com/worldmind/starblaster/StarblasterProvider.java`
+- Create: `src/main/java/com/worldmind/starblaster/StarblasterRequest.java`
+- Test: `src/test/java/com/worldmind/starblaster/StarblasterProviderTest.java`
 
 **Step 1: Write the test**
 
 ```java
-package com.worldmind.stargate;
+package com.worldmind.starblaster;
 
 import org.junit.jupiter.api.Test;
 import java.nio.file.Path;
 import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
-class StargateProviderTest {
+class StarblasterProviderTest {
 
     @Test
-    void stargateRequestBuildsWithAllFields() {
-        var request = new StargateRequest(
+    void starblasterRequestBuildsWithAllFields() {
+        var request = new StarblasterRequest(
             "forge",
             "directive-001",
             Path.of("/tmp/project"),
@@ -48,8 +48,8 @@ class StargateProviderTest {
     }
 
     @Test
-    void stargateRequestInstructionTextIsPreserved() {
-        var request = new StargateRequest(
+    void starblasterRequestInstructionTextIsPreserved() {
+        var request = new StarblasterRequest(
             "forge", "d-001", Path.of("/tmp"),
             "Build the feature",
             Map.of(), 2048, 1
@@ -61,65 +61,65 @@ class StargateProviderTest {
 
 **Step 2: Run test to verify it fails**
 
-Run: `mvn test -pl . -Dtest=StargateProviderTest -f /Users/dbbaskette/Projects/Worldmind/pom.xml`
+Run: `mvn test -pl . -Dtest=StarblasterProviderTest -f /Users/dbbaskette/Projects/Worldmind/pom.xml`
 Expected: FAIL — class not found
 
 **Step 3: Write the interface and record**
 
-`StargateProvider.java`:
+`StarblasterProvider.java`:
 ```java
-package com.worldmind.stargate;
+package com.worldmind.starblaster;
 
 /**
  * Abstraction for container orchestration.
- * Implementations: DockerStargateProvider (dev), CloudFoundryStargateProvider (prod).
+ * Implementations: DockerStarblasterProvider (dev), CloudFoundryStarblasterProvider (prod).
  */
-public interface StargateProvider {
+public interface StarblasterProvider {
 
     /**
      * Creates and starts a container for a Centurion.
-     * @return the container/stargate ID
+     * @return the container/starblaster ID
      */
-    String openStargate(StargateRequest request);
+    String openStarblaster(StarblasterRequest request);
 
     /**
      * Blocks until the container exits or timeout is reached.
      * @return the container exit code (0 = success)
      */
-    int waitForCompletion(String stargateId, int timeoutSeconds);
+    int waitForCompletion(String starblasterId, int timeoutSeconds);
 
     /**
      * Captures stdout/stderr logs from the container.
      */
-    String captureOutput(String stargateId);
+    String captureOutput(String starblasterId);
 
     /**
      * Stops and removes the container.
      */
-    void teardownStargate(String stargateId);
+    void teardownStarblaster(String starblasterId);
 }
 ```
 
-`StargateRequest.java`:
+`StarblasterRequest.java`:
 ```java
-package com.worldmind.stargate;
+package com.worldmind.starblaster;
 
 import java.io.Serializable;
 import java.nio.file.Path;
 import java.util.Map;
 
 /**
- * Everything needed to open a Stargate container.
+ * Everything needed to open a Starblaster container.
  *
  * @param centurionType  e.g. "forge", "vigil", "gauntlet"
- * @param directiveId    the directive this stargate serves
+ * @param directiveId    the directive this starblaster serves
  * @param projectPath    host path to the project directory (bind-mounted as /workspace)
  * @param instructionText the full instruction markdown for Goose
  * @param envVars        environment variables to inject (GOOSE_PROVIDER, GOOSE_MODEL, etc.)
  * @param memoryLimitMb  memory limit in MB
  * @param cpuCount       CPU count limit
  */
-public record StargateRequest(
+public record StarblasterRequest(
     String centurionType,
     String directiveId,
     Path projectPath,
@@ -132,40 +132,40 @@ public record StargateRequest(
 
 **Step 4: Run test to verify it passes**
 
-Run: `mvn test -pl . -Dtest=StargateProviderTest -f /Users/dbbaskette/Projects/Worldmind/pom.xml`
+Run: `mvn test -pl . -Dtest=StarblasterProviderTest -f /Users/dbbaskette/Projects/Worldmind/pom.xml`
 Expected: PASS (2 tests)
 
 **Step 5: Commit**
 
 ```bash
-git add src/main/java/com/worldmind/stargate/StargateProvider.java \
-        src/main/java/com/worldmind/stargate/StargateRequest.java \
-        src/test/java/com/worldmind/stargate/StargateProviderTest.java
-git commit -m "feat: StargateProvider interface and StargateRequest record"
+git add src/main/java/com/worldmind/starblaster/StarblasterProvider.java \
+        src/main/java/com/worldmind/starblaster/StarblasterRequest.java \
+        src/test/java/com/worldmind/starblaster/StarblasterProviderTest.java
+git commit -m "feat: StarblasterProvider interface and StarblasterRequest record"
 ```
 
 ---
 
-## Task 2.2: StargateProperties Configuration
+## Task 2.2: StarblasterProperties Configuration
 
 **Files:**
-- Create: `src/main/java/com/worldmind/stargate/StargateProperties.java`
+- Create: `src/main/java/com/worldmind/starblaster/StarblasterProperties.java`
 - Modify: `src/main/resources/application.yml:38-46`
-- Test: `src/test/java/com/worldmind/stargate/StargatePropertiesTest.java`
+- Test: `src/test/java/com/worldmind/starblaster/StarblasterPropertiesTest.java`
 
 **Step 1: Write the test**
 
 ```java
-package com.worldmind.stargate;
+package com.worldmind.starblaster;
 
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
-class StargatePropertiesTest {
+class StarblasterPropertiesTest {
 
     @Test
     void defaultsAreReasonable() {
-        var props = new StargateProperties();
+        var props = new StarblasterProperties();
         assertEquals("docker", props.getProvider());
         assertEquals(300, props.getTimeoutSeconds());
         assertEquals(4096, props.getMemoryLimitMb());
@@ -175,7 +175,7 @@ class StargatePropertiesTest {
 
     @Test
     void gooseDefaultsAreReasonable() {
-        var props = new StargateProperties();
+        var props = new StarblasterProperties();
         assertEquals("openai", props.getGooseProvider());
         assertEquals("http://host.docker.internal:1234/v1", props.getLmStudioUrl());
     }
@@ -186,32 +186,32 @@ class StargatePropertiesTest {
 
 **Step 3: Write implementation**
 
-`StargateProperties.java`:
+`StarblasterProperties.java`:
 ```java
-package com.worldmind.stargate;
+package com.worldmind.starblaster;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
 /**
- * Configuration properties for Stargate container management and Goose model provider.
+ * Configuration properties for Starblaster container management and Goose model provider.
  * Bound from application.yml under the "worldmind" prefix.
  */
 @Component
 @ConfigurationProperties(prefix = "worldmind")
-public class StargateProperties {
+public class StarblasterProperties {
 
-    private Stargate stargate = new Stargate();
+    private Starblaster starblaster = new Starblaster();
     private Goose goose = new Goose();
 
-    // -- Stargate accessors (delegate to nested) --
+    // -- Starblaster accessors (delegate to nested) --
 
-    public String getProvider() { return stargate.provider; }
-    public int getTimeoutSeconds() { return stargate.timeoutSeconds; }
-    public int getMemoryLimitMb() { return stargate.memoryLimitMb; }
-    public int getCpuCount() { return stargate.cpuCount; }
-    public int getMaxParallel() { return stargate.maxParallel; }
-    public String getImage() { return stargate.image; }
+    public String getProvider() { return starblaster.provider; }
+    public int getTimeoutSeconds() { return starblaster.timeoutSeconds; }
+    public int getMemoryLimitMb() { return starblaster.memoryLimitMb; }
+    public int getCpuCount() { return starblaster.cpuCount; }
+    public int getMaxParallel() { return starblaster.maxParallel; }
+    public String getImage() { return starblaster.image; }
 
     // -- Goose accessors (delegate to nested) --
 
@@ -219,12 +219,12 @@ public class StargateProperties {
     public String getGooseModel() { return goose.model; }
     public String getLmStudioUrl() { return goose.lmStudioUrl; }
 
-    public Stargate getStargate() { return stargate; }
-    public void setStargate(Stargate stargate) { this.stargate = stargate; }
+    public Starblaster getStarblaster() { return starblaster; }
+    public void setStarblaster(Starblaster starblaster) { this.starblaster = starblaster; }
     public Goose getGoose() { return goose; }
     public void setGoose(Goose goose) { this.goose = goose; }
 
-    public static class Stargate {
+    public static class Starblaster {
         private String provider = "docker";
         private int maxParallel = 10;
         private int timeoutSeconds = 300;
@@ -270,8 +270,8 @@ worldmind:
     provider: ${GOOSE_PROVIDER:openai}
     model: ${GOOSE_MODEL:qwen2.5-coder-32b}
     lm-studio-url: ${LM_STUDIO_URL:http://host.docker.internal:1234/v1}
-  stargate:
-    provider: ${STARGATE_PROVIDER:docker}
+  starblaster:
+    provider: ${STARBLASTER_PROVIDER:docker}
     max-parallel: 10
     timeout-seconds: 300
     memory-limit-mb: 4096
@@ -284,10 +284,10 @@ worldmind:
 **Step 5: Commit**
 
 ```bash
-git add src/main/java/com/worldmind/stargate/StargateProperties.java \
+git add src/main/java/com/worldmind/starblaster/StarblasterProperties.java \
         src/main/resources/application.yml \
-        src/test/java/com/worldmind/stargate/StargatePropertiesTest.java
-git commit -m "feat: StargateProperties with Goose provider and container config"
+        src/test/java/com/worldmind/starblaster/StarblasterPropertiesTest.java
+git commit -m "feat: StarblasterProperties with Goose provider and container config"
 ```
 
 ---
@@ -295,13 +295,13 @@ git commit -m "feat: StargateProperties with Goose provider and container config
 ## Task 2.3: InstructionBuilder
 
 **Files:**
-- Create: `src/main/java/com/worldmind/stargate/InstructionBuilder.java`
-- Test: `src/test/java/com/worldmind/stargate/InstructionBuilderTest.java`
+- Create: `src/main/java/com/worldmind/starblaster/InstructionBuilder.java`
+- Test: `src/test/java/com/worldmind/starblaster/InstructionBuilderTest.java`
 
 **Step 1: Write the test**
 
 ```java
-package com.worldmind.stargate;
+package com.worldmind.starblaster;
 
 import com.worldmind.core.model.*;
 import org.junit.jupiter.api.Test;
@@ -369,7 +369,7 @@ class InstructionBuilderTest {
 **Step 3: Write implementation**
 
 ```java
-package com.worldmind.stargate;
+package com.worldmind.starblaster;
 
 import com.worldmind.core.model.Directive;
 import com.worldmind.core.model.ProjectContext;
@@ -431,23 +431,23 @@ public final class InstructionBuilder {
 **Step 5: Commit**
 
 ```bash
-git add src/main/java/com/worldmind/stargate/InstructionBuilder.java \
-        src/test/java/com/worldmind/stargate/InstructionBuilderTest.java
+git add src/main/java/com/worldmind/starblaster/InstructionBuilder.java \
+        src/test/java/com/worldmind/starblaster/InstructionBuilderTest.java
 git commit -m "feat: InstructionBuilder converts directives to Goose instructions"
 ```
 
 ---
 
-## Task 2.4: DockerStargateProvider
+## Task 2.4: DockerStarblasterProvider
 
 **Files:**
-- Create: `src/main/java/com/worldmind/stargate/DockerStargateProvider.java`
-- Test: `src/test/java/com/worldmind/stargate/DockerStargateProviderTest.java`
+- Create: `src/main/java/com/worldmind/starblaster/DockerStarblasterProvider.java`
+- Test: `src/test/java/com/worldmind/starblaster/DockerStarblasterProviderTest.java`
 
 **Step 1: Write the test**
 
 ```java
-package com.worldmind.stargate;
+package com.worldmind.starblaster;
 
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.*;
@@ -464,19 +464,19 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-class DockerStargateProviderTest {
+class DockerStarblasterProviderTest {
 
     private DockerClient dockerClient;
-    private DockerStargateProvider provider;
+    private DockerStarblasterProvider provider;
 
     @BeforeEach
     void setUp() {
         dockerClient = mock(DockerClient.class, RETURNS_DEEP_STUBS);
-        provider = new DockerStargateProvider(dockerClient);
+        provider = new DockerStarblasterProvider(dockerClient);
     }
 
     @Test
-    void openStargateCreatesAndStartsContainer() {
+    void openStarblasterCreatesAndStartsContainer() {
         when(dockerClient.createContainerCmd(any(String.class))
                 .withName(any())
                 .withHostConfig(any())
@@ -484,19 +484,19 @@ class DockerStargateProviderTest {
                 .exec())
                 .thenReturn(mock(CreateContainerResponse.class));
 
-        var request = new StargateRequest(
+        var request = new StarblasterRequest(
             "forge", "DIR-001", Path.of("/tmp/project"),
             "Create hello.py", Map.of("GOOSE_PROVIDER", "openai"),
             4096, 2
         );
 
         // Should not throw
-        assertDoesNotThrow(() -> provider.openStargate(request));
+        assertDoesNotThrow(() -> provider.openStarblaster(request));
     }
 
     @Test
-    void teardownStargateStopsAndRemovesContainer() {
-        provider.teardownStargate("container-123");
+    void teardownStarblasterStopsAndRemovesContainer() {
+        provider.teardownStarblaster("container-123");
 
         verify(dockerClient).stopContainerCmd("container-123");
         verify(dockerClient).removeContainerCmd("container-123");
@@ -509,7 +509,7 @@ class DockerStargateProviderTest {
 **Step 3: Write implementation**
 
 ```java
-package com.worldmind.stargate;
+package com.worldmind.starblaster;
 
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.WaitContainerResultCallback;
@@ -522,23 +522,23 @@ import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Docker-based StargateProvider for local development.
+ * Docker-based StarblasterProvider for local development.
  * Creates Docker containers for each Centurion directive execution.
  */
-public class DockerStargateProvider implements StargateProvider {
+public class DockerStarblasterProvider implements StarblasterProvider {
 
-    private static final Logger log = LoggerFactory.getLogger(DockerStargateProvider.class);
+    private static final Logger log = LoggerFactory.getLogger(DockerStarblasterProvider.class);
 
     private final DockerClient dockerClient;
 
-    public DockerStargateProvider(DockerClient dockerClient) {
+    public DockerStarblasterProvider(DockerClient dockerClient) {
         this.dockerClient = dockerClient;
     }
 
     @Override
-    public String openStargate(StargateRequest request) {
-        String containerName = "stargate-" + request.centurionType() + "-" + request.directiveId();
-        log.info("Opening Stargate {} for directive {}", containerName, request.directiveId());
+    public String openStarblaster(StarblasterRequest request) {
+        String containerName = "starblaster-" + request.centurionType() + "-" + request.directiveId();
+        log.info("Opening Starblaster {} for directive {}", containerName, request.directiveId());
 
         var envList = new ArrayList<String>();
         request.envVars().forEach((k, v) -> envList.add(k + "=" + v));
@@ -562,28 +562,28 @@ public class DockerStargateProvider implements StargateProvider {
 
         String containerId = response.getId();
         dockerClient.startContainerCmd(containerId).exec();
-        log.info("Stargate {} started (container {})", containerName, containerId);
+        log.info("Starblaster {} started (container {})", containerName, containerId);
         return containerId;
     }
 
     @Override
-    public int waitForCompletion(String stargateId, int timeoutSeconds) {
+    public int waitForCompletion(String starblasterId, int timeoutSeconds) {
         try {
-            var callback = dockerClient.waitContainerCmd(stargateId)
+            var callback = dockerClient.waitContainerCmd(starblasterId)
                     .exec(new WaitContainerResultCallback());
             var result = callback.awaitStatusCode(timeoutSeconds, TimeUnit.SECONDS);
             return result != null ? result : -1;
         } catch (Exception e) {
-            log.error("Timeout or error waiting for stargate {}", stargateId, e);
+            log.error("Timeout or error waiting for starblaster {}", starblasterId, e);
             return -1;
         }
     }
 
     @Override
-    public String captureOutput(String stargateId) {
+    public String captureOutput(String starblasterId) {
         var sb = new StringBuilder();
         try {
-            dockerClient.logContainerCmd(stargateId)
+            dockerClient.logContainerCmd(starblasterId)
                     .withStdOut(true)
                     .withStdErr(true)
                     .withFollowStream(false)
@@ -595,23 +595,23 @@ public class DockerStargateProvider implements StargateProvider {
                     }).awaitCompletion(30, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            log.warn("Interrupted while capturing output from stargate {}", stargateId);
+            log.warn("Interrupted while capturing output from starblaster {}", starblasterId);
         }
         return sb.toString();
     }
 
     @Override
-    public void teardownStargate(String stargateId) {
+    public void teardownStarblaster(String starblasterId) {
         try {
-            dockerClient.stopContainerCmd(stargateId).exec();
+            dockerClient.stopContainerCmd(starblasterId).exec();
         } catch (Exception e) {
-            log.debug("Container {} may already be stopped", stargateId);
+            log.debug("Container {} may already be stopped", starblasterId);
         }
         try {
-            dockerClient.removeContainerCmd(stargateId).withForce(true).exec();
-            log.info("Stargate {} torn down", stargateId);
+            dockerClient.removeContainerCmd(starblasterId).withForce(true).exec();
+            log.info("Starblaster {} torn down", starblasterId);
         } catch (Exception e) {
-            log.warn("Failed to remove container {}", stargateId, e);
+            log.warn("Failed to remove container {}", starblasterId, e);
         }
     }
 }
@@ -622,23 +622,23 @@ public class DockerStargateProvider implements StargateProvider {
 **Step 5: Commit**
 
 ```bash
-git add src/main/java/com/worldmind/stargate/DockerStargateProvider.java \
-        src/test/java/com/worldmind/stargate/DockerStargateProviderTest.java
-git commit -m "feat: DockerStargateProvider for container lifecycle management"
+git add src/main/java/com/worldmind/starblaster/DockerStarblasterProvider.java \
+        src/test/java/com/worldmind/starblaster/DockerStarblasterProviderTest.java
+git commit -m "feat: DockerStarblasterProvider for container lifecycle management"
 ```
 
 ---
 
-## Task 2.5: StargateManager (File Diffing + Provider Delegation)
+## Task 2.5: StarblasterManager (File Diffing + Provider Delegation)
 
 **Files:**
-- Create: `src/main/java/com/worldmind/stargate/StargateManager.java`
-- Test: `src/test/java/com/worldmind/stargate/StargateManagerTest.java`
+- Create: `src/main/java/com/worldmind/starblaster/StarblasterManager.java`
+- Test: `src/test/java/com/worldmind/starblaster/StarblasterManagerTest.java`
 
 **Step 1: Write the test**
 
 ```java
-package com.worldmind.stargate;
+package com.worldmind.starblaster;
 
 import com.worldmind.core.model.FileRecord;
 import org.junit.jupiter.api.BeforeEach;
@@ -655,22 +655,22 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.*;
 
-class StargateManagerTest {
+class StarblasterManagerTest {
 
-    private StargateProvider provider;
-    private StargateProperties properties;
-    private StargateManager manager;
+    private StarblasterProvider provider;
+    private StarblasterProperties properties;
+    private StarblasterManager manager;
 
     @BeforeEach
     void setUp() {
-        provider = mock(StargateProvider.class);
-        properties = new StargateProperties();
-        manager = new StargateManager(provider, properties);
+        provider = mock(StarblasterProvider.class);
+        properties = new StarblasterProperties();
+        manager = new StarblasterManager(provider, properties);
     }
 
     @Test
     void executeDirectiveCallsProviderLifecycle() {
-        when(provider.openStargate(any())).thenReturn("container-1");
+        when(provider.openStarblaster(any())).thenReturn("container-1");
         when(provider.waitForCompletion("container-1", 300)).thenReturn(0);
         when(provider.captureOutput("container-1")).thenReturn("done");
 
@@ -679,16 +679,16 @@ class StargateManagerTest {
             "Create file", Map.of()
         );
 
-        verify(provider).openStargate(any());
+        verify(provider).openStarblaster(any());
         verify(provider).waitForCompletion("container-1", 300);
         verify(provider).captureOutput("container-1");
-        verify(provider).teardownStargate("container-1");
+        verify(provider).teardownStarblaster("container-1");
         assertEquals(0, result.exitCode());
     }
 
     @Test
     void executeDirectiveReportsFailureOnNonZeroExit() {
-        when(provider.openStargate(any())).thenReturn("container-2");
+        when(provider.openStarblaster(any())).thenReturn("container-2");
         when(provider.waitForCompletion("container-2", 300)).thenReturn(1);
         when(provider.captureOutput("container-2")).thenReturn("error");
 
@@ -704,13 +704,13 @@ class StargateManagerTest {
     @Test
     void detectFileChangesFindsNewFiles(@TempDir Path tempDir) throws IOException {
         // Take snapshot with no files
-        var before = StargateManager.snapshotFiles(tempDir);
+        var before = StarblasterManager.snapshotFiles(tempDir);
 
         // Create a new file
         Files.writeString(tempDir.resolve("hello.py"), "print('hello')");
 
         // Detect changes
-        var changes = StargateManager.detectChanges(before, tempDir);
+        var changes = StarblasterManager.detectChanges(before, tempDir);
 
         assertEquals(1, changes.size());
         assertEquals("hello.py", changes.get(0).path());
@@ -721,12 +721,12 @@ class StargateManagerTest {
     void detectFileChangesFindsModifiedFiles(@TempDir Path tempDir) throws IOException {
         Files.writeString(tempDir.resolve("existing.py"), "old");
 
-        var before = StargateManager.snapshotFiles(tempDir);
+        var before = StarblasterManager.snapshotFiles(tempDir);
 
         // Modify the file
         Files.writeString(tempDir.resolve("existing.py"), "new content");
 
-        var changes = StargateManager.detectChanges(before, tempDir);
+        var changes = StarblasterManager.detectChanges(before, tempDir);
 
         assertEquals(1, changes.size());
         assertEquals("existing.py", changes.get(0).path());
@@ -740,7 +740,7 @@ class StargateManagerTest {
 **Step 3: Write implementation**
 
 ```java
-package com.worldmind.stargate;
+package com.worldmind.starblaster;
 
 import com.worldmind.core.model.FileRecord;
 import org.slf4j.Logger;
@@ -755,35 +755,35 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * Manages Stargate lifecycle and file change detection.
- * Delegates container operations to the active StargateProvider.
+ * Manages Starblaster lifecycle and file change detection.
+ * Delegates container operations to the active StarblasterProvider.
  */
 @Service
-public class StargateManager {
+public class StarblasterManager {
 
-    private static final Logger log = LoggerFactory.getLogger(StargateManager.class);
+    private static final Logger log = LoggerFactory.getLogger(StarblasterManager.class);
 
-    private final StargateProvider provider;
-    private final StargateProperties properties;
+    private final StarblasterProvider provider;
+    private final StarblasterProperties properties;
 
-    public StargateManager(StargateProvider provider, StargateProperties properties) {
+    public StarblasterManager(StarblasterProvider provider, StarblasterProperties properties) {
         this.provider = provider;
         this.properties = properties;
     }
 
     /**
-     * Result of a stargate execution.
+     * Result of a starblaster execution.
      */
     public record ExecutionResult(
         int exitCode,
         String output,
-        String stargateId,
+        String starblasterId,
         List<FileRecord> fileChanges,
         long elapsedMs
     ) {}
 
     /**
-     * Executes a directive in a Stargate container.
+     * Executes a directive in a Starblaster container.
      */
     public ExecutionResult executeDirective(
             String centurionType,
@@ -801,7 +801,7 @@ public class StargateManager {
             envVars.put("OPENAI_API_KEY", "not-needed-for-local");
         }
 
-        var request = new StargateRequest(
+        var request = new StarblasterRequest(
             centurionType, directiveId, projectPath,
             instructionText, envVars,
             properties.getMemoryLimitMb(), properties.getCpuCount()
@@ -811,22 +811,22 @@ public class StargateManager {
         Map<String, Long> beforeSnapshot = snapshotFiles(projectPath);
 
         long startMs = System.currentTimeMillis();
-        String stargateId = provider.openStargate(request);
+        String starblasterId = provider.openStarblaster(request);
 
         try {
-            int exitCode = provider.waitForCompletion(stargateId, properties.getTimeoutSeconds());
-            String output = provider.captureOutput(stargateId);
+            int exitCode = provider.waitForCompletion(starblasterId, properties.getTimeoutSeconds());
+            String output = provider.captureOutput(starblasterId);
             long elapsedMs = System.currentTimeMillis() - startMs;
 
             // Detect file changes
             List<FileRecord> changes = detectChanges(beforeSnapshot, projectPath);
 
-            log.info("Stargate {} completed with exit code {} in {}ms — {} file changes",
-                    stargateId, exitCode, elapsedMs, changes.size());
+            log.info("Starblaster {} completed with exit code {} in {}ms — {} file changes",
+                    starblasterId, exitCode, elapsedMs, changes.size());
 
-            return new ExecutionResult(exitCode, output, stargateId, changes, elapsedMs);
+            return new ExecutionResult(exitCode, output, starblasterId, changes, elapsedMs);
         } finally {
-            provider.teardownStargate(stargateId);
+            provider.teardownStarblaster(starblasterId);
         }
     }
 
@@ -879,23 +879,23 @@ public class StargateManager {
 **Step 5: Commit**
 
 ```bash
-git add src/main/java/com/worldmind/stargate/StargateManager.java \
-        src/test/java/com/worldmind/stargate/StargateManagerTest.java
-git commit -m "feat: StargateManager with file change detection"
+git add src/main/java/com/worldmind/starblaster/StarblasterManager.java \
+        src/test/java/com/worldmind/starblaster/StarblasterManagerTest.java
+git commit -m "feat: StarblasterManager with file change detection"
 ```
 
 ---
 
-## Task 2.6: StargateBridge
+## Task 2.6: StarblasterBridge
 
 **Files:**
-- Create: `src/main/java/com/worldmind/stargate/StargateBridge.java`
-- Test: `src/test/java/com/worldmind/stargate/StargateBridgeTest.java`
+- Create: `src/main/java/com/worldmind/starblaster/StarblasterBridge.java`
+- Test: `src/test/java/com/worldmind/starblaster/StarblasterBridgeTest.java`
 
 **Step 1: Write the test**
 
 ```java
-package com.worldmind.stargate;
+package com.worldmind.starblaster;
 
 import com.worldmind.core.model.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -909,15 +909,15 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-class StargateBridgeTest {
+class StarblasterBridgeTest {
 
-    private StargateManager manager;
-    private StargateBridge bridge;
+    private StarblasterManager manager;
+    private StarblasterBridge bridge;
 
     @BeforeEach
     void setUp() {
-        manager = mock(StargateManager.class);
-        bridge = new StargateBridge(manager);
+        manager = mock(StarblasterManager.class);
+        bridge = new StarblasterBridge(manager);
     }
 
     @Test
@@ -930,7 +930,7 @@ class StargateBridgeTest {
         );
         var context = new ProjectContext("/tmp/p", "", "python", "none", "", 0, "");
         var fileChanges = List.of(new FileRecord("hello.py", "created", 1));
-        var execResult = new StargateManager.ExecutionResult(0, "done", "c-1", fileChanges, 5000L);
+        var execResult = new StarblasterManager.ExecutionResult(0, "done", "c-1", fileChanges, 5000L);
 
         when(manager.executeDirective(
             eq("FORGE"), eq("DIR-001"), any(), anyString(), any()))
@@ -941,7 +941,7 @@ class StargateBridgeTest {
         assertEquals(DirectiveStatus.PASSED, result.directive().status());
         assertEquals(5000L, result.directive().elapsedMs());
         assertEquals(1, result.directive().filesAffected().size());
-        assertNotNull(result.stargateInfo());
+        assertNotNull(result.starblasterInfo());
     }
 
     @Test
@@ -952,7 +952,7 @@ class StargateBridgeTest {
             List.of(), DirectiveStatus.PENDING, 0, 3,
             FailureStrategy.RETRY, List.of(), null
         );
-        var execResult = new StargateManager.ExecutionResult(1, "error", "c-2", List.of(), 3000L);
+        var execResult = new StarblasterManager.ExecutionResult(1, "error", "c-2", List.of(), 3000L);
 
         when(manager.executeDirective(any(), any(), any(), anyString(), any()))
             .thenReturn(execResult);
@@ -969,7 +969,7 @@ class StargateBridgeTest {
 **Step 3: Write implementation**
 
 ```java
-package com.worldmind.stargate;
+package com.worldmind.starblaster;
 
 import com.worldmind.core.model.*;
 import org.slf4j.Logger;
@@ -981,17 +981,17 @@ import java.time.Instant;
 import java.util.Map;
 
 /**
- * Thin orchestration layer between domain records and the StargateManager.
- * Translates Directives into stargate executions and results back into records.
+ * Thin orchestration layer between domain records and the StarblasterManager.
+ * Translates Directives into starblaster executions and results back into records.
  */
 @Service
-public class StargateBridge {
+public class StarblasterBridge {
 
-    private static final Logger log = LoggerFactory.getLogger(StargateBridge.class);
+    private static final Logger log = LoggerFactory.getLogger(StarblasterBridge.class);
 
-    private final StargateManager manager;
+    private final StarblasterManager manager;
 
-    public StargateBridge(StargateManager manager) {
+    public StarblasterBridge(StarblasterManager manager) {
         this.manager = manager;
     }
 
@@ -1000,12 +1000,12 @@ public class StargateBridge {
      */
     public record BridgeResult(
         Directive directive,
-        StargateInfo stargateInfo,
+        StarblasterInfo starblasterInfo,
         String output
     ) {}
 
     /**
-     * Executes a single directive via the Stargate infrastructure.
+     * Executes a single directive via the Starblaster infrastructure.
      */
     public BridgeResult executeDirective(Directive directive, ProjectContext context, Path projectPath) {
         log.info("Executing directive {} [{}]: {}",
@@ -1041,8 +1041,8 @@ public class StargateBridge {
             execResult.elapsedMs()
         );
 
-        var stargateInfo = new StargateInfo(
-            execResult.stargateId(),
+        var starblasterInfo = new StarblasterInfo(
+            execResult.starblasterId(),
             directive.centurion(),
             directive.id(),
             success ? "completed" : "failed",
@@ -1050,7 +1050,7 @@ public class StargateBridge {
             completedAt
         );
 
-        return new BridgeResult(updatedDirective, stargateInfo, execResult.output());
+        return new BridgeResult(updatedDirective, starblasterInfo, execResult.output());
     }
 }
 ```
@@ -1060,23 +1060,23 @@ public class StargateBridge {
 **Step 5: Commit**
 
 ```bash
-git add src/main/java/com/worldmind/stargate/StargateBridge.java \
-        src/test/java/com/worldmind/stargate/StargateBridgeTest.java
-git commit -m "feat: StargateBridge translates directives to stargate executions"
+git add src/main/java/com/worldmind/starblaster/StarblasterBridge.java \
+        src/test/java/com/worldmind/starblaster/StarblasterBridgeTest.java
+git commit -m "feat: StarblasterBridge translates directives to starblaster executions"
 ```
 
 ---
 
-## Task 2.7: StargateConfig (Spring Bean Wiring)
+## Task 2.7: StarblasterConfig (Spring Bean Wiring)
 
 **Files:**
-- Create: `src/main/java/com/worldmind/stargate/StargateConfig.java`
+- Create: `src/main/java/com/worldmind/starblaster/StarblasterConfig.java`
 - Test: (covered by existing tests + integration)
 
 **Step 1: Write the config**
 
 ```java
-package com.worldmind.stargate;
+package com.worldmind.starblaster;
 
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
@@ -1089,14 +1089,14 @@ import org.springframework.context.annotation.Configuration;
 import java.net.URI;
 
 /**
- * Spring configuration for Stargate beans.
- * Selects the active StargateProvider based on worldmind.stargate.provider property.
+ * Spring configuration for Starblaster beans.
+ * Selects the active StarblasterProvider based on worldmind.starblaster.provider property.
  */
 @Configuration
-public class StargateConfig {
+public class StarblasterConfig {
 
     @Bean
-    @ConditionalOnProperty(name = "worldmind.stargate.provider", havingValue = "docker", matchIfMissing = true)
+    @ConditionalOnProperty(name = "worldmind.starblaster.provider", havingValue = "docker", matchIfMissing = true)
     public DockerClient dockerClient() {
         var config = DefaultDockerClientConfig.createDefaultConfigBuilder().build();
         var httpClient = new ApacheDockerHttpClient.Builder()
@@ -1107,9 +1107,9 @@ public class StargateConfig {
     }
 
     @Bean
-    @ConditionalOnProperty(name = "worldmind.stargate.provider", havingValue = "docker", matchIfMissing = true)
-    public StargateProvider dockerStargateProvider(DockerClient dockerClient) {
-        return new DockerStargateProvider(dockerClient);
+    @ConditionalOnProperty(name = "worldmind.starblaster.provider", havingValue = "docker", matchIfMissing = true)
+    public StarblasterProvider dockerStarblasterProvider(DockerClient dockerClient) {
+        return new DockerStarblasterProvider(dockerClient);
     }
 }
 ```
@@ -1122,8 +1122,8 @@ Expected: BUILD SUCCESS
 **Step 3: Commit**
 
 ```bash
-git add src/main/java/com/worldmind/stargate/StargateConfig.java
-git commit -m "feat: StargateConfig wires Docker provider beans"
+git add src/main/java/com/worldmind/starblaster/StarblasterConfig.java
+git commit -m "feat: StarblasterConfig wires Docker provider beans"
 ```
 
 ---
@@ -1141,7 +1141,7 @@ package com.worldmind.core.nodes;
 
 import com.worldmind.core.model.*;
 import com.worldmind.core.state.WorldmindState;
-import com.worldmind.stargate.StargateBridge;
+import com.worldmind.starblaster.StarblasterBridge;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -1156,12 +1156,12 @@ import static org.mockito.Mockito.*;
 
 class DispatchCenturionNodeTest {
 
-    private StargateBridge bridge;
+    private StarblasterBridge bridge;
     private DispatchCenturionNode node;
 
     @BeforeEach
     void setUp() {
-        bridge = mock(StargateBridge.class);
+        bridge = mock(StarblasterBridge.class);
         node = new DispatchCenturionNode(bridge);
     }
 
@@ -1179,9 +1179,9 @@ class DispatchCenturionNodeTest {
             List.of(), DirectiveStatus.PASSED, 1, 3,
             FailureStrategy.RETRY, List.of(new FileRecord("hello.py", "created", 1)), 5000L
         );
-        var stargateInfo = new StargateInfo("c-1", "FORGE", "DIR-001", "completed",
+        var starblasterInfo = new StarblasterInfo("c-1", "FORGE", "DIR-001", "completed",
             Instant.now(), Instant.now());
-        var bridgeResult = new StargateBridge.BridgeResult(updatedDirective, stargateInfo, "ok");
+        var bridgeResult = new StarblasterBridge.BridgeResult(updatedDirective, starblasterInfo, "ok");
 
         when(bridge.executeDirective(any(), any(), any())).thenReturn(bridgeResult);
 
@@ -1195,7 +1195,7 @@ class DispatchCenturionNodeTest {
         var result = node.apply(state);
 
         assertNotNull(result);
-        assertTrue(result.containsKey("stargates"));
+        assertTrue(result.containsKey("starblasters"));
         assertTrue(result.containsKey("currentDirectiveIndex"));
         assertEquals(1, result.get("currentDirectiveIndex"));
     }
@@ -1225,7 +1225,7 @@ package com.worldmind.core.nodes;
 import com.worldmind.core.model.DirectiveStatus;
 import com.worldmind.core.model.MissionStatus;
 import com.worldmind.core.state.WorldmindState;
-import com.worldmind.stargate.StargateBridge;
+import com.worldmind.starblaster.StarblasterBridge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -1236,17 +1236,17 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * LangGraph4j node that dispatches the next pending directive to a Stargate.
- * Calls StargateBridge to execute the directive and returns updated state.
+ * LangGraph4j node that dispatches the next pending directive to a Starblaster.
+ * Calls StarblasterBridge to execute the directive and returns updated state.
  */
 @Component
 public class DispatchCenturionNode {
 
     private static final Logger log = LoggerFactory.getLogger(DispatchCenturionNode.class);
 
-    private final StargateBridge bridge;
+    private final StarblasterBridge bridge;
 
-    public DispatchCenturionNode(StargateBridge bridge) {
+    public DispatchCenturionNode(StarblasterBridge bridge) {
         this.bridge = bridge;
     }
 
@@ -1276,7 +1276,7 @@ public class DispatchCenturionNode {
         );
 
         var updates = new HashMap<String, Object>();
-        updates.put("stargates", List.of(result.stargateInfo()));
+        updates.put("starblasters", List.of(result.starblasterInfo()));
         updates.put("currentDirectiveIndex", currentIndex + 1);
         updates.put("status", MissionStatus.EXECUTING.name());
 
@@ -1297,7 +1297,7 @@ public class DispatchCenturionNode {
 ```bash
 git add src/main/java/com/worldmind/core/nodes/DispatchCenturionNode.java \
         src/test/java/com/worldmind/core/nodes/DispatchCenturionNodeTest.java
-git commit -m "feat: DispatchCenturionNode dispatches directives to Stargates"
+git commit -m "feat: DispatchCenturionNode dispatches directives to Starblasters"
 ```
 
 ---
@@ -1384,20 +1384,20 @@ git commit -m "feat: wire dispatch_centurion node into LangGraph4j graph"
 
 ---
 
-## Task 2.10: Update CLI Output for Stargate Activity
+## Task 2.10: Update CLI Output for Starblaster Activity
 
 **Files:**
 - Modify: `src/main/java/com/worldmind/dispatch/cli/ConsoleOutput.java`
 - Modify: `src/main/java/com/worldmind/dispatch/cli/MissionCommand.java:86-91`
 
-**Step 1: Add stargate output methods to ConsoleOutput**
+**Step 1: Add starblaster output methods to ConsoleOutput**
 
 Add to `ConsoleOutput.java`:
 
 ```java
-public static void stargate(String message) {
+public static void starblaster(String message) {
     System.out.println(CommandLine.Help.Ansi.AUTO.string(
-            "@|fg(magenta) [STARGATE]|@ " + message));
+            "@|fg(magenta) [STARBLASTER]|@ " + message));
 }
 
 public static void centurion(String type, String message) {
@@ -1414,15 +1414,15 @@ public static void fileChange(String action, String path) {
 
 **Step 2: Update MissionCommand to display execution results**
 
-Replace lines 86-91 of `MissionCommand.java` (the `AWAITING_APPROVAL` block) with logic that also shows stargate activity and file changes when the mission has executed:
+Replace lines 86-91 of `MissionCommand.java` (the `AWAITING_APPROVAL` block) with logic that also shows starblaster activity and file changes when the mission has executed:
 
 ```java
 // Display execution results
-var stargates = finalState.stargates();
-if (!stargates.isEmpty()) {
+var starblasters = finalState.starblasters();
+if (!starblasters.isEmpty()) {
     System.out.println();
-    for (var sg : stargates) {
-        ConsoleOutput.stargate(String.format(
+    for (var sg : starblasters) {
+        ConsoleOutput.starblaster(String.format(
             "Centurion %s — %s (%s)",
             sg.centurionType(), sg.directiveId(), sg.status()));
     }
@@ -1461,7 +1461,7 @@ Run: `mvn test -f /Users/dbbaskette/Projects/Worldmind/pom.xml`
 ```bash
 git add src/main/java/com/worldmind/dispatch/cli/ConsoleOutput.java \
         src/main/java/com/worldmind/dispatch/cli/MissionCommand.java
-git commit -m "feat: CLI output for Stargate activity and file changes"
+git commit -m "feat: CLI output for Starblaster activity and file changes"
 ```
 
 ---
@@ -1548,12 +1548,12 @@ git commit -m "feat: Centurion Forge Docker image with Goose CLI"
 
 **Step 1: Write the integration test**
 
-This test requires Docker running and the centurion-forge image built. It uses a simple inline instruction (no LLM needed) to verify the full stargate lifecycle.
+This test requires Docker running and the centurion-forge image built. It uses a simple inline instruction (no LLM needed) to verify the full starblaster lifecycle.
 
 ```java
 package com.worldmind.integration;
 
-import com.worldmind.stargate.*;
+import com.worldmind.starblaster.*;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
 import com.github.dockerjava.core.DockerClientImpl;
 import com.github.dockerjava.httpclient5.ApacheDockerHttpClient;
@@ -1568,7 +1568,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * End-to-end integration test for Stargate execution.
+ * End-to-end integration test for Starblaster execution.
  * Requires Docker to be running and the centurion-forge image built.
  * Run with: mvn test -Dgroups=integration
  */
@@ -1576,7 +1576,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class ForgeIntegrationTest {
 
     @Test
-    void stargateExecutesGooseAndCreatesFile(@TempDir Path tempDir) {
+    void starblasterExecutesGooseAndCreatesFile(@TempDir Path tempDir) {
         // Setup Docker client
         var dockerConfig = DefaultDockerClientConfig.createDefaultConfigBuilder().build();
         var httpClient = new ApacheDockerHttpClient.Builder()
@@ -1585,9 +1585,9 @@ class ForgeIntegrationTest {
                 .build();
         var dockerClient = DockerClientImpl.getInstance(dockerConfig, httpClient);
 
-        var provider = new DockerStargateProvider(dockerClient);
-        var properties = new StargateProperties();
-        var manager = new StargateManager(provider, properties);
+        var provider = new DockerStarblasterProvider(dockerClient);
+        var properties = new StarblasterProperties();
+        var manager = new StarblasterManager(provider, properties);
 
         // Execute a simple file creation task
         var result = manager.executeDirective(
@@ -1663,16 +1663,16 @@ git commit -m "chore: Phase 2 final cleanup and test fixes"
 
 | Task | Component | Commit Message |
 |------|-----------|---------------|
-| 2.1 | StargateProvider + StargateRequest | `feat: StargateProvider interface and StargateRequest record` |
-| 2.2 | StargateProperties | `feat: StargateProperties with Goose provider and container config` |
+| 2.1 | StarblasterProvider + StarblasterRequest | `feat: StarblasterProvider interface and StarblasterRequest record` |
+| 2.2 | StarblasterProperties | `feat: StarblasterProperties with Goose provider and container config` |
 | 2.3 | InstructionBuilder | `feat: InstructionBuilder converts directives to Goose instructions` |
-| 2.4 | DockerStargateProvider | `feat: DockerStargateProvider for container lifecycle management` |
-| 2.5 | StargateManager | `feat: StargateManager with file change detection` |
-| 2.6 | StargateBridge | `feat: StargateBridge translates directives to stargate executions` |
-| 2.7 | StargateConfig | `feat: StargateConfig wires Docker provider beans` |
-| 2.8 | DispatchCenturionNode | `feat: DispatchCenturionNode dispatches directives to Stargates` |
+| 2.4 | DockerStarblasterProvider | `feat: DockerStarblasterProvider for container lifecycle management` |
+| 2.5 | StarblasterManager | `feat: StarblasterManager with file change detection` |
+| 2.6 | StarblasterBridge | `feat: StarblasterBridge translates directives to starblaster executions` |
+| 2.7 | StarblasterConfig | `feat: StarblasterConfig wires Docker provider beans` |
+| 2.8 | DispatchCenturionNode | `feat: DispatchCenturionNode dispatches directives to Starblasters` |
 | 2.9 | Graph wiring | `feat: wire dispatch_centurion node into LangGraph4j graph` |
-| 2.10 | CLI output | `feat: CLI output for Stargate activity and file changes` |
+| 2.10 | CLI output | `feat: CLI output for Starblaster activity and file changes` |
 | 2.11 | Docker image | `feat: Centurion Forge Docker image with Goose CLI` |
 | 2.12 | Integration test | `test: end-to-end Centurion Forge integration test` |
 | 2.13 | Final verification | `chore: Phase 2 final cleanup and test fixes` |

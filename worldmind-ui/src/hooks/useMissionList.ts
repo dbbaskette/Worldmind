@@ -8,12 +8,12 @@ export function useMissionList() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  const submitMission = useCallback(async (request: string, mode: string, projectPath?: string): Promise<string> => {
+  const submitMission = useCallback(async (request: string, mode: string, projectPath?: string, gitRemoteUrl?: string): Promise<string> => {
     setSubmitting(true)
     setSubmitError(null)
 
     try {
-      const result = await apiClient.submitMission(request, mode, projectPath)
+      const result = await apiClient.submitMission(request, mode, projectPath, gitRemoteUrl)
       const missionId = result.mission_id
 
       // Add placeholder mission to list

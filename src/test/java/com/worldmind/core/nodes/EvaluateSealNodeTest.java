@@ -3,7 +3,7 @@ package com.worldmind.core.nodes;
 import com.worldmind.core.model.*;
 import com.worldmind.core.seal.SealEvaluationService;
 import com.worldmind.core.state.WorldmindState;
-import com.worldmind.stargate.StargateBridge;
+import com.worldmind.starblaster.StarblasterBridge;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,18 +19,18 @@ import static org.mockito.Mockito.*;
 /**
  * Unit tests for {@link EvaluateSealNode}.
  * <p>
- * Uses Mockito to mock {@link StargateBridge} and {@link SealEvaluationService}
+ * Uses Mockito to mock {@link StarblasterBridge} and {@link SealEvaluationService}
  * so that no real Docker containers are launched and no LLM calls are made.
  */
 class EvaluateSealNodeTest {
 
-    private StargateBridge bridge;
+    private StarblasterBridge bridge;
     private SealEvaluationService sealService;
     private EvaluateSealNode node;
 
     @BeforeEach
     void setUp() {
-        bridge = mock(StargateBridge.class);
+        bridge = mock(StarblasterBridge.class);
         sealService = mock(SealEvaluationService.class);
         node = new EvaluateSealNode(bridge, sealService);
     }
@@ -53,18 +53,18 @@ class EvaluateSealNodeTest {
         return forgeDirective(status, 1, 3, FailureStrategy.RETRY);
     }
 
-    private StargateBridge.BridgeResult bridgeResult(String centurionType, String directiveId,
+    private StarblasterBridge.BridgeResult bridgeResult(String centurionType, String directiveId,
                                                       String output) {
         var updatedDirective = new Directive(
                 directiveId, centurionType, "desc", "", "criteria",
                 List.of(), DirectiveStatus.PASSED, 1, 1,
                 FailureStrategy.SKIP, List.of(), 1000L
         );
-        var stargateInfo = new StargateInfo(
+        var starblasterInfo = new StarblasterInfo(
                 "c-" + centurionType.toLowerCase(), centurionType, directiveId,
                 "completed", Instant.now(), Instant.now()
         );
-        return new StargateBridge.BridgeResult(updatedDirective, stargateInfo, output);
+        return new StarblasterBridge.BridgeResult(updatedDirective, starblasterInfo, output);
     }
 
     private WorldmindState stateWithDirective(Directive directive) {
@@ -73,7 +73,7 @@ class EvaluateSealNodeTest {
                 "currentDirectiveIndex", 1,  // dispatch already advanced, so lastIndex = 0
                 "testResults", List.of(),
                 "reviewFeedback", List.of(),
-                "stargates", List.of()
+                "starblasters", List.of()
         ));
     }
 
@@ -131,7 +131,7 @@ class EvaluateSealNodeTest {
         assertEquals(true, result.get("sealGranted"));
         assertTrue(result.containsKey("testResults"));
         assertTrue(result.containsKey("reviewFeedback"));
-        assertTrue(result.containsKey("stargates"));
+        assertTrue(result.containsKey("starblasters"));
 
         @SuppressWarnings("unchecked")
         var testResults = (List<TestResult>) result.get("testResults");

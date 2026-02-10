@@ -55,8 +55,8 @@ worldmind:
     provider: ${GOOSE_PROVIDER:openai}
     model: ${GOOSE_MODEL:qwen2.5-coder-32b}
     lm-studio-url: ${LM_STUDIO_URL:http://host.docker.internal:1234/v1}
-  stargate:
-    provider: ${STARGATE_PROVIDER:docker}
+  starblaster:
+    provider: ${STARBLASTER_PROVIDER:docker}
     max-parallel: 1
     timeout-seconds: 300
     wave-cooldown-seconds: ${WAVE_COOLDOWN_SECONDS:60}

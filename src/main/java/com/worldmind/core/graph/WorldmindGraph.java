@@ -82,7 +82,8 @@ public class WorldmindGraph {
                                 "converge_results", "converge_results"))
                 .addEdge("converge_results", END);
 
-        var configBuilder = CompileConfig.builder();
+        var configBuilder = CompileConfig.builder()
+                .recursionLimit(100);
         if (checkpointSaver != null) {
             configBuilder.checkpointSaver(checkpointSaver);
             log.info("Graph compiled with checkpoint saver: {}", checkpointSaver.getClass().getSimpleName());

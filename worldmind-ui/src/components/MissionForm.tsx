@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { INTERACTION_MODES } from '../utils/constants'
 
 interface MissionFormProps {
-  onSubmit: (request: string, mode: string, projectPath?: string) => Promise<void>
+  onSubmit: (request: string, mode: string, projectPath?: string, gitRemoteUrl?: string) => Promise<void>
   submitting: boolean
   error: string | null
 }
@@ -11,11 +11,12 @@ export function MissionForm({ onSubmit, submitting, error }: MissionFormProps) {
   const [request, setRequest] = useState('')
   const [mode, setMode] = useState('APPROVE_PLAN')
   const [projectPath, setProjectPath] = useState('')
+  const [gitRemoteUrl, setGitRemoteUrl] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (request.trim()) {
-      await onSubmit(request, mode, projectPath || undefined)
+      await onSubmit(request, mode, projectPath || undefined, gitRemoteUrl || undefined)
       setRequest('')
     }
   }
@@ -67,6 +68,20 @@ export function MissionForm({ onSubmit, submitting, error }: MissionFormProps) {
                 value={projectPath}
                 onChange={(e) => setProjectPath(e.target.value)}
                 placeholder="Leave empty for current project"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={submitting}
+              />
+            </div>
+
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Git Remote URL (optional)
+              </label>
+              <input
+                type="text"
+                value={gitRemoteUrl}
+                onChange={(e) => setGitRemoteUrl(e.target.value)}
+                placeholder="For CF deployments"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 disabled={submitting}
               />

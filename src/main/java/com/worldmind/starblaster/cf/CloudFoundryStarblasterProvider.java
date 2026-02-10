@@ -1,7 +1,7 @@
-package com.worldmind.stargate.cf;
+package com.worldmind.starblaster.cf;
 
-import com.worldmind.stargate.StargateProvider;
-import com.worldmind.stargate.StargateRequest;
+import com.worldmind.starblaster.StarblasterProvider;
+import com.worldmind.starblaster.StarblasterRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
- * Cloud Foundry-based StargateProvider for production deployments.
+ * Cloud Foundry-based StarblasterProvider for production deployments.
  *
  * <p>Uses CF tasks to run Centurion directives on pre-deployed CF apps.
  * Each centurion type maps to a CF application (configured via
@@ -27,9 +27,9 @@ import java.util.stream.Collectors;
  * <p>This class shells out to the {@code cf} CLI via {@link ProcessBuilder}
  * rather than depending on the heavy cloudfoundry-client-reactor library.
  */
-public class CloudFoundryStargateProvider implements StargateProvider {
+public class CloudFoundryStarblasterProvider implements StarblasterProvider {
 
-    private static final Logger log = LoggerFactory.getLogger(CloudFoundryStargateProvider.class);
+    private static final Logger log = LoggerFactory.getLogger(CloudFoundryStarblasterProvider.class);
 
     private static final int POLL_INTERVAL_SECONDS = 5;
 
@@ -37,35 +37,35 @@ public class CloudFoundryStargateProvider implements StargateProvider {
     private final GitWorkspaceManager gitWorkspaceManager;
 
     /**
-     * Tracks stargateId to app name mapping so waitForCompletion/captureOutput/teardown
+     * Tracks starblasterId to app name mapping so waitForCompletion/captureOutput/teardown
      * can look up the app without re-parsing every time.
      */
-    private final ConcurrentHashMap<String, String> stargateAppNames = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, String> starblasterAppNames = new ConcurrentHashMap<>();
 
     /**
-     * Creates a new CloudFoundryStargateProvider.
+     * Creates a new CloudFoundryStarblasterProvider.
      *
      * @param cfProperties      CF configuration properties
      * @param gitWorkspaceManager git workspace manager for branch operations
      */
-    public CloudFoundryStargateProvider(CloudFoundryProperties cfProperties,
+    public CloudFoundryStarblasterProvider(CloudFoundryProperties cfProperties,
                                         GitWorkspaceManager gitWorkspaceManager) {
         this.cfProperties = cfProperties;
         this.gitWorkspaceManager = gitWorkspaceManager;
     }
 
     /**
-     * Opens a Stargate by running a CF task on the centurion app.
+     * Opens a Starblaster by running a CF task on the centurion app.
      *
      * <p>The task clones the mission branch, copies the directive, runs Goose,
      * and pushes any changes back to the branch.
      *
-     * @param request the stargate request containing centurion type, directive, etc.
-     * @return the task name (stargateId) in format {@code stargate-{type}-{directiveId}}
+     * @param request the starblaster request containing centurion type, directive, etc.
+     * @return the task name (starblasterId) in format {@code starblaster-{type}-{directiveId}}
      * @throws RuntimeException if the centurion type is unknown or the cf command fails
      */
     @Override
-    public String openStargate(StargateRequest request) {
+    public String openStarblaster(StarblasterRequest request) {
         var type = request.centurionType().toLowerCase();
         var appName = cfProperties.getCenturionApps().get(type);
         if (appName == null) {
@@ -75,7 +75,7 @@ public class CloudFoundryStargateProvider implements StargateProvider {
         }
 
         var directiveId = request.directiveId();
-        var taskName = "stargate-" + type + "-" + directiveId;
+        var taskName = "starblaster-" + type + "-" + directiveId;
         var branchName = gitWorkspaceManager.getBranchName(directiveId);
         var gitRemoteUrl = cfProperties.getGitRemoteUrl();
 
@@ -95,7 +95,7 @@ public class CloudFoundryStargateProvider implements StargateProvider {
                 "git push"
         );
 
-        log.info("Opening Stargate {} for directive {} on app {}", taskName, directiveId, appName);
+        log.info("Opening Starblaster {} for directive {} on app {}", taskName, directiveId, appName);
         log.debug("Task command: {}", taskCommand);
 
         var output = runCf("run-task", appName,
@@ -107,7 +107,7 @@ public class CloudFoundryStargateProvider implements StargateProvider {
         log.info("CF task {} started on app {}: {}", taskName, appName, output.trim());
 
         // Track the mapping for later operations
-        stargateAppNames.put(taskName, appName);
+        starblasterAppNames.put(taskName, appName);
 
         return taskName;
     }
@@ -117,65 +117,65 @@ public class CloudFoundryStargateProvider implements StargateProvider {
      *
      * <p>CF task states: RUNNING, SUCCEEDED, FAILED.
      *
-     * @param stargateId     the task name returned by {@link #openStargate}
+     * @param starblasterId     the task name returned by {@link #openStarblaster}
      * @param timeoutSeconds maximum time to wait
      * @return 0 for SUCCEEDED, 1 for FAILED, -1 for timeout
      */
     @Override
-    public int waitForCompletion(String stargateId, int timeoutSeconds) {
-        var appName = getAppNameFromStargateId(stargateId);
-        log.info("Waiting for task {} on app {} (timeout: {}s)", stargateId, appName, timeoutSeconds);
+    public int waitForCompletion(String starblasterId, int timeoutSeconds) {
+        var appName = getAppNameFromStarblasterId(starblasterId);
+        log.info("Waiting for task {} on app {} (timeout: {}s)", starblasterId, appName, timeoutSeconds);
 
         long deadline = System.currentTimeMillis() + (timeoutSeconds * 1000L);
 
         while (System.currentTimeMillis() < deadline) {
             try {
                 var output = runCf("tasks", appName);
-                var status = parseTaskStatus(output, stargateId);
+                var status = parseTaskStatus(output, starblasterId);
 
                 if ("SUCCEEDED".equals(status)) {
-                    log.info("Task {} completed successfully", stargateId);
+                    log.info("Task {} completed successfully", starblasterId);
                     return 0;
                 } else if ("FAILED".equals(status)) {
-                    log.warn("Task {} failed", stargateId);
+                    log.warn("Task {} failed", starblasterId);
                     return 1;
                 }
 
                 // Still RUNNING — wait and poll again
-                log.debug("Task {} still running, polling in {}s", stargateId, POLL_INTERVAL_SECONDS);
+                log.debug("Task {} still running, polling in {}s", starblasterId, POLL_INTERVAL_SECONDS);
                 Thread.sleep(POLL_INTERVAL_SECONDS * 1000L);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                log.warn("Interrupted while waiting for task {}", stargateId);
+                log.warn("Interrupted while waiting for task {}", starblasterId);
                 return -1;
             } catch (Exception e) {
-                log.warn("Error polling task {} status: {}", stargateId, e.getMessage());
+                log.warn("Error polling task {} status: {}", starblasterId, e.getMessage());
                 // Continue polling — transient errors are expected
             }
         }
 
-        log.warn("Task {} timed out after {}s", stargateId, timeoutSeconds);
+        log.warn("Task {} timed out after {}s", starblasterId, timeoutSeconds);
         return -1;
     }
 
     /**
      * Captures recent logs from the CF app filtered for this task.
      *
-     * @param stargateId the task name
+     * @param starblasterId the task name
      * @return log output, or empty string on error
      */
     @Override
-    public String captureOutput(String stargateId) {
+    public String captureOutput(String starblasterId) {
         try {
-            var appName = getAppNameFromStargateId(stargateId);
+            var appName = getAppNameFromStarblasterId(starblasterId);
             var output = runCf("logs", appName, "--recent");
 
             // Filter lines related to this task
             return output.lines()
-                    .filter(line -> line.contains(stargateId) || line.contains("APP/TASK"))
+                    .filter(line -> line.contains(starblasterId) || line.contains("APP/TASK"))
                     .collect(Collectors.joining("\n"));
         } catch (Exception e) {
-            log.warn("Failed to capture output for task {}: {}", stargateId, e.getMessage());
+            log.warn("Failed to capture output for task {}: {}", starblasterId, e.getMessage());
             return "";
         }
     }
@@ -183,19 +183,19 @@ public class CloudFoundryStargateProvider implements StargateProvider {
     /**
      * Terminates a CF task. Silently ignores errors (task may already be done).
      *
-     * @param stargateId the task name
+     * @param starblasterId the task name
      */
     @Override
-    public void teardownStargate(String stargateId) {
+    public void teardownStarblaster(String starblasterId) {
         try {
-            var appName = getAppNameFromStargateId(stargateId);
-            runCf("terminate-task", appName, stargateId);
-            log.info("Task {} terminated on app {}", stargateId, appName);
+            var appName = getAppNameFromStarblasterId(starblasterId);
+            runCf("terminate-task", appName, starblasterId);
+            log.info("Task {} terminated on app {}", starblasterId, appName);
         } catch (Exception e) {
             log.debug("Could not terminate task {} (may already be done): {}",
-                    stargateId, e.getMessage());
+                    starblasterId, e.getMessage());
         } finally {
-            stargateAppNames.remove(stargateId);
+            starblasterAppNames.remove(starblasterId);
         }
     }
 
@@ -205,7 +205,7 @@ public class CloudFoundryStargateProvider implements StargateProvider {
      * <p>Expected output format:
      * <pre>
      * id   name                       state       ...
-     * 3    stargate-forge-DIR-001     SUCCEEDED   ...
+     * 3    starblaster-forge-DIR-001     SUCCEEDED   ...
      * </pre>
      *
      * @param tasksOutput raw output from cf tasks
@@ -234,45 +234,45 @@ public class CloudFoundryStargateProvider implements StargateProvider {
     }
 
     /**
-     * Extracts the app name for a given stargateId.
+     * Extracts the app name for a given starblasterId.
      *
      * <p>First checks the in-memory cache. If not found, parses the centurion type
-     * from the stargateId format {@code stargate-{type}-{directiveId}} and looks
+     * from the starblasterId format {@code starblaster-{type}-{directiveId}} and looks
      * it up in centurionApps.
      *
-     * @param stargateId task name in format stargate-{type}-{directiveId}
+     * @param starblasterId task name in format starblaster-{type}-{directiveId}
      * @return the CF app name
      * @throws RuntimeException if the type cannot be resolved
      */
-    String getAppNameFromStargateId(String stargateId) {
+    String getAppNameFromStarblasterId(String starblasterId) {
         // Check cache first
-        var cached = stargateAppNames.get(stargateId);
+        var cached = starblasterAppNames.get(starblasterId);
         if (cached != null) {
             return cached;
         }
 
-        // Parse: stargate-{type}-{directiveId}
-        if (!stargateId.startsWith("stargate-")) {
+        // Parse: starblaster-{type}-{directiveId}
+        if (!starblasterId.startsWith("starblaster-")) {
             throw new RuntimeException(
-                    "Invalid stargateId format: '%s' (expected stargate-{type}-{directiveId})".formatted(stargateId));
+                    "Invalid starblasterId format: '%s' (expected starblaster-{type}-{directiveId})".formatted(starblasterId));
         }
 
-        var withoutPrefix = stargateId.substring("stargate-".length());
+        var withoutPrefix = starblasterId.substring("starblaster-".length());
         var dashIndex = withoutPrefix.indexOf('-');
         if (dashIndex < 0) {
             throw new RuntimeException(
-                    "Invalid stargateId format: '%s' (expected stargate-{type}-{directiveId})".formatted(stargateId));
+                    "Invalid starblasterId format: '%s' (expected starblaster-{type}-{directiveId})".formatted(starblasterId));
         }
 
         var type = withoutPrefix.substring(0, dashIndex);
         var appName = cfProperties.getCenturionApps().get(type);
         if (appName == null) {
             throw new RuntimeException(
-                    "Unknown centurion type '%s' parsed from stargateId '%s'".formatted(type, stargateId));
+                    "Unknown centurion type '%s' parsed from starblasterId '%s'".formatted(type, starblasterId));
         }
 
         // Cache for future lookups
-        stargateAppNames.put(stargateId, appName);
+        starblasterAppNames.put(starblasterId, appName);
         return appName;
     }
 

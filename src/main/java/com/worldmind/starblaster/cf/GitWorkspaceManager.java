@@ -1,4 +1,4 @@
-package com.worldmind.stargate.cf;
+package com.worldmind.starblaster.cf;
 
 import com.worldmind.core.model.FileRecord;
 import org.slf4j.Logger;

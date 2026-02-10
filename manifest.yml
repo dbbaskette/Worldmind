@@ -12,10 +12,10 @@ applications:
     env:
       JBP_CONFIG_OPEN_JDK_JRE: '{ jre: { version: 21.+ } }'
       SPRING_PROFILES_ACTIVE: cf
-      worldmind.stargate.provider: cloudfoundry
+      worldmind.starblaster.provider: cloudfoundry
     services:
-      - worldmind-db
-      - worldmind-genai
+      - worldmind-postgres
+      - worldmind-model
 
   # --- Centurion: Forge (code generation) ---
   - name: centurion-forge
@@ -27,7 +27,7 @@ applications:
     health-check-type: process
     no-route: true
     services:
-      - worldmind-genai
+      - worldmind-model
 
   # --- Centurion: Gauntlet (testing) ---
   - name: centurion-gauntlet
@@ -39,7 +39,7 @@ applications:
     health-check-type: process
     no-route: true
     services:
-      - worldmind-genai
+      - worldmind-model
 
   # --- Centurion: Vigil (code review) ---
   - name: centurion-vigil
@@ -51,4 +51,4 @@ applications:
     health-check-type: process
     no-route: true
     services:
-      - worldmind-genai
+      - worldmind-model

@@ -4,7 +4,7 @@ import java.io.Serializable;
 import java.util.List;
 
 /**
- * A single unit of work within a mission plan, executed by a Centurion inside a Stargate container.
+ * A single unit of work within a mission plan, executed by a Centurion inside a Starblaster container.
  */
 public record Directive(
     String id,

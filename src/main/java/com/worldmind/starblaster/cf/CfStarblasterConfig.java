@@ -1,19 +1,19 @@
-package com.worldmind.stargate.cf;
+package com.worldmind.starblaster.cf;
 
-import com.worldmind.stargate.StargateProvider;
+import com.worldmind.starblaster.StarblasterProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Spring configuration for Cloud Foundry Stargate provider.
- * Activates when {@code worldmind.stargate.provider=cloudfoundry}.
+ * Spring configuration for Cloud Foundry Starblaster provider.
+ * Activates when {@code worldmind.starblaster.provider=cloudfoundry}.
  */
 @Configuration
-@ConditionalOnProperty(name = "worldmind.stargate.provider", havingValue = "cloudfoundry")
+@ConditionalOnProperty(name = "worldmind.starblaster.provider", havingValue = "cloudfoundry")
 @EnableConfigurationProperties(CloudFoundryProperties.class)
-public class CfStargateConfig {
+public class CfStarblasterConfig {
 
     @Bean
     public GitWorkspaceManager gitWorkspaceManager(CloudFoundryProperties cfProperties) {
@@ -21,8 +21,8 @@ public class CfStargateConfig {
     }
 
     @Bean
-    public StargateProvider cloudFoundryStargateProvider(CloudFoundryProperties cfProperties,
+    public StarblasterProvider cloudFoundryStarblasterProvider(CloudFoundryProperties cfProperties,
                                                          GitWorkspaceManager gitWorkspaceManager) {
-        return new CloudFoundryStargateProvider(cfProperties, gitWorkspaceManager);
+        return new CloudFoundryStarblasterProvider(cfProperties, gitWorkspaceManager);
     }
 }

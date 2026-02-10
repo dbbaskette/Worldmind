@@ -81,7 +81,7 @@ public class MissionController {
         // Run mission asynchronously
         CompletableFuture<WorldmindState> future = CompletableFuture.supplyAsync(() -> {
             try {
-                WorldmindState result = missionEngine.runMission(missionId, request.request(), mode, request.projectPath());
+                WorldmindState result = missionEngine.runMission(missionId, request.request(), mode, request.projectPath(), request.gitRemoteUrl());
                 if (result != null) {
                     missionStates.put(missionId, result);
                 }

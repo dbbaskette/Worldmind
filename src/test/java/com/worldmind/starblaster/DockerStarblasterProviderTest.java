@@ -1,4 +1,4 @@
-package com.worldmind.stargate;
+package com.worldmind.starblaster;
 
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.*;
@@ -18,39 +18,39 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Unit tests for DockerStargateProvider.
+ * Unit tests for DockerStarblasterProvider.
  *
  * <p>The Docker Java client uses a deep fluent builder pattern that is notoriously
  * difficult to mock with Mockito. These tests use manual mock chaining rather than
  * RETURNS_DEEP_STUBS to maintain precise control over verifications and avoid
  * ClassCastException issues with concrete callback classes.
  */
-class DockerStargateProviderTest {
+class DockerStarblasterProviderTest {
 
     private DockerClient dockerClient;
-    private DockerStargateProvider provider;
+    private DockerStarblasterProvider provider;
 
     @BeforeEach
     void setUp() {
         dockerClient = mock(DockerClient.class);
-        provider = new DockerStargateProvider(dockerClient);
+        provider = new DockerStarblasterProvider(dockerClient);
     }
 
-    // ── openStargate tests ──────────────────────────────────────────────
+    // ── openStarblaster tests ──────────────────────────────────────────────
 
     @Test
-    void openStargateCreatesAndStartsContainer() {
+    void openStarblasterCreatesAndStartsContainer() {
         var createCmd = mockCreateContainerCmd("container-abc123");
         var startCmd = mock(StartContainerCmd.class);
         when(dockerClient.startContainerCmd("container-abc123")).thenReturn(startCmd);
 
-        var request = new StargateRequest(
+        var request = new StarblasterRequest(
             "forge", "DIR-001", Path.of("/tmp/project"),
             "Create hello.py", Map.of("GOOSE_PROVIDER", "openai"),
             4096, 2
         );
 
-        String containerId = provider.openStargate(request);
+        String containerId = provider.openStarblaster(request);
 
         assertEquals("container-abc123", containerId);
         verify(dockerClient).createContainerCmd("worldmind/centurion-forge:latest");
@@ -59,39 +59,39 @@ class DockerStargateProviderTest {
     }
 
     @Test
-    void openStargateUsesCorrectImageForCenturionType() {
+    void openStarblasterUsesCorrectImageForCenturionType() {
         mockCreateContainerCmd("container-vigil-001");
         when(dockerClient.startContainerCmd(anyString())).thenReturn(mock(StartContainerCmd.class));
 
-        var request = new StargateRequest(
+        var request = new StarblasterRequest(
             "vigil", "DIR-002", Path.of("/tmp/project"),
             "Review code", Map.of(),
             2048, 1
         );
 
-        provider.openStargate(request);
+        provider.openStarblaster(request);
 
         verify(dockerClient).createContainerCmd("worldmind/centurion-vigil:latest");
     }
 
     @Test
-    void openStargateSetsContainerName() {
+    void openStarblasterSetsContainerName() {
         var createCmd = mockCreateContainerCmd("container-xyz");
         when(dockerClient.startContainerCmd(anyString())).thenReturn(mock(StartContainerCmd.class));
 
-        var request = new StargateRequest(
+        var request = new StarblasterRequest(
             "forge", "DIR-001", Path.of("/tmp/project"),
             "Create hello.py", Map.of(),
             4096, 2
         );
 
-        provider.openStargate(request);
+        provider.openStarblaster(request);
 
-        verify(createCmd).withName("stargate-forge-DIR-001");
+        verify(createCmd).withName("starblaster-forge-DIR-001");
     }
 
     @Test
-    void openStargatePassesEnvironmentVariables() {
+    void openStarblasterPassesEnvironmentVariables() {
         var createCmd = mockCreateContainerCmd("container-env");
         when(dockerClient.startContainerCmd(anyString())).thenReturn(mock(StartContainerCmd.class));
 
@@ -99,13 +99,13 @@ class DockerStargateProviderTest {
             "GOOSE_PROVIDER", "openai",
             "GOOSE_MODEL", "gpt-4"
         );
-        var request = new StargateRequest(
+        var request = new StarblasterRequest(
             "forge", "DIR-003", Path.of("/tmp/project"),
             "Build feature", envVars,
             4096, 2
         );
 
-        provider.openStargate(request);
+        provider.openStarblaster(request);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<String>> envCaptor = ArgumentCaptor.forClass(List.class);
@@ -116,49 +116,49 @@ class DockerStargateProviderTest {
     }
 
     @Test
-    void openStargateSetsGooseRunCommand() {
+    void openStarblasterSetsGooseRunCommand() {
         var createCmd = mockCreateContainerCmd("container-cmd");
         when(dockerClient.startContainerCmd(anyString())).thenReturn(mock(StartContainerCmd.class));
 
-        var request = new StargateRequest(
+        var request = new StarblasterRequest(
             "forge", "DIR-004", Path.of("/tmp/project"),
             "Create a REST API", Map.of(),
             4096, 2
         );
 
-        provider.openStargate(request);
+        provider.openStarblaster(request);
 
         verify(createCmd).withCmd("/workspace/.worldmind/directives/DIR-004.md");
     }
 
     @Test
-    void openStargateSetsWorkingDirectory() {
+    void openStarblasterSetsWorkingDirectory() {
         var createCmd = mockCreateContainerCmd("container-wd");
         when(dockerClient.startContainerCmd(anyString())).thenReturn(mock(StartContainerCmd.class));
 
-        var request = new StargateRequest(
+        var request = new StarblasterRequest(
             "forge", "DIR-005", Path.of("/tmp/project"),
             "Build feature", Map.of(),
             4096, 2
         );
 
-        provider.openStargate(request);
+        provider.openStarblaster(request);
 
         verify(createCmd).withWorkingDir("/workspace");
     }
 
     @Test
-    void openStargateSetsHostConfig() {
+    void openStarblasterSetsHostConfig() {
         var createCmd = mockCreateContainerCmd("container-hc");
         when(dockerClient.startContainerCmd(anyString())).thenReturn(mock(StartContainerCmd.class));
 
-        var request = new StargateRequest(
+        var request = new StarblasterRequest(
             "forge", "DIR-006", Path.of("/tmp/project"),
             "Build feature", Map.of(),
             4096, 2
         );
 
-        provider.openStargate(request);
+        provider.openStarblaster(request);
 
         var hostConfigCaptor = ArgumentCaptor.forClass(HostConfig.class);
         verify(createCmd).withHostConfig(hostConfigCaptor.capture());
@@ -239,10 +239,10 @@ class DockerStargateProviderTest {
         verify(logCmd).withFollowStream(false);
     }
 
-    // ── teardownStargate tests ──────────────────────────────────────────
+    // ── teardownStarblaster tests ──────────────────────────────────────────
 
     @Test
-    void teardownStargateStopsAndRemovesContainer() {
+    void teardownStarblasterStopsAndRemovesContainer() {
         var stopCmd = mock(StopContainerCmd.class);
         when(dockerClient.stopContainerCmd("container-123")).thenReturn(stopCmd);
 
@@ -250,7 +250,7 @@ class DockerStargateProviderTest {
         when(dockerClient.removeContainerCmd("container-123")).thenReturn(removeCmd);
         when(removeCmd.withForce(true)).thenReturn(removeCmd);
 
-        provider.teardownStargate("container-123");
+        provider.teardownStarblaster("container-123");
 
         verify(stopCmd).exec();
         verify(removeCmd).withForce(true);
@@ -258,7 +258,7 @@ class DockerStargateProviderTest {
     }
 
     @Test
-    void teardownStargateContinuesRemovalEvenIfStopFails() {
+    void teardownStarblasterContinuesRemovalEvenIfStopFails() {
         var stopCmd = mock(StopContainerCmd.class);
         when(dockerClient.stopContainerCmd("container-123")).thenReturn(stopCmd);
         when(stopCmd.exec()).thenThrow(new RuntimeException("Container already stopped"));
@@ -267,12 +267,12 @@ class DockerStargateProviderTest {
         when(dockerClient.removeContainerCmd("container-123")).thenReturn(removeCmd);
         when(removeCmd.withForce(true)).thenReturn(removeCmd);
 
-        assertDoesNotThrow(() -> provider.teardownStargate("container-123"));
+        assertDoesNotThrow(() -> provider.teardownStarblaster("container-123"));
         verify(removeCmd).exec();
     }
 
     @Test
-    void teardownStargateHandlesRemovalFailureGracefully() {
+    void teardownStarblasterHandlesRemovalFailureGracefully() {
         var stopCmd = mock(StopContainerCmd.class);
         when(dockerClient.stopContainerCmd("container-123")).thenReturn(stopCmd);
 
@@ -282,7 +282,7 @@ class DockerStargateProviderTest {
         when(removeCmd.exec()).thenThrow(new RuntimeException("Container not found"));
 
         // Should not throw, just log a warning
-        assertDoesNotThrow(() -> provider.teardownStargate("container-123"));
+        assertDoesNotThrow(() -> provider.teardownStarblaster("container-123"));
     }
 
     // ── Helper methods ──────────────────────────────────────────────────
