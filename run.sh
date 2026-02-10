@@ -13,9 +13,18 @@ fi
 
 JAR="target/worldmind-0.1.0-SNAPSHOT.jar"
 PROFILE="${WORLDMIND_PROFILE:-local}"
+REGISTRY="${CENTURION_IMAGE_REGISTRY:-ghcr.io/dbbaskette}"
+CENTURIONS=(forge gauntlet vigil pulse prism)
 
 usage() {
-  echo "Usage: ./run.sh <command> [options]"
+  echo "Usage: ./run.sh [flags] [command] [options]"
+  echo ""
+  echo "Flags:"
+  echo "  --images            Build and push all centurion Docker images to GHCR"
+  echo "  --cf                Build and push to Cloud Foundry (reads vars from .env)"
+  echo "  --deploy            Build images, then push everything to Cloud Foundry"
+  echo "  --docker            Start everything in Docker (Postgres + Worldmind)"
+  echo "  --down              Stop all Docker services"
   echo ""
   echo "Commands:"
   echo "  mission <request>   Submit a mission request"
@@ -26,9 +35,6 @@ usage() {
   echo "  inspect <id>        View detailed mission state"
   echo "  log                 View mission execution logs"
   echo "  timeline <id>       Show checkpoint history"
-  echo "  up                  Start everything in Docker (Postgres + Worldmind)"
-  echo "  down                Stop all Docker services"
-  echo "  cf-push             Build and push to Cloud Foundry (reads CF vars from .env)"
   echo ""
   echo "Environment:"
   echo "  WORLDMIND_PROFILE   Spring profile (default: local)"
@@ -36,46 +42,56 @@ usage() {
   exit 1
 }
 
-if [ $# -eq 0 ]; then
-  usage
-fi
+# ---- Build and push centurion images to registry ----
+build_and_push_images() {
+  missing=""
+  for var in CENTURION_IMAGE_REGISTRY DOCKER_USERNAME CF_DOCKER_PASSWORD; do
+    if [ -z "${!var:-}" ]; then missing="$missing $var"; fi
+  done
+  if [ -n "$missing" ]; then
+    echo "ERROR: Missing required variables:$missing"
+    echo "Set them in .env (see .env.example for reference)."
+    exit 1
+  fi
 
-# Docker-only commands
-case "$1" in
-  up)
-    echo "Starting all services in Docker..."
-    docker compose --profile full up -d --build
-    echo ""
-    echo "  Dashboard:  http://localhost:${WORLDMIND_PORT:-8080}"
-    echo "  API:        http://localhost:${WORLDMIND_PORT:-8080}/api/v1"
-    echo "  Postgres:   localhost:5432"
-    echo ""
-    echo "  Logs:       docker compose --profile full logs -f"
-    echo "  Stop:       ./run.sh down"
-    exit 0
-    ;;
-  down)
-    echo "Stopping all services..."
-    docker compose --profile full down
-    exit 0
-    ;;
-  cf-push)
-    # Validate required CF variables
-    missing=""
-    for var in CF_DOCKER_PASSWORD CENTURION_IMAGE_REGISTRY DOCKER_USERNAME \
-               CF_API_URL CF_ORG CF_SPACE; do
-      if [ -z "${!var:-}" ]; then missing="$missing $var"; fi
-    done
-    if [ -n "$missing" ]; then
-      echo "ERROR: Missing required variables:$missing"
-      echo "Set them in .env (see .env.example for reference)."
-      exit 1
-    fi
+  echo "Building centurion-base..."
+  docker build -t "$REGISTRY/centurion-base:latest" docker/centurion-base/
 
-    # Generate vars YAML from .env for cf push --vars-file
-    VARS_FILE=$(mktemp /tmp/cf-vars-XXXXXX.yml)
-    trap "rm -f $VARS_FILE" EXIT
-    cat > "$VARS_FILE" <<EOVARS
+  for c in "${CENTURIONS[@]}"; do
+    echo "Building centurion-$c..."
+    docker build -t "$REGISTRY/centurion-$c:latest" "docker/centurion-$c/"
+  done
+
+  echo ""
+  echo "Logging into GHCR..."
+  echo "${CF_DOCKER_PASSWORD}" | docker login ghcr.io -u "${DOCKER_USERNAME}" --password-stdin
+
+  echo "Pushing images to $REGISTRY..."
+  docker push "$REGISTRY/centurion-base:latest"
+  for c in "${CENTURIONS[@]}"; do
+    docker push "$REGISTRY/centurion-$c:latest"
+  done
+
+  echo ""
+  echo "All centurion images pushed to $REGISTRY."
+}
+
+# ---- CF push ----
+cf_push() {
+  missing=""
+  for var in CF_DOCKER_PASSWORD CENTURION_IMAGE_REGISTRY DOCKER_USERNAME \
+             CF_API_URL CF_ORG CF_SPACE; do
+    if [ -z "${!var:-}" ]; then missing="$missing $var"; fi
+  done
+  if [ -n "$missing" ]; then
+    echo "ERROR: Missing required variables:$missing"
+    echo "Set them in .env (see .env.example for reference)."
+    exit 1
+  fi
+
+  VARS_FILE=$(mktemp /tmp/cf-vars-XXXXXX.yml)
+  trap "rm -f $VARS_FILE" EXIT
+  cat > "$VARS_FILE" <<EOVARS
 cf-api-url: ${CF_API_URL}
 cf-org: ${CF_ORG}
 cf-space: ${CF_SPACE}
@@ -84,11 +100,49 @@ docker-username: ${DOCKER_USERNAME}
 centurion-forge-app: ${CENTURION_FORGE_APP:-centurion-forge}
 centurion-gauntlet-app: ${CENTURION_GAUNTLET_APP:-centurion-gauntlet}
 centurion-vigil-app: ${CENTURION_VIGIL_APP:-centurion-vigil}
+centurion-pulse-app: ${CENTURION_PULSE_APP:-centurion-pulse}
+centurion-prism-app: ${CENTURION_PRISM_APP:-centurion-prism}
 EOVARS
 
-    echo "Building and pushing to Cloud Foundry..."
-    ./mvnw -q clean package -DskipTests
-    CF_DOCKER_PASSWORD="$CF_DOCKER_PASSWORD" cf push --vars-file "$VARS_FILE"
+  echo "Building and pushing to Cloud Foundry..."
+  ./mvnw -q clean package -DskipTests
+  CF_DOCKER_PASSWORD="$CF_DOCKER_PASSWORD" cf push --vars-file "$VARS_FILE"
+}
+
+if [ $# -eq 0 ]; then
+  usage
+fi
+
+case "$1" in
+  --docker)
+    echo "Starting all services in Docker..."
+    docker compose --profile full up -d --build
+    echo ""
+    echo "  Dashboard:  http://localhost:${WORLDMIND_PORT:-8080}"
+    echo "  API:        http://localhost:${WORLDMIND_PORT:-8080}/api/v1"
+    echo "  Postgres:   localhost:5432"
+    echo ""
+    echo "  Logs:       docker compose --profile full logs -f"
+    echo "  Stop:       ./run.sh --down"
+    exit 0
+    ;;
+  --down)
+    echo "Stopping all services..."
+    docker compose --profile full down
+    exit 0
+    ;;
+  --images)
+    build_and_push_images
+    exit 0
+    ;;
+  --cf)
+    cf_push
+    exit 0
+    ;;
+  --deploy)
+    build_and_push_images
+    echo ""
+    cf_push
     exit 0
     ;;
 esac

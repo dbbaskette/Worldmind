@@ -36,7 +36,7 @@ The project uses Xandarian Worldmind / Nova Corps nomenclature from Marvel Comic
 - **REST API** -- Full mission lifecycle via HTTP with SSE event streaming
 - **Security hardening** -- JWT authentication, command allowlists per centurion type, path restrictions
 - **Observability** -- Structured JSON logging, Prometheus metrics, component health checks
-- **Cloud Foundry ready** -- Deploy with `./run.sh cf-push` using git-based workspaces, java-cfenv service auto-binding, and CF task provider
+- **Cloud Foundry ready** -- Deploy with `./run.sh --cf` using git-based workspaces, java-cfenv service auto-binding, and CF task provider
 
 ## Architecture
 
@@ -131,7 +131,7 @@ flowchart TB
 
 3. Start everything with Docker
    ```bash
-   ./run.sh up
+   ./run.sh --docker
    ```
 
    Or start just PostgreSQL and run locally:
@@ -204,9 +204,9 @@ Worldmind uses five specialized Centurion agents, each with distinct capabilitie
 ./run.sh inspect <id>        # View detailed mission state
 ./run.sh log                 # View mission execution logs
 ./run.sh timeline <id>       # Show checkpoint history for a mission
-./run.sh up                  # Start everything in Docker
-./run.sh down                # Stop all Docker services
-./run.sh cf-push             # Build and push to Cloud Foundry
+./run.sh --docker            # Start everything in Docker
+./run.sh --down              # Stop all Docker services
+./run.sh --cf                # Build and push to Cloud Foundry
 ```
 
 ## Environment Variables
@@ -261,13 +261,13 @@ curl -X POST http://localhost:8080/api/v1/missions \
 
 ```bash
 # Start all services (PostgreSQL + Worldmind)
-./run.sh up
+./run.sh --docker
 
 # Start just PostgreSQL
 docker compose up -d postgres
 
 # Stop everything
-./run.sh down
+./run.sh --down
 ```
 
 ### Centurion Images
@@ -289,7 +289,7 @@ docker/
 Worldmind supports Cloud Foundry deployment using CF tasks and git-based workspace coordination.
 
 ```bash
-./run.sh cf-push
+./run.sh --cf
 ```
 
 **Required services:**

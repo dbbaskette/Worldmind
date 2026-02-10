@@ -8,10 +8,12 @@
 | **centurion-forge** | CF app (Docker image) | 0 instances; runs as CF tasks | Yes | No | Code generation — Goose agent writes implementation code |
 | **centurion-gauntlet** | CF app (Docker image) | 0 instances; runs as CF tasks | Yes | No | Test execution — Goose agent writes and runs tests |
 | **centurion-vigil** | CF app (Docker image) | 0 instances; runs as CF tasks | Yes | No | Code review — Goose agent reviews code for quality |
+| **centurion-pulse** | CF app (Docker image) | 0 instances; runs as CF tasks | Yes | No | Research — Goose agent performs read-only analysis |
+| **centurion-prism** | CF app (Docker image) | 0 instances; runs as CF tasks | Yes | No | Refactoring — Goose agent restructures existing code |
 | **worldmind-postgres** | CF service | Managed by marketplace tile | -- | -- | PostgreSQL for checkpoint state and mission persistence |
 | **worldmind-model** | CF service | Managed by marketplace tile | -- | -- | OpenAI-compatible LLM endpoint, bound to orchestrator + all centurions |
 
-**How centurions run:** The orchestrator calls `cf run-task centurion-forge` (or gauntlet/vigil) to launch a short-lived CF task on the Docker-based app. The task clones the mission git branch, runs Goose with the directive, commits results, and exits. The app itself has 0 long-running instances — it only exists as a task host.
+**How centurions run:** The orchestrator calls `cf run-task centurion-forge` (or gauntlet/vigil/pulse/prism) to launch a short-lived CF task on the Docker-based app. The task clones the mission git branch, runs Goose with the directive, commits results, and exits. The app itself has 0 long-running instances — it only exists as a task host.
 
 **How the model is consumed:**
 - **Orchestrator** — Spring AI `ChatClient` for classify, plan, and seal evaluation nodes. Credentials are auto-mapped from the `worldmind-model` binding via `CfModelServiceProcessor` (java-cfenv).
@@ -25,6 +27,8 @@
   - `{registry}/centurion-forge:latest`
   - `{registry}/centurion-gauntlet:latest`
   - `{registry}/centurion-vigil:latest`
+  - `{registry}/centurion-pulse:latest`
+  - `{registry}/centurion-prism:latest`
 - **GitHub PAT** with `read:packages` scope for pulling images from GHCR. Set `CF_DOCKER_PASSWORD` and `DOCKER_USERNAME` in your `.env` file.
 - CF foundation must have **Diego Docker support enabled**:
   ```bash
@@ -89,17 +93,19 @@ CENTURION_GAUNTLET_APP=centurion-gauntlet
 CENTURION_VIGIL_APP=centurion-vigil
 ```
 
-When you run `./run.sh cf-push`, it reads these from `.env`, generates a temporary vars file, and passes it to `cf push --vars-file`. No separate config file to manage.
+When you run `./run.sh --cf`, it reads these from `.env`, generates a temporary vars file, and passes it to `cf push --vars-file`. No separate config file to manage.
 
 ## 4. Deploy
 
 Build and push all applications:
 
 ```bash
-./run.sh cf-push
+./run.sh --cf
 ```
 
 This builds the JAR, generates a vars file from `.env`, and runs `cf push`, deploying all components listed in the Component Overview above.
+
+**Note:** On CF, the app auto-detects the Cloud Foundry environment (`VCAP_APPLICATION`) and starts in serve mode (HTTP server) without needing the `serve` subcommand.
 
 ## 5. How Services Are Bound
 
@@ -111,6 +117,8 @@ The `manifest.yml` binds services as follows:
 | centurion-forge | -- | Yes |
 | centurion-gauntlet | -- | Yes |
 | centurion-vigil | -- | Yes |
+| centurion-pulse | -- | Yes |
+| centurion-prism | -- | Yes |
 
 ### Orchestrator service binding (java-cfenv)
 
@@ -163,6 +171,8 @@ This gives each centurion an isolated working copy while maintaining a shared, o
 | `CENTURION_FORGE_APP` | CF app name for Forge centurion | No (default: `centurion-forge`) |
 | `CENTURION_GAUNTLET_APP` | CF app name for Gauntlet centurion | No (default: `centurion-gauntlet`) |
 | `CENTURION_VIGIL_APP` | CF app name for Vigil centurion | No (default: `centurion-vigil`) |
+| `CENTURION_PULSE_APP` | CF app name for Pulse centurion | No (default: `centurion-pulse`) |
+| `CENTURION_PRISM_APP` | CF app name for Prism centurion | No (default: `centurion-prism`) |
 
 ### Application properties
 

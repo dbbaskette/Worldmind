@@ -22,3 +22,10 @@ worldmind:
     provider: cloudfoundry
     max-parallel: 3
     wave-cooldown-seconds: 30
+  cf:
+    centurion-apps:
+      forge: ${CENTURION_FORGE_APP:centurion-forge}
+      gauntlet: ${CENTURION_GAUNTLET_APP:centurion-gauntlet}
+      vigil: ${CENTURION_VIGIL_APP:centurion-vigil}
+      pulse: ${CENTURION_PULSE_APP:centurion-pulse}
+      prism: ${CENTURION_PRISM_APP:centurion-prism}

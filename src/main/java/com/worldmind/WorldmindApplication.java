@@ -12,6 +12,12 @@ import java.util.Arrays;
 public class WorldmindApplication {
 
     public static void main(String[] args) {
+        // On Cloud Foundry, the buildpack runs the JAR with no arguments.
+        // Auto-inject "serve" so the embedded web server starts.
+        if (args.length == 0 && System.getenv("VCAP_APPLICATION") != null) {
+            args = new String[]{"serve"};
+        }
+
         boolean serveMode = Arrays.asList(args).contains("serve");
 
         SpringApplicationBuilder builder = new SpringApplicationBuilder(WorldmindApplication.class);

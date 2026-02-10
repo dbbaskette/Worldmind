@@ -17,9 +17,11 @@ applications:
       worldmind.cf.api-url: ((cf-api-url))
       worldmind.cf.org: ((cf-org))
       worldmind.cf.space: ((cf-space))
-      worldmind.cf.centurion-apps.forge: ((centurion-forge-app))
-      worldmind.cf.centurion-apps.gauntlet: ((centurion-gauntlet-app))
-      worldmind.cf.centurion-apps.vigil: ((centurion-vigil-app))
+      CENTURION_FORGE_APP: ((centurion-forge-app))
+      CENTURION_GAUNTLET_APP: ((centurion-gauntlet-app))
+      CENTURION_VIGIL_APP: ((centurion-vigil-app))
+      CENTURION_PULSE_APP: ((centurion-pulse-app))
+      CENTURION_PRISM_APP: ((centurion-prism-app))
     services:
       - worldmind-postgres
       - worldmind-model
@@ -54,6 +56,32 @@ applications:
   - name: ((centurion-vigil-app))
     docker:
       image: ((centurion-image-registry))/centurion-vigil:latest
+      username: ((docker-username))
+    memory: 2G
+    disk_quota: 4G
+    instances: 0
+    health-check-type: process
+    no-route: true
+    services:
+      - worldmind-model
+
+  # --- Centurion: Pulse (research, read-only) ---
+  - name: ((centurion-pulse-app))
+    docker:
+      image: ((centurion-image-registry))/centurion-pulse:latest
+      username: ((docker-username))
+    memory: 2G
+    disk_quota: 4G
+    instances: 0
+    health-check-type: process
+    no-route: true
+    services:
+      - worldmind-model
+
+  # --- Centurion: Prism (refactoring) ---
+  - name: ((centurion-prism-app))
+    docker:
+      image: ((centurion-image-registry))/centurion-prism:latest
       username: ((docker-username))
     memory: 2G
     disk_quota: 4G

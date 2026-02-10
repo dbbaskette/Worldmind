@@ -20,6 +20,11 @@ RUN npm install -g @modelcontextprotocol/server-filesystem
 # Copy entrypoint script (generates profiles.yaml from env vars, then runs goose)
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 
+# Create non-root user (CF Diego rejects root)
+RUN useradd -m -s /bin/bash centurion && \
+    mkdir -p /workspace && chown centurion:centurion /workspace
+USER centurion
+
 # Working directory
 WORKDIR /workspace
 
