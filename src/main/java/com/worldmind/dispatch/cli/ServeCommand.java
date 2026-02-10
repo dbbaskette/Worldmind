@@ -43,12 +43,15 @@ public class ServeCommand implements Runnable {
 
     private static void printBanner(int port) {
         ConsoleOutput.printBanner();
+        boolean onCf = System.getenv("VCAP_APPLICATION") != null;
         ConsoleOutput.info("Worldmind server running on port " + port);
-        System.out.println();
-        System.out.println("  Dashboard:  http://localhost:" + port);
-        System.out.println("  API:        http://localhost:" + port + "/api/v1");
-        System.out.println();
-        ConsoleOutput.info("Press Ctrl+C to stop.");
+        if (!onCf) {
+            System.out.println();
+            System.out.println("  Dashboard:  http://localhost:" + port);
+            System.out.println("  API:        http://localhost:" + port + "/api/v1");
+            System.out.println();
+            ConsoleOutput.info("Press Ctrl+C to stop.");
+        }
     }
 
     public int getPort() {

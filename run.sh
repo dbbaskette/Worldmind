@@ -13,16 +13,12 @@ fi
 
 JAR="target/worldmind-0.1.0-SNAPSHOT.jar"
 PROFILE="${WORLDMIND_PROFILE:-local}"
-REGISTRY="${CENTURION_IMAGE_REGISTRY:-ghcr.io/dbbaskette}"
-CENTURIONS=(forge gauntlet vigil pulse prism)
 
 usage() {
   echo "Usage: ./run.sh [flags] [command] [options]"
   echo ""
   echo "Flags:"
-  echo "  --images            Build and push all centurion Docker images to GHCR"
   echo "  --cf                Build and push to Cloud Foundry (reads vars from .env)"
-  echo "  --deploy            Build images, then push everything to Cloud Foundry"
   echo "  --docker            Start everything in Docker (Postgres + Worldmind)"
   echo "  --down              Stop all Docker services"
   echo ""
@@ -42,45 +38,11 @@ usage() {
   exit 1
 }
 
-# ---- Build and push centurion images to registry ----
-build_and_push_images() {
-  missing=""
-  for var in CENTURION_IMAGE_REGISTRY DOCKER_USERNAME CF_DOCKER_PASSWORD; do
-    if [ -z "${!var:-}" ]; then missing="$missing $var"; fi
-  done
-  if [ -n "$missing" ]; then
-    echo "ERROR: Missing required variables:$missing"
-    echo "Set them in .env (see .env.example for reference)."
-    exit 1
-  fi
-
-  echo "Building centurion-base..."
-  docker build -t "$REGISTRY/centurion-base:latest" docker/centurion-base/
-
-  for c in "${CENTURIONS[@]}"; do
-    echo "Building centurion-$c..."
-    docker build -t "$REGISTRY/centurion-$c:latest" "docker/centurion-$c/"
-  done
-
-  echo ""
-  echo "Logging into GHCR..."
-  echo "${CF_DOCKER_PASSWORD}" | docker login ghcr.io -u "${DOCKER_USERNAME}" --password-stdin
-
-  echo "Pushing images to $REGISTRY..."
-  docker push "$REGISTRY/centurion-base:latest"
-  for c in "${CENTURIONS[@]}"; do
-    docker push "$REGISTRY/centurion-$c:latest"
-  done
-
-  echo ""
-  echo "All centurion images pushed to $REGISTRY."
-}
-
 # ---- CF push ----
 cf_push() {
   missing=""
   for var in CF_DOCKER_PASSWORD CENTURION_IMAGE_REGISTRY DOCKER_USERNAME \
-             CF_API_URL CF_ORG CF_SPACE; do
+             CF_API_URL CF_ORG CF_SPACE CF_USERNAME CF_PASSWORD; do
     if [ -z "${!var:-}" ]; then missing="$missing $var"; fi
   done
   if [ -n "$missing" ]; then
@@ -102,10 +64,24 @@ centurion-gauntlet-app: ${CENTURION_GAUNTLET_APP:-centurion-gauntlet}
 centurion-vigil-app: ${CENTURION_VIGIL_APP:-centurion-vigil}
 centurion-pulse-app: ${CENTURION_PULSE_APP:-centurion-pulse}
 centurion-prism-app: ${CENTURION_PRISM_APP:-centurion-prism}
+cf-username: ${CF_USERNAME}
+cf-password: ${CF_PASSWORD}
 EOVARS
 
-  echo "Building and pushing to Cloud Foundry..."
+  echo "Building JAR..."
   ./mvnw -q clean package -DskipTests
+
+  # Remove stale dotted env vars from previous manifests (CF keeps old env vars across pushes)
+  echo "Cleaning stale env vars..."
+  for old_var in worldmind.cf.centurion-apps.forge worldmind.cf.centurion-apps.gauntlet \
+                 worldmind.cf.centurion-apps.vigil worldmind.cf.centurion-apps.pulse \
+                 worldmind.cf.centurion-apps.prism worldmind.cf.api-url worldmind.cf.org \
+                 worldmind.cf.space worldmind.starblaster.provider \
+                 worldmind.starblaster.image-registry; do
+    cf unset-env worldmind "$old_var" 2>/dev/null || true
+  done
+
+  echo "Pushing to Cloud Foundry..."
   CF_DOCKER_PASSWORD="$CF_DOCKER_PASSWORD" cf push --vars-file "$VARS_FILE"
 }
 
@@ -131,17 +107,7 @@ case "$1" in
     docker compose --profile full down
     exit 0
     ;;
-  --images)
-    build_and_push_images
-    exit 0
-    ;;
   --cf)
-    cf_push
-    exit 0
-    ;;
-  --deploy)
-    build_and_push_images
-    echo ""
     cf_push
     exit 0
     ;;

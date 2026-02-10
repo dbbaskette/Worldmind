@@ -14,15 +14,14 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Unit tests for {@link CloudFoundryStarblasterProvider}.
  *
- * <p>Uses a test subclass to intercept CF CLI commands, allowing us to verify
- * command construction and test polling logic without a real CF environment.
- * Follows the same pattern as {@link GitWorkspaceManagerTest}.
+ * <p>Uses a stub {@link CfApiClient} to intercept CF API calls, allowing us to
+ * verify task creation, polling logic, and cancellation without a real CF environment.
  */
 class CloudFoundryStarblasterProviderTest {
 
-    private TestableCloudFoundryStarblasterProvider provider;
+    private CloudFoundryStarblasterProvider provider;
+    private StubCfApiClient stubApiClient;
     private CloudFoundryProperties cfProperties;
-    private GitWorkspaceManager gitWorkspaceManager;
 
     @BeforeEach
     void setUp() {
@@ -40,35 +39,33 @@ class CloudFoundryStarblasterProviderTest {
         cfProperties.setTaskDiskMb(4096);
         cfProperties.setTaskTimeoutSeconds(600);
 
-        gitWorkspaceManager = new GitWorkspaceManager(cfProperties.getGitRemoteUrl());
-        provider = new TestableCloudFoundryStarblasterProvider(cfProperties, gitWorkspaceManager);
+        var gitWorkspaceManager = new GitWorkspaceManager(cfProperties.getGitRemoteUrl());
+        stubApiClient = new StubCfApiClient(cfProperties);
+        provider = new CloudFoundryStarblasterProvider(cfProperties, gitWorkspaceManager, stubApiClient);
     }
 
     // --- openStarblaster tests ---
 
     @Test
-    void openStarblasterConstructsCorrectRunTaskCommand() {
-        provider.setCfOutput("Creating task for app centurion-forge...\nOK");
+    void openStarblasterCreatesTaskWithCorrectParameters() {
         var request = makeRequest("forge", "DIR-001");
 
         provider.openStarblaster(request);
 
-        var commands = provider.getExecutedCommands();
-        assertEquals(1, commands.size());
+        var calls = stubApiClient.createTaskCalls;
+        assertEquals(1, calls.size());
 
-        var cmd = commands.get(0);
-        assertTrue(cmd.contains("run-task"), "Should contain run-task: " + cmd);
-        assertTrue(cmd.contains("centurion-forge"), "Should contain app name: " + cmd);
-        assertTrue(cmd.contains("starblaster-forge-DIR-001"), "Should contain task name: " + cmd);
-        assertTrue(cmd.contains("git clone"), "Should contain git clone: " + cmd);
-        assertTrue(cmd.contains("worldmind/DIR-001"), "Should contain branch name: " + cmd);
-        assertTrue(cmd.contains("goose run"), "Should contain goose run: " + cmd);
-        assertTrue(cmd.contains("git push"), "Should contain git push: " + cmd);
+        var call = calls.get(0);
+        assertEquals("centurion-forge", call.appName);
+        assertEquals("starblaster-forge-DIR-001", call.taskName);
+        assertTrue(call.command.contains("git clone"), "Should contain git clone: " + call.command);
+        assertTrue(call.command.contains("worldmind/DIR-001"), "Should contain branch name: " + call.command);
+        assertTrue(call.command.contains("goose run"), "Should contain goose run: " + call.command);
+        assertTrue(call.command.contains("git push"), "Should contain git push: " + call.command);
     }
 
     @Test
     void openStarblasterReturnsCorrectTaskNameFormat() {
-        provider.setCfOutput("Creating task for app centurion-forge...\nOK");
         var request = makeRequest("forge", "DIR-001");
 
         var starblasterId = provider.openStarblaster(request);
@@ -77,19 +74,18 @@ class CloudFoundryStarblasterProviderTest {
     }
 
     @Test
-    void openStarblasterThrowsOnUnknownCenturionType() {
+    void openStarblasterFallsBackToConventionForUnknownType() {
         var request = makeRequest("unknown", "DIR-001");
 
-        var ex = assertThrows(RuntimeException.class, () -> provider.openStarblaster(request));
-        assertTrue(ex.getMessage().contains("Unknown centurion type"),
-                "Should mention unknown type: " + ex.getMessage());
-        assertTrue(ex.getMessage().contains("unknown"),
-                "Should include the bad type: " + ex.getMessage());
+        var starblasterId = provider.openStarblaster(request);
+        assertEquals("starblaster-unknown-DIR-001", starblasterId);
+
+        var call = stubApiClient.createTaskCalls.get(0);
+        assertEquals("centurion-unknown", call.appName);
     }
 
     @Test
     void openStarblasterUsesRequestMemoryWhenProvided() {
-        provider.setCfOutput("OK");
         var request = new StarblasterRequest(
                 "forge", "DIR-002", Path.of("/tmp/project"),
                 "Build something", Map.of(), 8192, 4
@@ -97,13 +93,12 @@ class CloudFoundryStarblasterProviderTest {
 
         provider.openStarblaster(request);
 
-        var cmd = provider.getExecutedCommands().get(0);
-        assertTrue(cmd.contains("8192M"), "Should use request memory: " + cmd);
+        var call = stubApiClient.createTaskCalls.get(0);
+        assertEquals(8192, call.memoryMb);
     }
 
     @Test
     void openStarblasterFallsBackToDefaultMemoryWhenZero() {
-        provider.setCfOutput("OK");
         var request = new StarblasterRequest(
                 "forge", "DIR-003", Path.of("/tmp/project"),
                 "Build something", Map.of(), 0, 2
@@ -111,24 +106,22 @@ class CloudFoundryStarblasterProviderTest {
 
         provider.openStarblaster(request);
 
-        var cmd = provider.getExecutedCommands().get(0);
-        assertTrue(cmd.contains("2048M"), "Should use default memory: " + cmd);
+        var call = stubApiClient.createTaskCalls.get(0);
+        assertEquals(2048, call.memoryMb);
     }
 
     @Test
     void openStarblasterIncludesDiskLimit() {
-        provider.setCfOutput("OK");
         var request = makeRequest("forge", "DIR-004");
 
         provider.openStarblaster(request);
 
-        var cmd = provider.getExecutedCommands().get(0);
-        assertTrue(cmd.contains("4096M"), "Should include disk limit: " + cmd);
+        var call = stubApiClient.createTaskCalls.get(0);
+        assertEquals(4096, call.diskMb);
     }
 
     @Test
     void openStarblasterHandlesCaseInsensitiveCenturionType() {
-        provider.setCfOutput("OK");
         var request = new StarblasterRequest(
                 "FORGE", "DIR-005", Path.of("/tmp/project"),
                 "Build something", Map.of(), 4096, 2
@@ -139,8 +132,8 @@ class CloudFoundryStarblasterProviderTest {
     }
 
     @Test
-    void openStarblasterThrowsOnCfCommandFailure() {
-        provider.setThrowOnCf(true);
+    void openStarblasterThrowsOnApiFailure() {
+        stubApiClient.throwOnCreateTask = true;
         var request = makeRequest("forge", "DIR-001");
 
         assertThrows(RuntimeException.class, () -> provider.openStarblaster(request));
@@ -150,7 +143,7 @@ class CloudFoundryStarblasterProviderTest {
 
     @Test
     void waitForCompletionReturnsZeroWhenTaskSucceeded() {
-        provider.setCfOutput(cfTasksOutput("starblaster-forge-DIR-001", "SUCCEEDED"));
+        stubApiClient.taskState = "SUCCEEDED";
 
         int result = provider.waitForCompletion("starblaster-forge-DIR-001", 30);
 
@@ -159,7 +152,7 @@ class CloudFoundryStarblasterProviderTest {
 
     @Test
     void waitForCompletionReturnsOneWhenTaskFailed() {
-        provider.setCfOutput(cfTasksOutput("starblaster-forge-DIR-001", "FAILED"));
+        stubApiClient.taskState = "FAILED";
 
         int result = provider.waitForCompletion("starblaster-forge-DIR-001", 30);
 
@@ -168,8 +161,7 @@ class CloudFoundryStarblasterProviderTest {
 
     @Test
     void waitForCompletionReturnsMinusOneOnTimeout() {
-        // Always return RUNNING — with 0 timeout, should immediately time out
-        provider.setCfOutput(cfTasksOutput("starblaster-forge-DIR-001", "RUNNING"));
+        stubApiClient.taskState = "RUNNING";
 
         int result = provider.waitForCompletion("starblaster-forge-DIR-001", 0);
 
@@ -178,84 +170,59 @@ class CloudFoundryStarblasterProviderTest {
 
     @Test
     void waitForCompletionPollsUntilSucceeded() {
-        // Simulate RUNNING on first poll, then SUCCEEDED
-        provider.setCfOutputSequence(List.of(
-                cfTasksOutput("starblaster-forge-DIR-001", "RUNNING"),
-                cfTasksOutput("starblaster-forge-DIR-001", "SUCCEEDED")
-        ));
-        // Use minimal poll interval for test speed
-        provider.setPollIntervalMs(10);
+        stubApiClient.taskStateSequence = List.of("RUNNING", "RUNNING", "SUCCEEDED");
 
         int result = provider.waitForCompletion("starblaster-forge-DIR-001", 30);
 
         assertEquals(0, result);
-        assertTrue(provider.getExecutedCommands().size() >= 2,
-                "Should have polled at least twice");
+        assertTrue(stubApiClient.getTaskStateCalls >= 3,
+                "Should have polled at least 3 times, got " + stubApiClient.getTaskStateCalls);
     }
 
     // --- captureOutput tests ---
 
     @Test
-    void captureOutputReturnsLogContent() {
-        var logOutput = """
-                2024-01-01T00:00:00.00+0000 [APP/TASK/starblaster-forge-DIR-001/0] OUT Starting task...
-                2024-01-01T00:00:01.00+0000 [APP/TASK/starblaster-forge-DIR-001/0] OUT Cloning repo...
-                2024-01-01T00:00:05.00+0000 [APP/TASK/starblaster-forge-DIR-001/0] OUT Running goose...
-                2024-01-01T00:00:10.00+0000 [APP/PROC/WEB/0] OUT Health check passed
-                2024-01-01T00:00:15.00+0000 [APP/TASK/starblaster-forge-DIR-001/0] OUT Task complete
-                """;
-        provider.setCfOutput(logOutput);
+    void captureOutputReturnsFailureReasonWhenFailed() {
+        stubApiClient.failureReason = "OOM killed";
 
         var output = provider.captureOutput("starblaster-forge-DIR-001");
 
-        assertNotNull(output);
-        assertFalse(output.isEmpty(), "Should contain log lines");
-        assertTrue(output.contains("APP/TASK"), "Should include task log lines");
+        assertTrue(output.contains("OOM killed"), "Should contain failure reason: " + output);
+    }
+
+    @Test
+    void captureOutputReturnsFallbackWhenNoFailure() {
+        stubApiClient.failureReason = "";
+
+        var output = provider.captureOutput("starblaster-forge-DIR-001");
+
+        assertTrue(output.contains("cf logs"), "Should reference cf logs: " + output);
     }
 
     @Test
     void captureOutputReturnsEmptyStringOnError() {
-        provider.setThrowOnCf(true);
+        stubApiClient.throwOnGetFailureReason = true;
 
         var output = provider.captureOutput("starblaster-forge-DIR-001");
 
         assertEquals("", output);
     }
 
-    @Test
-    void captureOutputFiltersToTaskLines() {
-        var logOutput = """
-                2024-01-01T00:00:00.00+0000 [APP/PROC/WEB/0] OUT Unrelated web log
-                2024-01-01T00:00:01.00+0000 [APP/TASK/starblaster-forge-DIR-001/0] OUT Task log
-                2024-01-01T00:00:02.00+0000 [RTR/0] OUT Router log
-                """;
-        provider.setCfOutput(logOutput);
-
-        var output = provider.captureOutput("starblaster-forge-DIR-001");
-
-        assertTrue(output.contains("Task log"), "Should include task-specific line");
-        assertFalse(output.contains("Unrelated web log"), "Should not include unrelated web log");
-        assertFalse(output.contains("Router log"), "Should not include router log");
-    }
-
     // --- teardownStarblaster tests ---
 
     @Test
-    void teardownStarblasterCallsTerminateTask() {
-        provider.setCfOutput("OK");
-
+    void teardownStarblasterCallsCancelTask() {
         provider.teardownStarblaster("starblaster-forge-DIR-001");
 
-        var commands = provider.getExecutedCommands();
-        assertEquals(1, commands.size());
-        assertTrue(commands.get(0).contains("terminate-task"));
-        assertTrue(commands.get(0).contains("centurion-forge"));
-        assertTrue(commands.get(0).contains("starblaster-forge-DIR-001"));
+        assertEquals(1, stubApiClient.cancelTaskCalls.size());
+        var call = stubApiClient.cancelTaskCalls.get(0);
+        assertEquals("centurion-forge", call.appName);
+        assertEquals("starblaster-forge-DIR-001", call.taskName);
     }
 
     @Test
     void teardownStarblasterDoesNotThrowOnErrors() {
-        provider.setThrowOnCf(true);
+        stubApiClient.throwOnCancelTask = true;
 
         assertDoesNotThrow(() -> provider.teardownStarblaster("starblaster-forge-DIR-001"));
     }
@@ -282,7 +249,6 @@ class CloudFoundryStarblasterProviderTest {
 
     @Test
     void getAppNameFromStarblasterIdHandlesDirectiveIdWithDashes() {
-        // directiveId might contain dashes, e.g. "abc-123-def"
         var appName = provider.getAppNameFromStarblasterId("starblaster-forge-abc-123-def");
         assertEquals("centurion-forge", appName);
     }
@@ -294,57 +260,15 @@ class CloudFoundryStarblasterProviderTest {
     }
 
     @Test
-    void getAppNameFromStarblasterIdThrowsOnUnknownType() {
-        assertThrows(RuntimeException.class, () ->
-                provider.getAppNameFromStarblasterId("starblaster-unknown-DIR-001"));
+    void getAppNameFromStarblasterIdFallsBackForUnknownType() {
+        var appName = provider.getAppNameFromStarblasterId("starblaster-unknown-DIR-001");
+        assertEquals("centurion-unknown", appName);
     }
 
     @Test
     void getAppNameFromStarblasterIdThrowsOnMissingDirectiveId() {
         assertThrows(RuntimeException.class, () ->
                 provider.getAppNameFromStarblasterId("starblaster-"));
-    }
-
-    // --- parseTaskStatus tests ---
-
-    @Test
-    void parseTaskStatusFindsSucceeded() {
-        var output = cfTasksOutput("starblaster-forge-DIR-001", "SUCCEEDED");
-        var status = provider.parseTaskStatus(output, "starblaster-forge-DIR-001");
-        assertEquals("SUCCEEDED", status);
-    }
-
-    @Test
-    void parseTaskStatusFindsRunning() {
-        var output = cfTasksOutput("starblaster-forge-DIR-001", "RUNNING");
-        var status = provider.parseTaskStatus(output, "starblaster-forge-DIR-001");
-        assertEquals("RUNNING", status);
-    }
-
-    @Test
-    void parseTaskStatusFindsFailed() {
-        var output = cfTasksOutput("starblaster-forge-DIR-001", "FAILED");
-        var status = provider.parseTaskStatus(output, "starblaster-forge-DIR-001");
-        assertEquals("FAILED", status);
-    }
-
-    @Test
-    void parseTaskStatusReturnsNullWhenTaskNotFound() {
-        var output = cfTasksOutput("other-task", "SUCCEEDED");
-        var status = provider.parseTaskStatus(output, "starblaster-forge-DIR-001");
-        assertNull(status);
-    }
-
-    @Test
-    void parseTaskStatusReturnsNullOnEmptyOutput() {
-        var status = provider.parseTaskStatus("", "starblaster-forge-DIR-001");
-        assertNull(status);
-    }
-
-    @Test
-    void parseTaskStatusReturnsNullOnNullOutput() {
-        var status = provider.parseTaskStatus(null, "starblaster-forge-DIR-001");
-        assertNull(status);
     }
 
     // --- Helper methods ---
@@ -357,119 +281,64 @@ class CloudFoundryStarblasterProviderTest {
         );
     }
 
-    /**
-     * Generates mock {@code cf tasks} output matching the real CF CLI format.
-     */
-    private String cfTasksOutput(String taskName, String state) {
-        return """
-                Getting tasks for app centurion-forge in org worldmind-org / space production...
-                OK
+    // --- Stub CfApiClient that records calls ---
 
-                id   name                          state       start time                      command
-                3    %s   %s   2024-01-01T00:00:00Z   echo hello
-                """.formatted(taskName, state);
-    }
+    static class StubCfApiClient extends CfApiClient {
 
-    // --- Test subclass that intercepts CF CLI commands ---
+        final List<CreateTaskCall> createTaskCalls = new ArrayList<>();
+        final List<CancelTaskCall> cancelTaskCalls = new ArrayList<>();
+        boolean throwOnCreateTask = false;
+        boolean throwOnCancelTask = false;
+        boolean throwOnGetFailureReason = false;
 
-    /**
-     * Testable subclass of CloudFoundryStarblasterProvider that intercepts CF CLI calls
-     * so we can test logic without a real Cloud Foundry environment.
-     * Follows the same pattern as {@link GitWorkspaceManagerTest.TestableGitWorkspaceManager}.
-     */
-    static class TestableCloudFoundryStarblasterProvider extends CloudFoundryStarblasterProvider {
+        String taskState = "RUNNING";
+        List<String> taskStateSequence = null;
+        int getTaskStateCalls = 0;
 
-        private String cfOutput = "";
-        private boolean throwOnCf = false;
-        private final List<String> executedCommands = new ArrayList<>();
-        private List<String> cfOutputSequence = null;
-        private int sequenceIndex = 0;
-        private long pollIntervalMs = -1; // -1 means use default
+        String failureReason = "";
 
-        TestableCloudFoundryStarblasterProvider(CloudFoundryProperties cfProperties,
-                                              GitWorkspaceManager gitWorkspaceManager) {
-            super(cfProperties, gitWorkspaceManager);
-        }
-
-        void setCfOutput(String output) {
-            this.cfOutput = output;
-            this.cfOutputSequence = null;
-            this.sequenceIndex = 0;
-        }
-
-        void setCfOutputSequence(List<String> outputs) {
-            this.cfOutputSequence = new ArrayList<>(outputs);
-            this.sequenceIndex = 0;
-        }
-
-        void setThrowOnCf(boolean throwOnCf) {
-            this.throwOnCf = throwOnCf;
-        }
-
-        void setPollIntervalMs(long pollIntervalMs) {
-            this.pollIntervalMs = pollIntervalMs;
-        }
-
-        List<String> getExecutedCommands() {
-            return executedCommands;
+        StubCfApiClient(CloudFoundryProperties cfProperties) {
+            super(cfProperties);
         }
 
         @Override
-        String runCf(String... args) {
-            var command = String.join(" ", args);
-            executedCommands.add(command);
-            if (throwOnCf) {
-                throw new RuntimeException("Simulated CF CLI failure: " + command);
+        public String createTask(String appName, String command, String taskName,
+                                 int memoryMb, int diskMb) {
+            if (throwOnCreateTask) {
+                throw new RuntimeException("Simulated CF API failure");
             }
-            if (cfOutputSequence != null && sequenceIndex < cfOutputSequence.size()) {
-                return cfOutputSequence.get(sequenceIndex++);
-            }
-            return cfOutput;
+            createTaskCalls.add(new CreateTaskCall(appName, command, taskName, memoryMb, diskMb));
+            return "fake-task-guid";
         }
 
         @Override
-        int runCfExitCode(String... args) {
-            var command = String.join(" ", args);
-            executedCommands.add(command);
-            if (throwOnCf) {
-                return -1;
+        public String getTaskState(String appName, String taskName) {
+            getTaskStateCalls++;
+            if (taskStateSequence != null && !taskStateSequence.isEmpty()) {
+                int idx = Math.min(getTaskStateCalls - 1, taskStateSequence.size() - 1);
+                return taskStateSequence.get(idx);
             }
-            return 0;
+            return taskState;
         }
 
         @Override
-        public int waitForCompletion(String starblasterId, int timeoutSeconds) {
-            // Override to use a shorter poll interval for tests
-            if (pollIntervalMs >= 0) {
-                return waitForCompletionWithPollInterval(starblasterId, timeoutSeconds, pollIntervalMs);
+        public String getTaskFailureReason(String appName, String taskName) {
+            if (throwOnGetFailureReason) {
+                throw new RuntimeException("Simulated CF API failure");
             }
-            return super.waitForCompletion(starblasterId, timeoutSeconds);
+            return failureReason;
         }
 
-        private int waitForCompletionWithPollInterval(String starblasterId, int timeoutSeconds, long intervalMs) {
-            var appName = getAppNameFromStarblasterId(starblasterId);
-            long deadline = System.currentTimeMillis() + (timeoutSeconds * 1000L);
-
-            while (System.currentTimeMillis() < deadline) {
-                try {
-                    var output = runCf("tasks", appName);
-                    var status = parseTaskStatus(output, starblasterId);
-
-                    if ("SUCCEEDED".equals(status)) {
-                        return 0;
-                    } else if ("FAILED".equals(status)) {
-                        return 1;
-                    }
-
-                    Thread.sleep(intervalMs);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return -1;
-                } catch (Exception e) {
-                    // continue polling
-                }
+        @Override
+        public void cancelTask(String appName, String taskName) {
+            if (throwOnCancelTask) {
+                throw new RuntimeException("Simulated CF API failure");
             }
-            return -1;
+            cancelTaskCalls.add(new CancelTaskCall(appName, taskName));
         }
+
+        record CreateTaskCall(String appName, String command, String taskName,
+                              int memoryMb, int diskMb) {}
+        record CancelTaskCall(String appName, String taskName) {}
     }
 }

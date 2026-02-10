@@ -21,8 +21,14 @@ public class CfStarblasterConfig {
     }
 
     @Bean
+    public CfApiClient cfApiClient(CloudFoundryProperties cfProperties) {
+        return new CfApiClient(cfProperties);
+    }
+
+    @Bean
     public StarblasterProvider cloudFoundryStarblasterProvider(CloudFoundryProperties cfProperties,
-                                                         GitWorkspaceManager gitWorkspaceManager) {
-        return new CloudFoundryStarblasterProvider(cfProperties, gitWorkspaceManager);
+                                                         GitWorkspaceManager gitWorkspaceManager,
+                                                         CfApiClient cfApiClient) {
+        return new CloudFoundryStarblasterProvider(cfProperties, gitWorkspaceManager, cfApiClient);
     }
 }

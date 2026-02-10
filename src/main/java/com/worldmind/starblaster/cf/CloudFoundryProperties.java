@@ -3,6 +3,7 @@ package com.worldmind.starblaster.cf;
 import java.util.HashMap;
 import java.util.Map;
 
+import jakarta.annotation.PostConstruct;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -32,6 +33,16 @@ public class CloudFoundryProperties {
      */
     private Map<String, String> centurionApps = new HashMap<>();
 
+    /** Ensure all centurion types have defaults after property binding */
+    @PostConstruct
+    public void applyDefaults() {
+        centurionApps.putIfAbsent("forge", "centurion-forge");
+        centurionApps.putIfAbsent("gauntlet", "centurion-gauntlet");
+        centurionApps.putIfAbsent("vigil", "centurion-vigil");
+        centurionApps.putIfAbsent("pulse", "centurion-pulse");
+        centurionApps.putIfAbsent("prism", "centurion-prism");
+    }
+
     /** Task timeout in seconds (default 10 minutes) */
     private int taskTimeoutSeconds = 600;
 
@@ -40,6 +51,12 @@ public class CloudFoundryProperties {
 
     /** Task disk limit in MB (default 4 GB) */
     private int taskDiskMb = 4096;
+
+    /** CF username for API authentication (used to obtain UAA token) */
+    private String cfUsername = "";
+
+    /** CF password for API authentication */
+    private String cfPassword = "";
 
     // -- Getters and Setters --
 
@@ -105,5 +122,21 @@ public class CloudFoundryProperties {
 
     public void setTaskDiskMb(int taskDiskMb) {
         this.taskDiskMb = taskDiskMb;
+    }
+
+    public String getCfUsername() {
+        return cfUsername;
+    }
+
+    public void setCfUsername(String cfUsername) {
+        this.cfUsername = cfUsername;
+    }
+
+    public String getCfPassword() {
+        return cfPassword;
+    }
+
+    public void setCfPassword(String cfPassword) {
+        this.cfPassword = cfPassword;
     }
 }

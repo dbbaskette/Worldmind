@@ -20,9 +20,15 @@ spring:
 worldmind:
   starblaster:
     provider: cloudfoundry
+    image-registry: ${CENTURION_IMAGE_REGISTRY:ghcr.io/dbbaskette}
     max-parallel: 3
     wave-cooldown-seconds: 30
   cf:
+    api-url: ${CF_API_URL:}
+    org: ${CF_ORG:}
+    space: ${CF_SPACE:}
+    cf-username: ${CF_USERNAME:}
+    cf-password: ${CF_PASSWORD:}
     centurion-apps:
       forge: ${CENTURION_FORGE_APP:centurion-forge}
       gauntlet: ${CENTURION_GAUNTLET_APP:centurion-gauntlet}

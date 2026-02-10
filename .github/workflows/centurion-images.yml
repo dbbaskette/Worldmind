@@ -1,0 +1,70 @@
+name: Build Centurion Images
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docker/**'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push centurion-base
+        uses: docker/build-push-action@v6
+        with:
+          context: docker/centurion-base
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/centurion-base:latest
+
+      - name: Build and push centurion-forge
+        uses: docker/build-push-action@v6
+        with:
+          context: docker/centurion-forge
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/centurion-forge:latest
+
+      - name: Build and push centurion-gauntlet
+        uses: docker/build-push-action@v6
+        with:
+          context: docker/centurion-gauntlet
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/centurion-gauntlet:latest
+
+      - name: Build and push centurion-vigil
+        uses: docker/build-push-action@v6
+        with:
+          context: docker/centurion-vigil
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/centurion-vigil:latest
+
+      - name: Build and push centurion-pulse
+        uses: docker/build-push-action@v6
+        with:
+          context: docker/centurion-pulse
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/centurion-pulse:latest
+
+      - name: Build and push centurion-prism
+        uses: docker/build-push-action@v6
+        with:
+          context: docker/centurion-prism
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/centurion-prism:latest

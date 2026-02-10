@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { apiClient } from '../api/client'
 import { MissionResponse } from '../api/types'
 
@@ -6,6 +6,10 @@ export function useMission(missionId: string | null) {
   const [mission, setMission] = useState<MissionResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const missionRef = useRef<MissionResponse | null>(null)
+
+  // Keep ref in sync so the interval callback sees current status
+  missionRef.current = mission
 
   const fetchMission = useCallback(async () => {
     if (!missionId) {
@@ -30,15 +34,15 @@ export function useMission(missionId: string | null) {
   useEffect(() => {
     fetchMission()
 
-    // Auto-refresh every 5 seconds if mission is in progress
     const interval = setInterval(() => {
-      if (mission && ['CLASSIFYING', 'UPLOADING', 'PLANNING', 'EXECUTING'].includes(mission.status)) {
+      const current = missionRef.current
+      if (current && ['CLASSIFYING', 'UPLOADING', 'PLANNING', 'EXECUTING'].includes(current.status)) {
         fetchMission()
       }
     }, 5000)
 
     return () => clearInterval(interval)
-  }, [missionId, fetchMission, mission])
+  }, [missionId, fetchMission])
 
   const refresh = useCallback(() => {
     fetchMission()

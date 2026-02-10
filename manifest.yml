@@ -12,11 +12,12 @@ applications:
     env:
       JBP_CONFIG_OPEN_JDK_JRE: '{ jre: { version: 21.+ } }'
       SPRING_PROFILES_ACTIVE: cf
-      worldmind.starblaster.provider: cloudfoundry
-      worldmind.starblaster.image-registry: ((centurion-image-registry))
-      worldmind.cf.api-url: ((cf-api-url))
-      worldmind.cf.org: ((cf-org))
-      worldmind.cf.space: ((cf-space))
+      CENTURION_IMAGE_REGISTRY: ((centurion-image-registry))
+      CF_API_URL: ((cf-api-url))
+      CF_ORG: ((cf-org))
+      CF_SPACE: ((cf-space))
+      CF_USERNAME: ((cf-username))
+      CF_PASSWORD: ((cf-password))
       CENTURION_FORGE_APP: ((centurion-forge-app))
       CENTURION_GAUNTLET_APP: ((centurion-gauntlet-app))
       CENTURION_VIGIL_APP: ((centurion-vigil-app))

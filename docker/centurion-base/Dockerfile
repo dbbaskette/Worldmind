@@ -14,8 +14,11 @@ RUN pip install --no-cache-dir "langfuse>=2.0.0,<3.0.0" && \
 # Verify goose CLI is available and langfuse.decorators is importable
 RUN goose --version && python -c "import langfuse.decorators; print('langfuse OK')"
 
-# Install MCP servers
-RUN npm install -g @modelcontextprotocol/server-filesystem
+# Install MCP servers (retry + longer timeout for cross-platform QEMU builds)
+RUN npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 60000 && \
+    npm config set fetch-retry-maxtimeout 300000 && \
+    npm install -g @modelcontextprotocol/server-filesystem
 
 # Copy entrypoint script (generates profiles.yaml from env vars, then runs goose)
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
