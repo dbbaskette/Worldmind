@@ -5,6 +5,8 @@ import com.worldmind.starblaster.StarblasterRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Base64;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -54,22 +56,32 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
         var directiveId = request.directiveId();
         var taskName = "starblaster-" + type + "-" + directiveId;
         var branchName = gitWorkspaceManager.getBranchName(directiveId);
-        var gitRemoteUrl = cfProperties.getGitRemoteUrl();
+        var gitRemoteUrl = request.gitRemoteUrl() != null && !request.gitRemoteUrl().isBlank()
+                ? request.gitRemoteUrl()
+                : cfProperties.getGitRemoteUrl();
 
         var memoryMb = request.memoryLimitMb() > 0
                 ? request.memoryLimitMb()
                 : cfProperties.getTaskMemoryMb();
         var diskMb = cfProperties.getTaskDiskMb();
 
-        // Build the task command that runs inside the CF app container
+        // Base64-encode the instruction so it survives shell escaping
+        var instructionB64 = Base64.getEncoder().encodeToString(
+                request.instructionText().getBytes(StandardCharsets.UTF_8));
+
+        // Build the task command that runs inside the CF app container.
+        // Clone from default branch, create a directive branch, write the
+        // instruction file (from base64), run Goose, commit, and push.
         var taskCommand = String.join(" && ",
-                "git clone -b %s %s /workspace".formatted(branchName, gitRemoteUrl),
-                "mkdir -p /workspace/.worldmind/directives",
+                "git clone %s /workspace".formatted(gitRemoteUrl),
                 "cd /workspace",
-                "goose run /workspace/.worldmind/directives/%s.md".formatted(directiveId),
+                "git checkout -b %s".formatted(branchName),
+                "mkdir -p .worldmind/directives",
+                "echo '%s' | base64 -d > .worldmind/directives/%s.md".formatted(instructionB64, directiveId),
+                "goose run .worldmind/directives/%s.md".formatted(directiveId),
                 "git add -A",
                 "git commit -m 'DIR-%s'".formatted(directiveId),
-                "git push"
+                "git push -u origin %s".formatted(branchName)
         );
 
         log.info("Opening Starblaster {} for directive {} on app {}", taskName, directiveId, appName);

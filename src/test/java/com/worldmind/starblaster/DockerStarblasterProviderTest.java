@@ -47,7 +47,8 @@ class DockerStarblasterProviderTest {
         var request = new StarblasterRequest(
             "forge", "DIR-001", Path.of("/tmp/project"),
             "Create hello.py", Map.of("GOOSE_PROVIDER", "openai"),
-            4096, 2
+            4096, 2,
+            ""
         );
 
         String containerId = provider.openStarblaster(request);
@@ -66,7 +67,8 @@ class DockerStarblasterProviderTest {
         var request = new StarblasterRequest(
             "vigil", "DIR-002", Path.of("/tmp/project"),
             "Review code", Map.of(),
-            2048, 1
+            2048, 1,
+            ""
         );
 
         provider.openStarblaster(request);
@@ -82,7 +84,8 @@ class DockerStarblasterProviderTest {
         var request = new StarblasterRequest(
             "forge", "DIR-001", Path.of("/tmp/project"),
             "Create hello.py", Map.of(),
-            4096, 2
+            4096, 2,
+            ""
         );
 
         provider.openStarblaster(request);
@@ -102,7 +105,8 @@ class DockerStarblasterProviderTest {
         var request = new StarblasterRequest(
             "forge", "DIR-003", Path.of("/tmp/project"),
             "Build feature", envVars,
-            4096, 2
+            4096, 2,
+            ""
         );
 
         provider.openStarblaster(request);
@@ -123,7 +127,8 @@ class DockerStarblasterProviderTest {
         var request = new StarblasterRequest(
             "forge", "DIR-004", Path.of("/tmp/project"),
             "Create a REST API", Map.of(),
-            4096, 2
+            4096, 2,
+            ""
         );
 
         provider.openStarblaster(request);
@@ -139,7 +144,8 @@ class DockerStarblasterProviderTest {
         var request = new StarblasterRequest(
             "forge", "DIR-005", Path.of("/tmp/project"),
             "Build feature", Map.of(),
-            4096, 2
+            4096, 2,
+            ""
         );
 
         provider.openStarblaster(request);
@@ -155,7 +161,8 @@ class DockerStarblasterProviderTest {
         var request = new StarblasterRequest(
             "forge", "DIR-006", Path.of("/tmp/project"),
             "Build feature", Map.of(),
-            4096, 2
+            4096, 2,
+            ""
         );
 
         provider.openStarblaster(request);

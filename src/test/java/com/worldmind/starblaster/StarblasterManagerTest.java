@@ -38,7 +38,8 @@ class StarblasterManagerTest {
 
         var result = manager.executeDirective(
             "forge", "DIR-001", Path.of("/tmp/test"),
-            "Create file", Map.of()
+            "Create file", Map.of(),
+            ""
         );
 
         verify(provider).openStarblaster(any());
@@ -56,7 +57,8 @@ class StarblasterManagerTest {
 
         var result = manager.executeDirective(
             "forge", "DIR-002", Path.of("/tmp/test"),
-            "Bad instruction", Map.of()
+            "Bad instruction", Map.of(),
+            ""
         );
 
         assertEquals(1, result.exitCode());

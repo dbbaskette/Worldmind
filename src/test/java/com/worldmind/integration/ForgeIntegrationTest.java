@@ -43,7 +43,8 @@ class ForgeIntegrationTest {
             Map.of("GOOSE_PROVIDER", "openai",
                    "GOOSE_MODEL", "qwen2.5-coder-32b",
                    "OPENAI_HOST", "http://host.docker.internal:1234/v1",
-                   "OPENAI_API_KEY", "not-needed")
+                   "OPENAI_API_KEY", "not-needed"),
+            ""
         );
 
         // Verify execution completed

@@ -158,7 +158,13 @@ public class WorldmindState extends AgentState {
 
     @SuppressWarnings("unchecked")
     public List<WaveDispatchResult> waveDispatchResults() {
-        return this.<List<WaveDispatchResult>>value("waveDispatchResults").orElse(List.of());
+        List<?> raw = this.<List<?>>value("waveDispatchResults").orElse(List.of());
+        if (raw.isEmpty()) return List.of();
+        return raw.stream()
+                .map(item -> item instanceof WaveDispatchResult wr ? wr
+                        : item instanceof Map<?, ?> m ? waveDispatchResultFromMap((Map<String, Object>) m)
+                        : (WaveDispatchResult) item)
+                .toList();
     }
 
     // ── List accessors (appender channels) ───────────────────────────
@@ -190,17 +196,35 @@ public class WorldmindState extends AgentState {
 
     @SuppressWarnings("unchecked")
     public List<StarblasterInfo> starblasters() {
-        return this.<List<StarblasterInfo>>value("starblasters").orElse(List.of());
+        List<?> raw = this.<List<?>>value("starblasters").orElse(List.of());
+        if (raw.isEmpty()) return List.of();
+        return raw.stream()
+                .map(item -> item instanceof StarblasterInfo si ? si
+                        : item instanceof Map<?, ?> m ? starblasterInfoFromMap((Map<String, Object>) m)
+                        : (StarblasterInfo) item)
+                .toList();
     }
 
     @SuppressWarnings("unchecked")
     public List<TestResult> testResults() {
-        return this.<List<TestResult>>value("testResults").orElse(List.of());
+        List<?> raw = this.<List<?>>value("testResults").orElse(List.of());
+        if (raw.isEmpty()) return List.of();
+        return raw.stream()
+                .map(item -> item instanceof TestResult tr ? tr
+                        : item instanceof Map<?, ?> m ? testResultFromMap((Map<String, Object>) m)
+                        : (TestResult) item)
+                .toList();
     }
 
     @SuppressWarnings("unchecked")
     public List<ReviewFeedback> reviewFeedback() {
-        return this.<List<ReviewFeedback>>value("reviewFeedback").orElse(List.of());
+        List<?> raw = this.<List<?>>value("reviewFeedback").orElse(List.of());
+        if (raw.isEmpty()) return List.of();
+        return raw.stream()
+                .map(item -> item instanceof ReviewFeedback rf ? rf
+                        : item instanceof Map<?, ?> m ? reviewFeedbackFromMap((Map<String, Object>) m)
+                        : (ReviewFeedback) item)
+                .toList();
     }
 
     @SuppressWarnings("unchecked")
@@ -232,6 +256,66 @@ public class WorldmindState extends AgentState {
                 enumOrNull(FailureStrategy.class, m.get("onFailure")),
                 files,
                 m.get("elapsedMs") instanceof Number n ? n.longValue() : null
+        );
+    }
+
+    private static StarblasterInfo starblasterInfoFromMap(Map<String, Object> m) {
+        return new StarblasterInfo(
+                (String) m.get("containerId"),
+                (String) m.get("centurionType"),
+                (String) m.get("directiveId"),
+                (String) m.get("status"),
+                instantOrNull(m.get("startedAt")),
+                instantOrNull(m.get("completedAt"))
+        );
+    }
+
+    private static java.time.Instant instantOrNull(Object v) {
+        if (v == null) return null;
+        if (v instanceof java.time.Instant i) return i;
+        if (v instanceof String s) return java.time.Instant.parse(s);
+        if (v instanceof Number n) return java.time.Instant.ofEpochMilli(n.longValue());
+        return null;
+    }
+
+    private static TestResult testResultFromMap(Map<String, Object> m) {
+        return new TestResult(
+                (String) m.get("directiveId"),
+                Boolean.TRUE.equals(m.get("passed")),
+                numInt(m.get("totalTests")),
+                numInt(m.get("failedTests")),
+                (String) m.get("output"),
+                numLong(m.get("durationMs"))
+        );
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ReviewFeedback reviewFeedbackFromMap(Map<String, Object> m) {
+        return new ReviewFeedback(
+                (String) m.get("directiveId"),
+                Boolean.TRUE.equals(m.get("approved")),
+                (String) m.get("summary"),
+                m.get("issues") instanceof List<?> l ? (List<String>) l : List.of(),
+                m.get("suggestions") instanceof List<?> l ? (List<String>) l : List.of(),
+                numInt(m.get("score"))
+        );
+    }
+
+    @SuppressWarnings("unchecked")
+    private static WaveDispatchResult waveDispatchResultFromMap(Map<String, Object> m) {
+        List<FileRecord> files = List.of();
+        Object rawFiles = m.get("filesAffected");
+        if (rawFiles instanceof List<?> fl && !fl.isEmpty()) {
+            files = fl.stream()
+                    .map(f -> f instanceof FileRecord fr ? fr : fileRecordFromMap((Map<String, Object>) f))
+                    .toList();
+        }
+        return new WaveDispatchResult(
+                (String) m.get("directiveId"),
+                enumOrNull(DirectiveStatus.class, m.get("status")),
+                files,
+                (String) m.get("output"),
+                numLong(m.get("elapsedMs"))
         );
     }
 

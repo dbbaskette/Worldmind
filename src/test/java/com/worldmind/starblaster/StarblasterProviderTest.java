@@ -16,7 +16,8 @@ class StarblasterProviderTest {
             "Create hello.py that prints hello world",
             Map.of("GOOSE_PROVIDER", "openai"),
             4096,
-            2
+            2,
+            ""
         );
         assertEquals("forge", request.centurionType());
         assertEquals("directive-001", request.directiveId());
@@ -30,7 +31,8 @@ class StarblasterProviderTest {
         var request = new StarblasterRequest(
             "forge", "d-001", Path.of("/tmp"),
             "Build the feature",
-            Map.of(), 2048, 1
+            Map.of(), 2048, 1,
+            ""
         );
         assertEquals("Build the feature", request.instructionText());
     }

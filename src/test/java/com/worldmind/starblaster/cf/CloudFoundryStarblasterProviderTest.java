@@ -88,7 +88,8 @@ class CloudFoundryStarblasterProviderTest {
     void openStarblasterUsesRequestMemoryWhenProvided() {
         var request = new StarblasterRequest(
                 "forge", "DIR-002", Path.of("/tmp/project"),
-                "Build something", Map.of(), 8192, 4
+                "Build something", Map.of(), 8192, 4,
+                ""
         );
 
         provider.openStarblaster(request);
@@ -101,7 +102,8 @@ class CloudFoundryStarblasterProviderTest {
     void openStarblasterFallsBackToDefaultMemoryWhenZero() {
         var request = new StarblasterRequest(
                 "forge", "DIR-003", Path.of("/tmp/project"),
-                "Build something", Map.of(), 0, 2
+                "Build something", Map.of(), 0, 2,
+                ""
         );
 
         provider.openStarblaster(request);
@@ -124,7 +126,8 @@ class CloudFoundryStarblasterProviderTest {
     void openStarblasterHandlesCaseInsensitiveCenturionType() {
         var request = new StarblasterRequest(
                 "FORGE", "DIR-005", Path.of("/tmp/project"),
-                "Build something", Map.of(), 4096, 2
+                "Build something", Map.of(), 4096, 2,
+                ""
         );
 
         var starblasterId = provider.openStarblaster(request);
@@ -277,7 +280,8 @@ class CloudFoundryStarblasterProviderTest {
         return new StarblasterRequest(
                 centurionType, directiveId, Path.of("/tmp/project"),
                 "Build the feature", Map.of("GOOSE_PROVIDER", "anthropic"),
-                4096, 2
+                4096, 2,
+                ""
         );
     }
 

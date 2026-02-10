@@ -71,7 +71,8 @@ public class StarblasterManager {
             String directiveId,
             Path projectPath,
             String instructionText,
-            Map<String, String> extraEnv) {
+            Map<String, String> extraEnv,
+            String gitRemoteUrl) {
 
         // When running inside Docker, use the shared workspace volume path
         // instead of the host project path for directive files and snapshots
@@ -106,7 +107,8 @@ public class StarblasterManager {
         var request = new StarblasterRequest(
             centurionType, directiveId, projectPath,
             instructionText, envVars,
-            properties.getMemoryLimitMb(), properties.getCpuCount()
+            properties.getMemoryLimitMb(), properties.getCpuCount(),
+            gitRemoteUrl
         );
 
         // Write instruction file for Goose CLI (expects a markdown file path, not inline text).
