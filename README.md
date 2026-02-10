@@ -6,6 +6,8 @@
   <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License">
   <img src="https://img.shields.io/badge/Java-21-orange.svg" alt="Java">
   <img src="https://img.shields.io/badge/Spring%20Boot-3.4-green.svg" alt="Spring Boot">
+  <img src="https://img.shields.io/badge/Spring%20AI-1.1-purple.svg" alt="Spring AI">
+  <img src="https://img.shields.io/badge/LangGraph4j-1.8-blue.svg" alt="LangGraph4j">
 </p>
 
 <p align="center">An agentic code assistant that accepts natural language development requests and autonomously plans, implements, tests, and reviews code.</p>
@@ -14,32 +16,36 @@
 
 Software development involves repetitive cycles of planning, coding, testing, and reviewing. Worldmind automates this entire pipeline by combining a deterministic orchestration layer with autonomous coding agents, enabling developers to describe what they want in plain English and receive production-ready, reviewed code.
 
-Worldmind uses a hybrid architecture pairing [LangGraph4j](https://github.com/bsorrentino/langgraph4j) for orchestration with [Goose](https://github.com/block/goose) worker agents running in isolated Docker containers. The control plane classifies requests, scans project context, generates execution plans, and dispatches specialized agents — each with constrained permissions and clear success criteria.
+Worldmind uses a hybrid architecture pairing [LangGraph4j](https://github.com/bsorrentino/langgraph4j) for orchestration with [Goose](https://github.com/block/goose) worker agents running in isolated Docker containers. The control plane classifies requests, scans project context, generates execution plans, and dispatches specialized agents -- each with constrained permissions and clear success criteria.
+
+The LLM layer supports multiple providers -- Anthropic Claude, OpenAI-compatible endpoints (LM Studio, Ollama), and Google Gemini -- configurable per deployment via Spring AI.
 
 The project uses Xandarian Worldmind / Nova Corps nomenclature from Marvel Comics throughout its architecture.
 
 ## Key Features
 
-- **Natural language missions** — Submit development requests in plain English via CLI or REST API
-- **Intelligent classification** — Automatically categorizes requests by complexity and determines execution strategy
-- **Project-aware planning** — Scans your codebase to generate context-aware directives with success criteria
-- **Specialized agents (Centurions)** — Purpose-built workers for code generation, review, testing, research, and refactoring
-- **Sandboxed execution (Starblasters)** — Each agent runs in an isolated Docker container with constrained permissions
-- **Crash-resilient state** — PostgreSQL-backed checkpointing enables recovery and time-travel debugging
-- **Flexible interaction modes** — Full auto, approve-plan, or step-by-step execution
-- **Real-time dashboard** — React web UI with SSE-powered live updates, plan approval, and event logs
-- **REST API** — Full mission lifecycle via HTTP with SSE event streaming
-- **Security hardening** — JWT authentication, command allowlists per centurion type, path restrictions
-- **Observability** — Structured JSON logging, Prometheus metrics, component health checks
-- **Cloud Foundry ready** — Deploy with `cf push` using git-based workspaces and CF task provider
+- **Natural language missions** -- Submit development requests in plain English via CLI, REST API, or web dashboard
+- **Intelligent classification** -- Automatically categorizes requests by complexity and determines execution strategy
+- **Project-aware planning** -- Scans your codebase to generate context-aware directives with success criteria
+- **Specialized agents (Centurions)** -- Purpose-built workers for code generation, review, testing, research, and refactoring
+- **Sandboxed execution (Starblasters)** -- Each agent runs in an isolated Docker container with constrained permissions
+- **Wave-based parallelism** -- Dependency-aware scheduling dispatches independent directives concurrently
+- **Crash-resilient state** -- PostgreSQL-backed checkpointing enables recovery and time-travel debugging
+- **Flexible interaction modes** -- Full auto, approve-plan, or step-by-step execution
+- **Real-time dashboard** -- React web UI with SSE-powered live updates, plan approval, and event logs
+- **REST API** -- Full mission lifecycle via HTTP with SSE event streaming
+- **Security hardening** -- JWT authentication, command allowlists per centurion type, path restrictions
+- **Observability** -- Structured JSON logging, Prometheus metrics, component health checks
+- **Cloud Foundry ready** -- Deploy with `./run.sh cf-push` using git-based workspaces, java-cfenv service auto-binding, and CF task provider
 
 ## Architecture
 
 ```mermaid
 flowchart TB
-    subgraph Dispatch["Dispatch (CLI / REST API)"]
+    subgraph Dispatch["Dispatch Layer"]
         CLI[picocli CLI]
-        REST[Spring Boot REST]
+        REST[REST API]
+        UI[React Dashboard]
     end
 
     subgraph Core["Worldmind Core (LangGraph4j)"]
@@ -47,11 +53,13 @@ flowchart TB
         Upload[Upload Context]
         Plan[Plan Mission]
         Approve{Approval Gate}
-        Execute[Execute Directives]
-        Review[Review & Seal]
+        Schedule[Schedule Waves]
+        Execute[Dispatch Centurions]
+        Converge[Converge Results]
+        Review[Evaluate Seal]
     end
 
-    subgraph Starblasters["Starblasters (Docker Containers)"]
+    subgraph Starblasters["Starblasters (Docker / CF Tasks)"]
         Forge["Forge (Code Gen)"]
         Vigil["Vigil (Review)"]
         Gauntlet["Gauntlet (Test)"]
@@ -69,31 +77,34 @@ flowchart TB
 
     CLI --> Classify
     REST --> Classify
+    UI --> REST
     Classify --> Upload --> Plan --> Approve
-    Approve -->|Approved| Execute
+    Approve -->|Approved| Schedule
+    Schedule --> Execute
     Execute --> Forge & Vigil & Gauntlet & Pulse & Prism
     Forge & Vigil & Gauntlet & Pulse & Prism --> Terrain & Chronicle & Spark
-    Execute --> Review
+    Execute --> Converge --> Review
+    Review -->|More waves| Schedule
     Core -.->|Checkpoint| DB
 ```
 
 ## Built With
 
 **Backend:**
-- [Java 21](https://openjdk.org/projects/jdk/21/) — Virtual threads for parallel agent execution
-- [Spring Boot 3.4](https://spring.io/projects/spring-boot) — Application framework and REST API
-- [Spring AI 1.0](https://spring.io/projects/spring-ai) — Anthropic Claude integration for LLM calls
-- [LangGraph4j 1.8](https://github.com/bsorrentino/langgraph4j) — Stateful graph orchestration (Java port of LangGraph)
-- [Goose](https://github.com/block/goose) — Autonomous coding agent (runs headless in containers)
-- [picocli](https://picocli.info/) — CLI framework with ANSI colors and GraalVM support
-- [Docker](https://www.docker.com/) — Container isolation for worker agents
-- [PostgreSQL 16](https://www.postgresql.org/) — State checkpointing and persistence
+- [Java 21](https://openjdk.org/projects/jdk/21/) -- Virtual threads for parallel agent execution
+- [Spring Boot 3.4](https://spring.io/projects/spring-boot) -- Application framework and REST API
+- [Spring AI 1.1](https://spring.io/projects/spring-ai) -- Multi-provider LLM integration (Anthropic, OpenAI, Google Gemini)
+- [LangGraph4j 1.8](https://github.com/bsorrentino/langgraph4j) -- Stateful graph orchestration (Java port of LangGraph)
+- [Goose](https://github.com/block/goose) -- Autonomous coding agent (runs headless in containers)
+- [picocli](https://picocli.info/) -- CLI framework with ANSI colors and GraalVM support
+- [Docker](https://www.docker.com/) -- Container isolation for worker agents
+- [PostgreSQL 16](https://www.postgresql.org/) -- State checkpointing and persistence
 
 **Frontend:**
-- [React 18](https://react.dev/) — UI framework with hooks and functional components
-- [TypeScript](https://www.typescriptlang.org/) — Type-safe JavaScript
-- [Vite](https://vite.dev/) — Fast build tool and dev server
-- [Tailwind CSS](https://tailwindcss.com/) — Utility-first CSS framework
+- [React 18](https://react.dev/) -- UI framework with hooks and functional components
+- [TypeScript](https://www.typescriptlang.org/) -- Type-safe JavaScript
+- [Vite](https://vite.dev/) -- Fast build tool and dev server
+- [Tailwind CSS](https://tailwindcss.com/) -- Utility-first CSS framework
 
 ## Getting Started
 
@@ -102,7 +113,7 @@ flowchart TB
 - Java 21+ ([download](https://adoptium.net/))
 - Maven 3.9+ ([download](https://maven.apache.org/download.cgi))
 - Docker and Docker Compose ([install guide](https://docs.docker.com/get-docker/))
-- An Anthropic API key ([get one](https://console.anthropic.com/))
+- An LLM API key (Anthropic, OpenAI-compatible, or Google Gemini)
 
 ### Installation
 
@@ -112,112 +123,106 @@ flowchart TB
    cd Worldmind
    ```
 
-2. Start PostgreSQL
-   ```bash
-   docker compose up -d
-   ```
-
-3. Configure environment
+2. Configure environment
    ```bash
    cp .env.example .env
-   # Edit .env with your Anthropic API key
+   # Edit .env with your API key and preferences
    ```
 
-4. Build the project
+3. Start everything with Docker
    ```bash
-   mvn clean package -DskipTests
+   ./run.sh up
    ```
 
-5. Run Worldmind
+   Or start just PostgreSQL and run locally:
    ```bash
-   java -jar target/worldmind-0.1.0-SNAPSHOT.jar mission "Add input validation to the user registration endpoint"
+   docker compose up -d postgres
+   ./run.sh serve
    ```
+
+4. Open the dashboard at `http://localhost:8080`
+
+### Quick Start (CLI)
+
+```bash
+# Submit a mission in full-auto mode
+./run.sh mission "Add input validation to the user registration endpoint"
+
+# Review plan before execution
+./run.sh mission --mode APPROVE_PLAN "Refactor the payment service to use the strategy pattern"
+```
 
 ## Usage
 
 ### Submit a Mission
 
 ```bash
-# Full auto mode (default) — plans and executes without approval
-worldmind mission "Add a REST endpoint for user search with pagination"
+# Full auto mode -- plans and executes without approval
+./run.sh mission "Add a REST endpoint for user search with pagination"
 
-# Approve plan first — review the plan before execution begins
-worldmind mission --mode APPROVE_PLAN "Refactor the payment service to use the strategy pattern"
+# Approve plan first -- review the plan before execution begins
+./run.sh mission --mode APPROVE_PLAN "Refactor the payment service to use the strategy pattern"
 
-# Step by step — approve each directive individually
-worldmind mission --mode STEP_BY_STEP "Migrate the database schema to support multi-tenancy"
+# Step by step -- approve each directive individually
+./run.sh mission --mode STEP_BY_STEP "Migrate the database schema to support multi-tenancy"
 ```
 
 ### Web UI Dashboard
 
-Access the real-time mission monitoring dashboard:
-
 ```bash
-# Start the server in web mode
-worldmind serve
-
-# Or with Spring Boot directly
-java -jar target/worldmind-0.1.0-SNAPSHOT.jar serve
+./run.sh serve
 ```
 
-Then navigate to `http://localhost:8080` in your browser.
+Navigate to `http://localhost:8080` in your browser.
 
 **Features:**
-- **Real-time monitoring** — Live directive status updates via SSE
-- **Plan approval** — Review and approve/cancel plans before execution
-- **Directive details** — View files affected, iterations, elapsed time
-- **Event log** — Color-coded event stream with timestamps
-- **Mission timeline** — Checkpoint history and state transitions
+- **Real-time monitoring** -- Live directive status updates via SSE
+- **Plan approval** -- Review and approve/cancel plans before execution
+- **Directive details** -- View files affected, iterations, elapsed time
+- **Event log** -- Color-coded event stream with timestamps
+- **Mission timeline** -- Checkpoint history and state transitions
 
 ### Centurion Types
 
 Worldmind uses five specialized Centurion agents, each with distinct capabilities:
 
-**FORGE** — Code generation and implementation
-```bash
-worldmind mission "Add user authentication with JWT tokens"
-```
-
-**GAUNTLET** — Test writing and execution (auto-triggered after FORGE)
-```bash
-# Automatically runs tests after FORGE completes
-```
-
-**VIGIL** — Code review and quality assessment (auto-triggered after FORGE)
-```bash
-# Automatically reviews code after FORGE completes
-```
-
-**PULSE** — Read-only research and context gathering
-```bash
-worldmind mission "Analyze the security vulnerabilities in our authentication module"
-```
-
-**PRISM** — Code refactoring with behavioral equivalence verification
-```bash
-worldmind mission "Refactor the InstructionBuilder class to reduce code duplication while maintaining all tests"
-```
+| Centurion | Role | Permissions |
+|-----------|------|-------------|
+| **Forge** | Code generation and implementation | Read/write `src/`, `lib/`, `app/` |
+| **Gauntlet** | Test writing and execution | Read/write `test/`, `tests/`, `spec/` |
+| **Vigil** | Code review and quality assessment | Read-only |
+| **Pulse** | Research and context gathering | Read-only |
+| **Prism** | Refactoring with behavioral equivalence | Read/write `src/`, `lib/`, `app/` |
 
 ### Other Commands
 
 ```bash
-worldmind status          # Show current mission status
-worldmind health          # Check system health (DB, Docker, LLM)
-worldmind history         # List past missions
-worldmind inspect <id>    # View detailed mission state
-worldmind log             # View mission execution logs
-worldmind timeline <id>   # Show checkpoint history for a mission
+./run.sh serve               # Start HTTP server + React dashboard
+./run.sh status              # Show current mission status
+./run.sh health              # Check system health (DB, Docker, LLM)
+./run.sh history             # List past missions
+./run.sh inspect <id>        # View detailed mission state
+./run.sh log                 # View mission execution logs
+./run.sh timeline <id>       # Show checkpoint history for a mission
+./run.sh up                  # Start everything in Docker
+./run.sh down                # Stop all Docker services
+./run.sh cf-push             # Build and push to Cloud Foundry
 ```
 
 ## Environment Variables
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
-| `ANTHROPIC_API_KEY` | Anthropic API key for Claude | - | Yes |
+| `ANTHROPIC_API_KEY` | Anthropic API key for Claude | -- | Yes (if using Anthropic) |
 | `DATABASE_URL` | PostgreSQL connection string | `jdbc:postgresql://localhost:5432/worldmind` | No |
 | `DB_USER` | Database username | `worldmind` | No |
 | `DB_PASSWORD` | Database password | `worldmind` | No |
-| `GOOSE_MODEL` | Model for Goose worker agents | `claude-sonnet-4-5-20250929` | No |
+| `GOOSE_MODEL` | Model for Goose worker agents | `qwen2.5-coder-32b` | No |
+| `GOOSE_PROVIDER` | LLM provider (`openai`, `anthropic`) | `openai` | No |
+| `LM_STUDIO_URL` | OpenAI-compatible endpoint URL | `http://host.docker.internal:1234/v1` | No |
+| `STARBLASTER_PROVIDER` | Container provider (`docker`, `cloudfoundry`) | `docker` | No |
+| `WORLDMIND_PROFILE` | Spring profile | `local` | No |
+| `WORLDMIND_PORT` | Server port | `8080` | No |
 
 ## REST API
 
@@ -236,6 +241,64 @@ All endpoints are under `/api/v1`.
 | `GET` | `/starblasters` | List active starblasters |
 | `GET` | `/health` | Component health status |
 
+### Example: Submit a Mission
+
+```bash
+curl -X POST http://localhost:8080/api/v1/missions \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "request": "Add input validation to the user registration endpoint",
+    "mode": "APPROVE_PLAN",
+    "project_path": "/path/to/project",
+    "git_remote_url": "https://github.com/org/repo.git"
+  }'
+```
+
+## Docker
+
+### Development Mode
+
+```bash
+# Start all services (PostgreSQL + Worldmind)
+./run.sh up
+
+# Start just PostgreSQL
+docker compose up -d postgres
+
+# Stop everything
+./run.sh down
+```
+
+### Centurion Images
+
+Centurion Docker images are located in `docker/`:
+
+```
+docker/
+├── centurion-base/        # Shared base with Goose + entrypoint
+├── centurion-forge/       # Code generation
+├── centurion-gauntlet/    # Test execution
+├── centurion-vigil/       # Code review
+├── centurion-pulse/       # Research (read-only)
+└── centurion-prism/       # Refactoring
+```
+
+## Cloud Foundry Deployment
+
+Worldmind supports Cloud Foundry deployment using CF tasks and git-based workspace coordination.
+
+```bash
+./run.sh cf-push
+```
+
+**Required services:**
+- `worldmind-postgres` -- PostgreSQL (auto-bound via java-cfenv)
+- `worldmind-model` -- OpenAI-compatible LLM (auto-bound via CfModelServiceProcessor)
+
+On CF, centurions share work through git branches instead of Docker volumes. The orchestrator creates a mission branch, centurions clone and push changes, and results are merged on completion.
+
+See [docs/deployment/cloudfoundry.md](docs/deployment/cloudfoundry.md) for the full deployment guide.
+
 ## Project Structure
 
 ```
@@ -250,7 +313,7 @@ src/main/java/com/worldmind/
 │   ├── logging/MdcContext.java            # SLF4J MDC context helper
 │   ├── metrics/WorldmindMetrics.java      # Micrometer/Prometheus metrics
 │   ├── model/                             # Domain records (16 records and enums)
-│   ├── nodes/                             # Graph nodes (9 — Classify through Converge)
+│   ├── nodes/                             # Graph nodes (classify, plan, dispatch, seal...)
 │   ├── persistence/                       # JdbcCheckpointSaver + CheckpointQueryService
 │   ├── scanner/ProjectScanner.java        # Codebase analysis and context extraction
 │   ├── scheduler/                         # Wave scheduling + oscillation detection
@@ -261,42 +324,35 @@ src/main/java/com/worldmind/
 │   ├── api/                               # REST controllers + SSE streaming
 │   └── cli/                               # picocli commands (11 commands)
 └── starblaster/
-    ├── DockerStarblasterProvider.java         # Docker container lifecycle
+    ├── DockerStarblasterProvider.java     # Docker container lifecycle
     ├── InstructionBuilder.java            # Centurion instruction templating
-    ├── StarblasterBridge.java                # Dispatch orchestration
-    └── cf/                                # Cloud Foundry task provider
+    ├── StarblasterBridge.java             # Dispatch orchestration
+    └── cf/                                # Cloud Foundry task provider + java-cfenv
 
 worldmind-ui/                              # React 18 + TypeScript + Vite + Tailwind
 ├── src/
 │   ├── api/                               # REST client and SSE hooks
-│   ├── components/                        # 9 React components (MissionForm, EventLog, ...)
+│   ├── components/                        # 9 React components
 │   ├── hooks/                             # useMission, useSse custom hooks
 │   └── utils/                             # Constants and formatting helpers
 └── dist/                                  # Production build output
-
-docker/                                    # Centurion container images
-├── centurion-base/                        # Shared base with Goose + entrypoint
-├── centurion-forge/                       # Code generation
-├── centurion-gauntlet/                    # Test execution
-├── centurion-vigil/                       # Code review
-├── centurion-pulse/                       # Research (read-only)
-└── centurion-prism/                       # Refactoring
 ```
 
 ## Roadmap
 
 - [x] Project scaffold (Maven, records, Docker Compose)
-- [x] Planning pipeline (classify → upload → plan)
-- [x] PostgreSQL checkpointing
-- [x] CLI with mission submission
+- [x] Planning pipeline (classify, upload context, plan)
+- [x] PostgreSQL checkpointing with time-travel debugging
+- [x] CLI with mission submission and management
 - [x] Centurions (Forge, Gauntlet, Vigil, Pulse, Prism) in Docker with Goose
 - [x] Build-test-fix loop with Seal of Approval quality gate
 - [x] Wave-based parallel fan-out with dependency-aware scheduling
-- [x] REST API with SSE streaming and watch mode
+- [x] REST API with SSE streaming
 - [x] Security hardening (JWT auth, command allowlists, path restrictions)
 - [x] Structured logging, Prometheus metrics, health checks
-- [x] React-based web UI dashboard with real-time monitoring
-- [x] Cloud Foundry deployment support
+- [x] React web UI dashboard with real-time monitoring
+- [x] Cloud Foundry deployment with java-cfenv and git workspaces
+- [x] Multi-provider LLM support (Anthropic, OpenAI, Google Gemini)
 - [ ] MCP server integration (Terrain, Chronicle, Spark)
 - [ ] Multi-project workspace support
 - [ ] GraalVM native image compilation
