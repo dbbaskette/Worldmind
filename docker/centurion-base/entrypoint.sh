@@ -1,12 +1,14 @@
-#!/bin/bash
-# Centurion container entrypoint
-# Generates Goose profiles.yaml from environment variables, then runs goose.
+#!/bin/sh
+# Centurion container entrypoint — Goose v1.x (Rust)
+# Generates config.yaml from environment variables, then runs goose.
 #
 # In Cloud Foundry: parses VCAP_SERVICES for GenAI tile credentials.
 # Locally: uses GOOSE_PROVIDER, GOOSE_MODEL, and provider-specific env vars.
+#
+# NOTE: Must be fully POSIX-compatible — CF tasks eval this under /bin/sh.
 
 GOOSE_CONFIG_DIR="${HOME}/.config/goose"
-PROFILES_FILE="$GOOSE_CONFIG_DIR/profiles.yaml"
+CONFIG_FILE="$GOOSE_CONFIG_DIR/config.yaml"
 
 mkdir -p "$GOOSE_CONFIG_DIR"
 
@@ -51,96 +53,94 @@ for label in vcap:
     API_KEY="${API_KEY:-}"
     API_URL="${API_URL:-}"
 
-    # Set provider-specific env vars for Goose
-    if [ "$PROVIDER" = "openai" ]; then
-        [ -n "$API_KEY" ] && export OPENAI_API_KEY="$API_KEY"
-        if [ -n "$API_URL" ]; then
-            # Goose uses OPENAI_HOST for custom endpoints.
-            # Trailing slash is required so URL path joins correctly
-            # (e.g. .../openai/ + v1/chat vs .../openaiv1/chat).
-            export OPENAI_HOST="${API_URL%/}/"
-        fi
-    elif [ "$PROVIDER" = "anthropic" ]; then
-        [ -n "$API_KEY" ] && export ANTHROPIC_API_KEY="$API_KEY"
-    elif [ "$PROVIDER" = "google" ]; then
-        [ -n "$API_KEY" ] && export GOOGLE_API_KEY="$API_KEY"
-    fi
-
     echo "[entrypoint] CF config: provider=$PROVIDER, model=$MODEL, api_url=${API_URL:-N/A}"
 else
-    # --- Local/Docker environment (existing logic) ---
+    # --- Local/Docker environment ---
     PROVIDER="${GOOSE_PROVIDER:-openai}"
     MODEL="${GOOSE_MODEL:-qwen2.5-coder-32b}"
+    API_KEY="${GOOSE_PROVIDER__API_KEY:-}"
+    API_URL="${GOOSE_PROVIDER__HOST:-}"
 fi
 
 # Allow explicit env vars to override CF-detected values
 PROVIDER="${GOOSE_PROVIDER:-$PROVIDER}"
 MODEL="${GOOSE_MODEL:-$MODEL}"
 
-cat > "$PROFILES_FILE" <<EOF
-default:
-  provider: $PROVIDER
-  processor: $MODEL
-  accelerator: $MODEL
-  moderator: none
-  toolkits:
-    - name: developer
-      requires: {}
-EOF
+# Export Goose v1.x environment variables
+export GOOSE_PROVIDER="$PROVIDER"
+export GOOSE_MODEL="$MODEL"
+export GOOSE_MODE=auto
+export GOOSE_CONTEXT_STRATEGY=summarize
+export GOOSE_MAX_TURNS=50
+
+# Set provider auth via Goose v1.x env vars
+if [ "$PROVIDER" = "openai" ]; then
+    [ -n "$API_KEY" ] && export GOOSE_PROVIDER__API_KEY="$API_KEY"
+    [ -n "$API_URL" ] && export GOOSE_PROVIDER__HOST="${API_URL%/}/"
+elif [ "$PROVIDER" = "anthropic" ]; then
+    [ -n "$API_KEY" ] && export GOOSE_PROVIDER__API_KEY="$API_KEY"
+elif [ "$PROVIDER" = "google" ]; then
+    [ -n "$API_KEY" ] && export GOOSE_PROVIDER__API_KEY="$API_KEY"
+fi
+
+# Write config.yaml with developer extension
+cat > "$CONFIG_FILE" <<CFGEOF
+extensions:
+  - type: builtin
+    name: developer
+CFGEOF
+
+# Add MCP server extensions (injected by Worldmind orchestrator)
+if [ -n "$MCP_SERVERS" ]; then
+  OLDIFS="$IFS"
+  IFS=','
+  for SERVER in $MCP_SERVERS; do
+    IFS="$OLDIFS"
+    URL_VAR="MCP_SERVER_${SERVER}_URL"
+    TOKEN_VAR="MCP_SERVER_${SERVER}_TOKEN"
+    eval "URL=\${$URL_VAR}"
+    eval "TOKEN=\${$TOKEN_VAR}"
+    if [ -n "$URL" ]; then
+      NAME=$(echo "$SERVER" | tr '[:upper:]' '[:lower:]')
+      if [ -n "$TOKEN" ]; then
+        export "${TOKEN_VAR}"
+        cat >> "$CONFIG_FILE" <<MCP_EOF
+  - type: streamable_http
+    name: ${NAME}
+    uri: ${URL}
+    headers:
+      Authorization: "Bearer \${${TOKEN_VAR}}"
+    env_keys:
+      - ${TOKEN_VAR}
+MCP_EOF
+      else
+        cat >> "$CONFIG_FILE" <<MCP_EOF
+  - type: streamable_http
+    name: ${NAME}
+    uri: ${URL}
+MCP_EOF
+      fi
+      echo "[entrypoint] MCP extension '${NAME}' configured: ${URL}"
+    fi
+  done
+  IFS="$OLDIFS"
+fi
 
 echo "[entrypoint] Goose config written: provider=$PROVIDER, model=$MODEL"
 
-# MCP server extensions for Goose (injected by Worldmind orchestrator).
-# NOTE: Must be POSIX-compatible — CF tasks eval this under /bin/sh, not bash.
-# Only add extensions if the installed Goose version supports them
-# (goose-ai Profile class must accept 'extensions' kwarg).
-if [ -n "$MCP_SERVERS" ]; then
-  if python3 -c "from goose.cli.config import Profile; Profile(provider='test',processor='test',accelerator='test',moderator='passive',toolkits=[],extensions={})" 2>/dev/null; then
-    echo "  extensions:" >> "$PROFILES_FILE"
-    OLDIFS="$IFS"
-    IFS=','
-    for SERVER in $MCP_SERVERS; do
-      IFS="$OLDIFS"
-      URL_VAR="MCP_SERVER_${SERVER}_URL"
-      TOKEN_VAR="MCP_SERVER_${SERVER}_TOKEN"
-      eval "URL=\${$URL_VAR}"
-      eval "TOKEN=\${$TOKEN_VAR}"
-      if [ -n "$URL" ]; then
-        NAME=$(echo "$SERVER" | tr '[:upper:]' '[:lower:]')
-        cat >> "$PROFILES_FILE" <<MCP_EOF
-    ${NAME}:
-      name: ${NAME}
-      type: streamablehttp
-      uri: ${URL}
-MCP_EOF
-        if [ -n "$TOKEN" ]; then
-          export "${TOKEN_VAR}"
-          cat >> "$PROFILES_FILE" <<MCP_TOKEN_EOF
-      env_keys:
-        - ${TOKEN_VAR}
-MCP_TOKEN_EOF
-        fi
-        echo "[entrypoint] MCP extension '${NAME}' configured: ${URL}"
-      fi
-    done
-    IFS="$OLDIFS"
-  else
-    echo "[entrypoint] Goose version does not support MCP extensions, skipping"
-  fi
-fi
-
-# Append CF platform CA certs to Python's trust store (internal CAs use self-signed certs)
+# Append CF platform CA certs to system trust store (for Rust TLS)
 if [ -n "$CF_SYSTEM_CERT_PATH" ]; then
-    python3 -c "
-import certifi, glob, os
-p = certifi.where()
-certs = glob.glob(os.environ['CF_SYSTEM_CERT_PATH'] + '/*.crt')
-if certs:
-    with open(p, 'a') as f:
-        for c in certs:
-            f.write(open(c).read())
-    print(f'[entrypoint] Appended {len(certs)} CF CA certs to {p}')
-" 2>/dev/null || true
+    COMBINED_CERTS="/tmp/ca-certificates.crt"
+    if [ -f /etc/ssl/certs/ca-certificates.crt ]; then
+        cp /etc/ssl/certs/ca-certificates.crt "$COMBINED_CERTS"
+    else
+        : > "$COMBINED_CERTS"
+    fi
+    for cert in "$CF_SYSTEM_CERT_PATH"/*.crt; do
+        [ -f "$cert" ] && cat "$cert" >> "$COMBINED_CERTS"
+    done
+    export SSL_CERT_FILE="$COMBINED_CERTS"
+    echo "[entrypoint] Appended CF CA certs to $COMBINED_CERTS"
 fi
 
 exec goose run "$@"

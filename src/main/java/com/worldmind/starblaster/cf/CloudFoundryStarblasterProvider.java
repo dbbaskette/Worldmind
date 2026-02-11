@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * Cloud Foundry-based StarblasterProvider for production deployments.
@@ -89,34 +90,26 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
 
         // Build the task command that runs inside the CF app container.
         // CF tasks bypass Docker ENTRYPOINT, so we source entrypoint.sh
-        // (minus its final 'exec goose run' line) to set up OPENAI_API_KEY,
-        // Goose profiles.yaml, etc. from VCAP_SERVICES.
-        // Goose wrapper: patches SSL (CF Docker lacks CA certs) and httpx auth
-        // (exchange library sends Basic auth instead of Bearer — Tanzu proxy rejects it).
-        // Exec's goose in-process so patches take effect. Base64-encoded to avoid escaping.
-        var gooseWrapper = "aW1wb3J0IHNzbDtvPXNzbC5jcmVhdGVfZGVmYXVsdF9jb250ZXh0CmRlZiBuKCphLCoq"
-                + "ayk6Yz1vKCphLCoqayk7Yy5jaGVja19ob3N0bmFtZT0wO2MudmVyaWZ5X21vZGU9c3Ns"
-                + "LkNFUlRfTk9ORTtyZXR1cm4gYwpzc2wuY3JlYXRlX2RlZmF1bHRfY29udGV4dD1uO3Nz"
-                + "bC5fY3JlYXRlX2RlZmF1bHRfaHR0cHNfY29udGV4dD1zc2wuX2NyZWF0ZV91bnZlcmlm"
-                + "aWVkX2NvbnRleHQKaW1wb3J0IGh0dHB4O2k9aHR0cHguQ2xpZW50Ll9faW5pdF9fCmRl"
-                + "ZiBwKHMsKmEsKiprKToKIGF1PWsuZ2V0KCdhdXRoJykKIGlmIHR5cGUoYXUpPT10dXBs"
-                + "ZSBhbmQgbGVuKGF1KT09MiBhbmQgYXVbMF09PSdCZWFyZXInOmRlbCBrWydhdXRoJ107"
-                + "aD1kaWN0KGsuZ2V0KCdoZWFkZXJzJylvcnt9KTtoWydBdXRob3JpemF0aW9uJ109J0Jl"
-                + "YXJlciAnK2F1WzFdO2tbJ2hlYWRlcnMnXT1oCiBpKHMsKmEsKiprKQpodHRweC5DbGll"
-                + "bnQuX19pbml0X189cAppbXBvcnQgc3lzO3N5cy5hcmd2PVsnZ29vc2UnLCdydW4nLHN5"
-                + "cy5hcmd2WzFdXTtleGVjKG9wZW4oJy91c3IvbG9jYWwvYmluL2dvb3NlJykucmVhZCgp"
-                + "KQo=";
+        // (minus its final 'exec goose run' line) to set up GOOSE_PROVIDER,
+        // GOOSE_MODEL, config.yaml, SSL certs, etc. from VCAP_SERVICES.
+        // Goose v1.x (Rust binary) handles SSL and auth natively.
+
+        // Export MCP env vars into the CF task shell so entrypoint.sh can generate Goose extensions
+        var mcpExports = request.envVars().entrySet().stream()
+                .filter(e -> e.getKey().startsWith("MCP_"))
+                .map(e -> "export %s='%s'".formatted(e.getKey(), e.getValue().replace("'", "\\'")))
+                .collect(Collectors.joining(" && "));
 
         var taskCommand = String.join(" && ",
-                // Source entrypoint.sh for VCAP_SERVICES env setup; fix OPENAI_HOST trailing slash
-                "eval \"$(sed '$d' /usr/local/bin/entrypoint.sh)\" && { [ -z \"$OPENAI_HOST\" ] || export OPENAI_HOST=\"${OPENAI_HOST%/}/\"; }",
-                // Write goose wrapper script (SSL + auth patches)
-                "echo '%s' | base64 -d > /tmp/g.py".formatted(gooseWrapper),
+                // Export MCP server env vars (no-op if none configured)
+                mcpExports.isEmpty() ? "true" : mcpExports,
+                // Source entrypoint.sh for VCAP_SERVICES env setup and config.yaml generation
+                "eval \"$(sed '$d' /usr/local/bin/entrypoint.sh)\"",
                 "git clone %s /workspace && cd /workspace".formatted(gitRemoteUrl),
                 "git config user.name 'Worldmind Centurion' && git config user.email 'centurion@worldmind.local'",
                 "git checkout -B %s".formatted(branchName),
                 "mkdir -p .worldmind/directives && curl --retry 3 -fk '%s' > .worldmind/directives/%s.md".formatted(instructionUrl, directiveId),
-                "python3 /tmp/g.py .worldmind/directives/%s.md".formatted(directiveId),
+                "goose run --no-session -i .worldmind/directives/%s.md".formatted(directiveId),
                 "git add -A && git commit -m '%s' && git push -uf origin %s".formatted(directiveId, branchName)
         );
 
