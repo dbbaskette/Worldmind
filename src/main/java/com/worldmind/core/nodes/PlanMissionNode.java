@@ -131,9 +131,6 @@ public class PlanMissionNode {
                 - Non-Goals: %s
                 - Technical Requirements: %s
                 - Acceptance Criteria: %s
-
-                Use this specification to generate focused, well-scoped directives
-                that address the goals and meet the acceptance criteria.
                 """,
                 spec.title(),
                 spec.overview(),
@@ -142,6 +139,38 @@ public class PlanMissionNode {
                 String.join("; ", spec.technicalRequirements()),
                 String.join("; ", spec.acceptanceCriteria())
             ));
+
+            if (spec.components() != null && !spec.components().isEmpty()) {
+                sb.append("\nComponents:\n");
+                for (var comp : spec.components()) {
+                    sb.append("  - ").append(comp.name()).append(": ").append(comp.responsibility()).append("\n");
+                    if (comp.affectedFiles() != null && !comp.affectedFiles().isEmpty()) {
+                        sb.append("    Affected files: ").append(String.join(", ", comp.affectedFiles())).append("\n");
+                    }
+                    if (comp.behaviorExpectations() != null && !comp.behaviorExpectations().isEmpty()) {
+                        sb.append("    Behavior: ").append(String.join("; ", comp.behaviorExpectations())).append("\n");
+                    }
+                    if (comp.integrationPoints() != null && !comp.integrationPoints().isEmpty()) {
+                        sb.append("    Integration points: ").append(String.join(", ", comp.integrationPoints())).append("\n");
+                    }
+                }
+            }
+
+            if (spec.edgeCases() != null && !spec.edgeCases().isEmpty()) {
+                sb.append("\nEdge Cases: ").append(String.join("; ", spec.edgeCases())).append("\n");
+            }
+
+            if (spec.outOfScopeAssumptions() != null && !spec.outOfScopeAssumptions().isEmpty()) {
+                sb.append("\nOut-of-Scope Assumptions: ").append(String.join("; ", spec.outOfScopeAssumptions())).append("\n");
+            }
+
+            sb.append("""
+
+                Use this specification to generate focused, well-scoped directives
+                that address the goals and meet the acceptance criteria.
+                Use the component breakdown to create targeted directives with
+                specific file paths and behavioral expectations.
+                """);
         });
 
         return sb.toString();

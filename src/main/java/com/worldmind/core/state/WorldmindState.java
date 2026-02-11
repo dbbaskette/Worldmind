@@ -128,13 +128,32 @@ public class WorldmindState extends AgentState {
             if (obj instanceof ProductSpec ps) return ps;
             if (obj instanceof Map<?, ?> m) {
                 var map = (Map<String, Object>) m;
+                List<ProductSpec.ComponentSpec> components = List.of();
+                if (map.get("components") instanceof List<?> cl && !cl.isEmpty()) {
+                    components = cl.stream()
+                            .map(c -> {
+                                if (c instanceof ProductSpec.ComponentSpec cs) return cs;
+                                var cm = (Map<String, Object>) c;
+                                return new ProductSpec.ComponentSpec(
+                                    (String) cm.get("name"),
+                                    (String) cm.get("responsibility"),
+                                    cm.get("affectedFiles") instanceof List<?> l ? (List<String>) l : List.of(),
+                                    cm.get("behaviorExpectations") instanceof List<?> l ? (List<String>) l : List.of(),
+                                    cm.get("integrationPoints") instanceof List<?> l ? (List<String>) l : List.of()
+                                );
+                            })
+                            .toList();
+                }
                 return new ProductSpec(
                     (String) map.get("title"),
                     (String) map.get("overview"),
                     map.get("goals") instanceof List<?> l ? (List<String>) l : List.of(),
                     map.get("nonGoals") instanceof List<?> l ? (List<String>) l : List.of(),
                     map.get("technicalRequirements") instanceof List<?> l ? (List<String>) l : List.of(),
-                    map.get("acceptanceCriteria") instanceof List<?> l ? (List<String>) l : List.of()
+                    map.get("acceptanceCriteria") instanceof List<?> l ? (List<String>) l : List.of(),
+                    components,
+                    map.get("edgeCases") instanceof List<?> l ? (List<String>) l : List.of(),
+                    map.get("outOfScopeAssumptions") instanceof List<?> l ? (List<String>) l : List.of()
                 );
             }
             return (ProductSpec) obj;

@@ -7,6 +7,7 @@ import com.worldmind.core.model.DirectiveStatus;
 import com.worldmind.core.model.FailureStrategy;
 import com.worldmind.core.model.MissionPlan;
 import com.worldmind.core.model.MissionStatus;
+import com.worldmind.core.model.ProductSpec;
 import com.worldmind.core.model.ProjectContext;
 import com.worldmind.core.state.WorldmindState;
 import org.junit.jupiter.api.DisplayName;
@@ -246,5 +247,58 @@ class PlanMissionNodeTest {
         assertTrue(result.containsKey("directives"));
         assertTrue(result.containsKey("executionStrategy"));
         assertTrue(result.containsKey("status"));
+    }
+
+    @Test
+    @DisplayName("includes component details, edge cases, and out-of-scope assumptions in LLM prompt")
+    void includesNewSpecFieldsInPrompt() {
+        var mockLlm = mock(LlmService.class);
+        var plan = new MissionPlan(
+                "Stub",
+                "sequential",
+                List.of(
+                        new MissionPlan.DirectivePlan("VIGIL", "Review", "", "Done", List.of())
+                )
+        );
+        when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
+
+        var spec = new ProductSpec(
+                "Auth Feature", "Add authentication",
+                List.of("Secure login"), List.of("No SSO"),
+                List.of("Spring Security"), List.of("Login works"),
+                List.of(new ProductSpec.ComponentSpec(
+                        "LoginController",
+                        "Handles login requests",
+                        List.of("src/main/java/LoginController.java"),
+                        List.of("Returns 200 on valid credentials"),
+                        List.of("UserService", "TokenProvider")
+                )),
+                List.of("Empty password returns 400"),
+                List.of("Database is already configured")
+        );
+
+        var node = new PlanMissionNode(mockLlm, null);
+        var state = new WorldmindState(Map.of(
+                "request", "Add authentication",
+                "classification", new Classification("feature", 3, List.of("auth"), "sequential", "java"),
+                "projectContext", new ProjectContext(".", List.of(), "java", "spring-boot", Map.of(), 25, "test"),
+                "productSpec", spec
+        ));
+
+        node.apply(state);
+
+        verify(mockLlm).structuredCall(
+                anyString(),
+                argThat(prompt ->
+                        prompt.contains("LoginController") &&
+                        prompt.contains("Handles login requests") &&
+                        prompt.contains("src/main/java/LoginController.java") &&
+                        prompt.contains("Returns 200 on valid credentials") &&
+                        prompt.contains("UserService") &&
+                        prompt.contains("Empty password returns 400") &&
+                        prompt.contains("Database is already configured")
+                ),
+                eq(MissionPlan.class)
+        );
     }
 }

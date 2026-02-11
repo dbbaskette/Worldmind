@@ -14,5 +14,17 @@ public record ProductSpec(
     List<String> goals,
     List<String> nonGoals,
     List<String> technicalRequirements,
-    List<String> acceptanceCriteria
-) implements Serializable {}
+    List<String> acceptanceCriteria,
+    List<ComponentSpec> components,
+    List<String> edgeCases,
+    List<String> outOfScopeAssumptions
+) implements Serializable {
+
+    public record ComponentSpec(
+        String name,
+        String responsibility,
+        List<String> affectedFiles,
+        List<String> behaviorExpectations,
+        List<String> integrationPoints
+    ) implements Serializable {}
+}

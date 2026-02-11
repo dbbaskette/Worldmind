@@ -53,7 +53,8 @@ class CheckpointerTest {
         when(mockLlm.structuredCall(anyString(), anyString(), eq(ProductSpec.class)))
                 .thenReturn(new ProductSpec(
                         "Test Spec", "Overview", List.of("Goal 1"), List.of("Non-goal 1"),
-                        List.of("Req 1"), List.of("Criterion 1")
+                        List.of("Req 1"), List.of("Criterion 1"),
+                        List.of(), List.of(), List.of()
                 ));
 
         mockScanner = mock(ProjectScanner.class);

@@ -29,15 +29,28 @@ public class GenerateSpecNode {
 
     private static final String SYSTEM_PROMPT = """
             You are a product specification writer for Worldmind, an agentic code assistant.
-            Given a user request, its classification, and project context, produce a clear,
-            structured product specification that will guide the mission planner.
+            Given a user request, its classification, and project context, produce a detailed,
+            implementation-ready product specification. This spec will be the sole input for
+            autonomous agents that implement, test, and review the work — they cannot ask
+            follow-up questions, so the spec must be unambiguous and complete.
 
             The specification should:
-            1. Clearly state the title and overview of what is being built or changed
-            2. List concrete, measurable goals
-            3. Explicitly call out non-goals to prevent scope creep
-            4. Identify technical requirements and constraints
-            5. Define acceptance criteria that can be objectively verified
+            1. Title and overview: what is being built or changed, and why
+            2. Goals: concrete, measurable outcomes (not vague aspirations)
+            3. Non-goals: explicitly prevent scope creep
+            4. Components: break the work into discrete components, each with:
+               - Name and responsibility (what this component does)
+               - Affected files (exact paths from the project file tree)
+               - Behavior expectations (what should happen, with specific inputs/outputs)
+               - Integration points (what other components or APIs this touches)
+            5. Technical requirements: frameworks, patterns, conventions to follow
+            6. Edge cases: error scenarios, boundary conditions, invalid inputs
+            7. Out-of-scope assumptions: what the agents can assume is already working
+            8. Acceptance criteria: verifiable conditions that prove the work is done
+
+            Be specific. Instead of "add error handling", write "return 400 with
+            {error: message} when the request body is missing the 'name' field".
+            Instead of "update the service layer", name the exact file and method.
 
             Respond with valid JSON matching the schema provided.
             """;
@@ -253,11 +266,56 @@ public class GenerateSpecNode {
         }
         sb.append("\n");
 
+        if (spec.components() != null && !spec.components().isEmpty()) {
+            sb.append("## Components\n\n");
+            for (var comp : spec.components()) {
+                sb.append("### ").append(comp.name()).append("\n");
+                sb.append("**Responsibility:** ").append(comp.responsibility()).append("\n\n");
+                if (comp.affectedFiles() != null && !comp.affectedFiles().isEmpty()) {
+                    sb.append("**Affected Files:**\n");
+                    for (String file : comp.affectedFiles()) {
+                        sb.append("- `").append(file).append("`\n");
+                    }
+                    sb.append("\n");
+                }
+                if (comp.behaviorExpectations() != null && !comp.behaviorExpectations().isEmpty()) {
+                    sb.append("**Behavior Expectations:**\n");
+                    for (String behavior : comp.behaviorExpectations()) {
+                        sb.append("- ").append(behavior).append("\n");
+                    }
+                    sb.append("\n");
+                }
+                if (comp.integrationPoints() != null && !comp.integrationPoints().isEmpty()) {
+                    sb.append("**Integration Points:**\n");
+                    for (String point : comp.integrationPoints()) {
+                        sb.append("- ").append(point).append("\n");
+                    }
+                    sb.append("\n");
+                }
+            }
+        }
+
         sb.append("## Technical Requirements\n");
         for (String req : spec.technicalRequirements()) {
             sb.append("- ").append(req).append("\n");
         }
         sb.append("\n");
+
+        if (spec.edgeCases() != null && !spec.edgeCases().isEmpty()) {
+            sb.append("## Edge Cases\n");
+            for (String edgeCase : spec.edgeCases()) {
+                sb.append("- ").append(edgeCase).append("\n");
+            }
+            sb.append("\n");
+        }
+
+        if (spec.outOfScopeAssumptions() != null && !spec.outOfScopeAssumptions().isEmpty()) {
+            sb.append("## Out-of-Scope Assumptions\n");
+            for (String assumption : spec.outOfScopeAssumptions()) {
+                sb.append("- ").append(assumption).append("\n");
+            }
+            sb.append("\n");
+        }
 
         sb.append("## Acceptance Criteria\n");
         for (String criterion : spec.acceptanceCriteria()) {
