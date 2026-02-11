@@ -17,7 +17,7 @@ export function MissionList({ missions, selectedMissionId, onSelect }: MissionLi
     return (
       <div className="p-6 text-center">
         <div className="w-10 h-10 rounded-full bg-wm-elevated border border-wm-border flex items-center justify-center mx-auto mb-3">
-          <svg className="w-5 h-5 text-wm_text-dim" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5 text-wm_text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
           </svg>
         </div>
@@ -41,13 +41,13 @@ export function MissionList({ missions, selectedMissionId, onSelect }: MissionLi
             }`}
           >
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] font-mono text-wm_text-dim">{mission.mission_id}</span>
+              <span className="text-[10px] font-mono text-wm_text-muted">{mission.mission_id}</span>
               <StatusBadge status={mission.status} type="mission" />
             </div>
             <p className="text-xs text-wm_text-primary leading-relaxed mb-1">
               {truncate(mission.request, 60)}
             </p>
-            <div className="flex items-center justify-between text-[10px] text-wm_text-dim">
+            <div className="flex items-center justify-between text-[10px] text-wm_text-muted">
               <span className="font-mono">{mission.interaction_mode.replace(/_/g, ' ').toLowerCase()}</span>
               {mission.directives.length > 0 && (
                 <span>{mission.directives.length} dir</span>

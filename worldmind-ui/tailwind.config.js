@@ -17,9 +17,9 @@ export default {
         },
         wm_text: {
           primary: '#F1F5F9',
-          secondary: '#94A3B8',
-          muted: '#64748B',
-          dim: '#475569',
+          secondary: '#CBD5E1',
+          muted: '#94A3B8',
+          dim: '#64748B',
         },
         centurion: {
           forge: '#FF6B35',

@@ -26,7 +26,7 @@ export function MetricsPanel({ metrics }: MetricsPanelProps) {
             <div className={`text-sm font-mono font-semibold ${warn ? 'text-red-400' : 'text-wm_text-primary'}`}>
               {value}
             </div>
-            <div className="text-[10px] text-wm_text-dim uppercase tracking-wider">{label}</div>
+            <div className="text-[10px] text-wm_text-muted uppercase tracking-wider">{label}</div>
           </div>
           {idx < items.length - 1 && <div className="w-px h-6 bg-wm-border shrink-0" />}
         </div>

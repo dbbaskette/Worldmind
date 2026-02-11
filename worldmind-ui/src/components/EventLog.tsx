@@ -23,16 +23,16 @@ export function EventLog({ events, connectionStatus }: EventLogProps) {
   return (
     <div className="bg-wm-bg rounded-lg border border-wm-border overflow-hidden">
       <div className="flex items-center justify-between px-3 py-2 border-b border-wm-border bg-wm-card">
-        <span className="text-[10px] font-mono uppercase tracking-wider text-wm_text-dim">Event Stream</span>
+        <span className="text-[10px] font-mono uppercase tracking-wider text-wm_text-muted">Event Stream</span>
         <div className="flex items-center gap-1.5">
           <span className={`w-1.5 h-1.5 rounded-full ${statusIndicator}`} />
-          <span className="text-[10px] font-mono text-wm_text-dim">{connectionStatus}</span>
+          <span className="text-[10px] font-mono text-wm_text-muted">{connectionStatus}</span>
         </div>
       </div>
 
       <div className="max-h-48 overflow-y-auto p-2 scan-lines font-mono text-[11px] space-y-0.5">
         {events.length === 0 && (
-          <div className="text-wm_text-dim text-center py-6">
+          <div className="text-wm_text-muted text-center py-6">
             <span className="cursor-blink">_</span> awaiting events...
           </div>
         )}
@@ -45,13 +45,13 @@ export function EventLog({ events, connectionStatus }: EventLogProps) {
 
           return (
             <div key={idx} className="flex gap-2 py-0.5 hover:bg-wm-surface/50 px-1 rounded">
-              <span className="text-wm_text-dim shrink-0">{time}</span>
+              <span className="text-wm_text-muted shrink-0">{time}</span>
               <span className={`shrink-0 ${color}`}>{event.eventType}</span>
               {event.directiveId && (
                 <span className="text-wm_text-muted">{event.directiveId}</span>
               )}
               {event.payload && Object.keys(event.payload).length > 0 && (
-                <span className="text-wm_text-dim truncate">
+                <span className="text-wm_text-muted truncate">
                   {Object.entries(event.payload).map(([k, v]) => `${k}=${v}`).join(' ')}
                 </span>
               )}

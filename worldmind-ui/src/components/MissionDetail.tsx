@@ -104,7 +104,7 @@ export function MissionDetail({ missionId }: MissionDetailProps) {
   if (!mission) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-xs text-wm_text-dim font-mono">Select a mission</p>
+        <p className="text-xs text-wm_text-muted font-mono">Select a mission</p>
       </div>
     )
   }
@@ -137,7 +137,7 @@ export function MissionDetail({ missionId }: MissionDetailProps) {
 
         <p className="text-sm text-wm_text-secondary leading-relaxed mb-3">{mission.request}</p>
 
-        <div className="flex items-center gap-4 text-[10px] font-mono text-wm_text-dim">
+        <div className="flex items-center gap-4 text-[10px] font-mono text-wm_text-muted">
           <span>mode: {mission.interaction_mode.replace(/_/g, ' ').toLowerCase()}</span>
           <span>strategy: {mission.execution_strategy.toLowerCase()}</span>
           {mission.seal_granted && (
@@ -163,7 +163,7 @@ export function MissionDetail({ missionId }: MissionDetailProps) {
 
       {mission.directives.length > 0 && (
         <div className="mb-5">
-          <div className="text-[10px] font-mono uppercase tracking-wider text-wm_text-dim mb-3">
+          <div className="text-[10px] font-mono uppercase tracking-wider text-wm_text-muted mb-3">
             Directives ({mission.directives.length})
           </div>
           <div className="space-y-2">

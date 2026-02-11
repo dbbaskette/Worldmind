@@ -98,7 +98,7 @@ export function MissionForm({ onSubmit, submitting, error }: MissionFormProps) {
         {showOptions && (
           <div className="flex gap-3 mt-3 animate-fade-in">
             <div className="flex-1">
-              <label className="block text-[10px] font-mono uppercase tracking-wider text-wm_text-dim mb-1">
+              <label className="block text-[10px] font-mono uppercase tracking-wider text-wm_text-muted mb-1">
                 Project Path
               </label>
               <input
@@ -111,7 +111,7 @@ export function MissionForm({ onSubmit, submitting, error }: MissionFormProps) {
               />
             </div>
             <div className="flex-1">
-              <label className="block text-[10px] font-mono uppercase tracking-wider text-wm_text-dim mb-1">
+              <label className="block text-[10px] font-mono uppercase tracking-wider text-wm_text-muted mb-1">
                 Git Remote URL
               </label>
               <input

@@ -51,20 +51,20 @@ export function ApprovalPanel({ mission, onRefresh }: ApprovalPanelProps) {
         <div className="bg-wm-surface rounded-lg p-3 mb-3 border border-wm-border">
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div>
-              <span className="text-wm_text-dim">Category:</span>{' '}
+              <span className="text-wm_text-muted">Category:</span>{' '}
               <span className="text-wm_text-secondary">{mission.classification.category}</span>
             </div>
             <div>
-              <span className="text-wm_text-dim">Complexity:</span>{' '}
+              <span className="text-wm_text-muted">Complexity:</span>{' '}
               <span className="text-wm_text-secondary font-mono">{mission.classification.complexity}/10</span>
             </div>
             <div>
-              <span className="text-wm_text-dim">Strategy:</span>{' '}
+              <span className="text-wm_text-muted">Strategy:</span>{' '}
               <span className="text-wm_text-secondary">{mission.classification.planningStrategy}</span>
             </div>
             {mission.classification.affectedComponents.length > 0 && (
               <div>
-                <span className="text-wm_text-dim">Affects:</span>{' '}
+                <span className="text-wm_text-muted">Affects:</span>{' '}
                 <span className="text-wm_text-secondary">{mission.classification.affectedComponents.join(', ')}</span>
               </div>
             )}
@@ -73,7 +73,7 @@ export function ApprovalPanel({ mission, onRefresh }: ApprovalPanelProps) {
       )}
 
       <div className="bg-wm-surface rounded-lg p-3 mb-4 border border-wm-border">
-        <div className="text-[10px] font-mono uppercase tracking-wider text-wm_text-dim mb-2">
+        <div className="text-[10px] font-mono uppercase tracking-wider text-wm_text-muted mb-2">
           Execution Plan ({mission.directives.length} directives)
         </div>
         <div className="space-y-1.5">
@@ -81,7 +81,7 @@ export function ApprovalPanel({ mission, onRefresh }: ApprovalPanelProps) {
             const accent = CENTURION_ACCENT[d.centurion] || '#6B7280'
             return (
               <div key={d.id} className="flex items-start gap-2 text-xs">
-                <span className="font-mono text-wm_text-dim w-4 shrink-0 text-right">{idx + 1}.</span>
+                <span className="font-mono text-wm_text-muted w-4 shrink-0 text-right">{idx + 1}.</span>
                 <span
                   className="font-mono text-[10px] px-1 py-0.5 rounded shrink-0"
                   style={{ backgroundColor: `${accent}20`, color: accent }}

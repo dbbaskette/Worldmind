@@ -131,7 +131,7 @@ function QualityScore({ score, summary }: { score: number | null; summary: strin
   return (
     <div className={`inline-flex items-center gap-1.5 ${bg} border rounded px-1.5 py-0.5`} title={summary || undefined}>
       <span className={`text-[10px] font-mono font-semibold ${color}`}>{score}/10</span>
-      {summary && <span className="text-[10px] text-wm_text-dim truncate max-w-[180px]">{summary}</span>}
+      {summary && <span className="text-[10px] text-wm_text-muted truncate max-w-[180px]">{summary}</span>}
     </div>
   )
 }
@@ -181,7 +181,7 @@ export function DirectiveCard({ directive, events, onRetry }: DirectiveCardProps
 
         <PhasePipeline directive={directive} events={events} />
 
-        <div className="flex items-center gap-3 text-[10px] text-wm_text-dim flex-wrap">
+        <div className="flex items-center gap-3 text-[10px] text-wm_text-muted flex-wrap">
           <span className="font-mono">iter {directive.iteration}/{directive.max_iterations}</span>
           {directive.elapsed_ms && (
             <span className="font-mono">{formatDuration(directive.elapsed_ms)}</span>
@@ -204,11 +204,11 @@ export function DirectiveCard({ directive, events, onRetry }: DirectiveCardProps
             {expanded && (
               <div className="mt-1.5 space-y-0.5 animate-fade-in">
                 {directive.files_affected.map((file, idx) => (
-                  <div key={idx} className="text-[10px] font-mono text-wm_text-dim bg-wm-bg rounded px-2 py-0.5 flex items-center gap-2">
+                  <div key={idx} className="text-[10px] font-mono text-wm_text-muted bg-wm-bg rounded px-2 py-0.5 flex items-center gap-2">
                     <span className="text-centurion-gauntlet">{file.action}</span>
                     <span className="text-wm_text-muted truncate">{file.path}</span>
                     {file.linesChanged > 0 && (
-                      <span className="text-wm_text-dim shrink-0">+{file.linesChanged}</span>
+                      <span className="text-wm_text-muted shrink-0">+{file.linesChanged}</span>
                     )}
                   </div>
                 ))}
