@@ -91,14 +91,17 @@ EOF
 echo "[entrypoint] Goose config written: provider=$PROVIDER, model=$MODEL"
 
 # Add MCP server extensions to Goose config (injected by Worldmind orchestrator)
+# NOTE: Must be POSIX-compatible — CF tasks eval this under /bin/sh, not bash.
 if [ -n "$MCP_SERVERS" ]; then
   echo "  extensions:" >> "$PROFILES_FILE"
-  IFS=',' read -ra SERVERS <<< "$MCP_SERVERS"
-  for SERVER in "${SERVERS[@]}"; do
+  OLDIFS="$IFS"
+  IFS=','
+  for SERVER in $MCP_SERVERS; do
+    IFS="$OLDIFS"
     URL_VAR="MCP_SERVER_${SERVER}_URL"
     TOKEN_VAR="MCP_SERVER_${SERVER}_TOKEN"
-    URL="${!URL_VAR}"
-    TOKEN="${!TOKEN_VAR}"
+    eval "URL=\${$URL_VAR}"
+    eval "TOKEN=\${$TOKEN_VAR}"
     if [ -n "$URL" ]; then
       NAME=$(echo "$SERVER" | tr '[:upper:]' '[:lower:]')
       cat >> "$PROFILES_FILE" <<MCP_EOF
@@ -108,7 +111,6 @@ if [ -n "$MCP_SERVERS" ]; then
       uri: ${URL}
 MCP_EOF
       if [ -n "$TOKEN" ]; then
-        # Export the token so Goose can reference it via env_keys
         export "${TOKEN_VAR}"
         cat >> "$PROFILES_FILE" <<MCP_TOKEN_EOF
       env_keys:
@@ -118,6 +120,7 @@ MCP_TOKEN_EOF
       echo "[entrypoint] MCP extension '${NAME}' configured: ${URL}"
     fi
   done
+  IFS="$OLDIFS"
 fi
 
 # Append CF platform CA certs to Python's trust store (internal CAs use self-signed certs)
