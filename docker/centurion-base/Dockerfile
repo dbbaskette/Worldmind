@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 
 # System dependencies (git for workspace, curl for downloads, python3 for VCAP parsing)
-RUN apt-get update && apt-get install -y curl git ca-certificates && \
+RUN apt-get update && apt-get install -y curl git ca-certificates bzip2 && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install Goose CLI v1.x (Rust binary) — download directly from GitHub releases
