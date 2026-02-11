@@ -94,7 +94,8 @@ public class WorldmindState extends AgentState {
                         (String) map.get("category"),
                         map.get("complexity") instanceof Number n ? n.intValue() : 0,
                         map.get("affectedComponents") instanceof List<?> l ? (List<String>) l : List.of(),
-                        (String) map.get("planningStrategy"));
+                        (String) map.get("planningStrategy"),
+                        (String) map.getOrDefault("runtimeTag", "base"));
             }
             return (Classification) obj;
         });
@@ -163,6 +164,10 @@ public class WorldmindState extends AgentState {
 
     public String gitRemoteUrl() {
         return this.<String>value("gitRemoteUrl").orElse("");
+    }
+
+    public String runtimeTag() {
+        return classification().map(Classification::runtimeTag).orElse("base");
     }
 
     @SuppressWarnings("unchecked")

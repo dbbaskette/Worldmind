@@ -27,7 +27,7 @@ class StarblasterManagerTest {
     void setUp() {
         provider = mock(StarblasterProvider.class);
         properties = new StarblasterProperties();
-        manager = new StarblasterManager(provider, properties);
+        manager = new StarblasterManager(provider, properties, null);
     }
 
     @Test
@@ -39,7 +39,7 @@ class StarblasterManagerTest {
         var result = manager.executeDirective(
             "forge", "DIR-001", Path.of("/tmp/test"),
             "Create file", Map.of(),
-            ""
+            "", "base"
         );
 
         verify(provider).openStarblaster(any());
@@ -58,7 +58,7 @@ class StarblasterManagerTest {
         var result = manager.executeDirective(
             "forge", "DIR-002", Path.of("/tmp/test"),
             "Bad instruction", Map.of(),
-            ""
+            "", "base"
         );
 
         assertEquals(1, result.exitCode());

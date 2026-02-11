@@ -1,8 +1,10 @@
 package com.worldmind.starblaster;
 
 import com.worldmind.core.model.FileRecord;
+import com.worldmind.mcp.McpProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -30,10 +32,13 @@ public class StarblasterManager {
 
     private final StarblasterProvider provider;
     private final StarblasterProperties properties;
+    private final McpProperties mcpProperties;
 
-    public StarblasterManager(StarblasterProvider provider, StarblasterProperties properties) {
+    public StarblasterManager(StarblasterProvider provider, StarblasterProperties properties,
+                              @Autowired(required = false) McpProperties mcpProperties) {
         this.provider = provider;
         this.properties = properties;
+        this.mcpProperties = mcpProperties;
     }
 
     /**
@@ -72,7 +77,8 @@ public class StarblasterManager {
             Path projectPath,
             String instructionText,
             Map<String, String> extraEnv,
-            String gitRemoteUrl) {
+            String gitRemoteUrl,
+            String runtimeTag) {
 
         // When running inside Docker, use the shared workspace volume path
         // instead of the host project path for directive files and snapshots
@@ -104,11 +110,32 @@ public class StarblasterManager {
             }
         }
 
+        // Inject MCP server configs for centurion's Goose MCP extensions
+        if (mcpProperties != null && mcpProperties.isConfigured()) {
+            var serverNames = new ArrayList<String>();
+            for (var entry : mcpProperties.getServers().entrySet()) {
+                String name = entry.getKey();
+                var config = entry.getValue();
+                if (config.getUrl() == null || config.getUrl().isBlank()) continue;
+                String envName = name.toUpperCase().replace("-", "_");
+                serverNames.add(envName);
+                envVars.put("MCP_SERVER_" + envName + "_URL", config.getUrl());
+                String token = config.getTokenFor(centurionType);
+                if (token != null && !token.isBlank()) {
+                    envVars.put("MCP_SERVER_" + envName + "_TOKEN", token);
+                }
+            }
+            if (!serverNames.isEmpty()) {
+                envVars.put("MCP_SERVERS", String.join(",", serverNames));
+            }
+        }
+
         var request = new StarblasterRequest(
             centurionType, directiveId, projectPath,
             instructionText, envVars,
             properties.getMemoryLimitMb(), properties.getCpuCount(),
-            gitRemoteUrl
+            gitRemoteUrl,
+            runtimeTag != null ? runtimeTag : "base"
         );
 
         // Write instruction file for Goose CLI (expects a markdown file path, not inline text).

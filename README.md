@@ -28,7 +28,8 @@ The project uses Xandarian Worldmind / Nova Corps nomenclature from Marvel Comic
 - **Intelligent classification** -- Automatically categorizes requests by complexity and determines execution strategy
 - **Project-aware planning** -- Scans your codebase to generate context-aware directives with success criteria
 - **Specialized agents (Centurions)** -- Purpose-built workers for code generation, review, testing, research, and refactoring
-- **Sandboxed execution (Starblasters)** -- Each agent runs in an isolated Docker container with constrained permissions
+- **Sandboxed execution (Starblasters)** -- Each agent runs in an isolated Docker container with constrained permissions and runtime-specific toolchains
+- **Runtime resolution** -- Automatically selects language-specific Docker images (Java, Python, Node) based on request classification, with base-image fallback
 - **Wave-based parallelism** -- Dependency-aware scheduling dispatches independent directives concurrently
 - **Crash-resilient state** -- PostgreSQL-backed checkpointing enables recovery and time-travel debugging
 - **Flexible interaction modes** -- Full auto, approve-plan, or step-by-step execution
@@ -221,6 +222,7 @@ Worldmind uses five specialized Centurion agents, each with distinct capabilitie
 | `GOOSE_PROVIDER` | LLM provider (`openai`, `anthropic`) | `openai` | No |
 | `LM_STUDIO_URL` | OpenAI-compatible endpoint URL | `http://host.docker.internal:1234/v1` | No |
 | `CENTURION_IMAGE_REGISTRY` | Docker image registry for centurions | `ghcr.io/dbbaskette` | No |
+| `STARBLASTER_IMAGE_PREFIX` | Image name prefix for starblaster images | `starblaster` | No |
 | `STARBLASTER_PROVIDER` | Container provider (`docker`, `cloudfoundry`) | `docker` | No |
 | `WORLDMIND_PROFILE` | Spring profile | `local` | No |
 | `WORLDMIND_PORT` | Server port | `8080` | No |
@@ -270,19 +272,27 @@ docker compose up -d postgres
 ./run.sh --down
 ```
 
-### Centurion Images
+### Docker Images
 
-Centurion Docker images are located in `docker/`:
+Docker images are located in `docker/`:
 
 ```
 docker/
-├── centurion-base/        # Shared base with Goose + entrypoint
-├── centurion-forge/       # Code generation
-├── centurion-gauntlet/    # Test execution
-├── centurion-vigil/       # Code review
-├── centurion-pulse/       # Research (read-only)
-└── centurion-prism/       # Refactoring
+├── centurion-base/        # Legacy shared base with Goose + entrypoint
+├── centurion-forge/       # Legacy code generation image
+├── centurion-gauntlet/    # Legacy test execution image
+├── centurion-vigil/       # Legacy code review image
+├── centurion-pulse/       # Legacy research image
+├── centurion-prism/       # Legacy refactoring image
+└── starblasters/          # Runtime-tagged images
+    ├── Dockerfile.base    # Base image (Goose + git + shell)
+    ├── Dockerfile.java    # JDK 21 + Maven + Gradle
+    ├── Dockerfile.python  # Python 3.12 + pip + uv
+    ├── entrypoint.sh      # Shared container entrypoint
+    └── build-all.sh       # Local build script
 ```
+
+**Runtime resolution:** Worldmind classifies each request to determine the target language and selects the matching tagged image (e.g., `starblaster:java`). If the tagged image isn't available, it falls back to `starblaster:base` where Goose installs the required toolchain at runtime.
 
 ## Cloud Foundry Deployment
 
@@ -354,6 +364,7 @@ worldmind-ui/                              # React 18 + TypeScript + Vite + Tail
 - [x] React web UI dashboard with real-time monitoring
 - [x] Cloud Foundry deployment with java-cfenv and git workspaces
 - [x] Multi-provider LLM support (Anthropic, OpenAI, Google Gemini)
+- [x] Runtime-tagged Starblaster images with automatic language detection and base fallback
 - [ ] MCP server integration (Terrain, Chronicle, Spark)
 - [ ] Multi-project workspace support
 - [ ] GraalVM native image compilation

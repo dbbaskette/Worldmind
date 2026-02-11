@@ -42,10 +42,10 @@ class PlanMissionNodeTest {
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
 
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, null);
         var state = new WorldmindState(Map.of(
                 "request", "Add user endpoint",
-                "classification", new Classification("feature", 3, List.of("api"), "sequential"),
+                "classification", new Classification("feature", 3, List.of("api"), "sequential", "java"),
                 "projectContext", new ProjectContext(".", List.of(), "java", "maven", Map.of(), 10, "test")
         ));
 
@@ -80,10 +80,10 @@ class PlanMissionNodeTest {
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
 
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, null);
         var state = new WorldmindState(Map.of(
                 "request", "Refactor service layer",
-                "classification", new Classification("refactor", 4, List.of("service"), "parallel"),
+                "classification", new Classification("refactor", 4, List.of("service"), "parallel", "java"),
                 "projectContext", new ProjectContext(".", List.of(), "java", "spring-boot", Map.of(), 50, "test")
         ));
 
@@ -104,10 +104,10 @@ class PlanMissionNodeTest {
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
 
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, null);
         var state = new WorldmindState(Map.of(
                 "request", "Write tests",
-                "classification", new Classification("test", 2, List.of("test"), "sequential"),
+                "classification", new Classification("test", 2, List.of("test"), "sequential", "java"),
                 "projectContext", new ProjectContext(".", List.of(), "java", "maven", Map.of(), 5, "test")
         ));
 
@@ -141,10 +141,10 @@ class PlanMissionNodeTest {
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
 
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, null);
         var state = new WorldmindState(Map.of(
                 "request", "Build full feature",
-                "classification", new Classification("feature", 5, List.of("api", "service", "model"), "adaptive"),
+                "classification", new Classification("feature", 5, List.of("api", "service", "model"), "adaptive", "base"),
                 "projectContext", new ProjectContext(".", List.of(), "kotlin", "spring-boot", Map.of(), 100, "test")
         ));
 
@@ -171,10 +171,10 @@ class PlanMissionNodeTest {
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
 
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, null);
         var state = new WorldmindState(Map.of(
                 "request", "Fix login bug",
-                "classification", new Classification("bugfix", 2, List.of("auth", "service"), "sequential"),
+                "classification", new Classification("bugfix", 2, List.of("auth", "service"), "sequential", "java"),
                 "projectContext", new ProjectContext(".", List.of(), "java", "spring-boot", Map.of(), 25, "test")
         ));
 
@@ -198,7 +198,7 @@ class PlanMissionNodeTest {
     @DisplayName("throws when classification is missing from state")
     void throwsWhenClassificationMissing() {
         var mockLlm = mock(LlmService.class);
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, null);
         var state = new WorldmindState(Map.of(
                 "request", "Do something",
                 "projectContext", new ProjectContext(".", List.of(), "java", "maven", Map.of(), 5, "test")
@@ -211,10 +211,10 @@ class PlanMissionNodeTest {
     @DisplayName("throws when projectContext is missing from state")
     void throwsWhenProjectContextMissing() {
         var mockLlm = mock(LlmService.class);
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, null);
         var state = new WorldmindState(Map.of(
                 "request", "Do something",
-                "classification", new Classification("feature", 1, List.of(), "sequential")
+                "classification", new Classification("feature", 1, List.of(), "sequential", "base")
         ));
 
         assertThrows(IllegalStateException.class, () -> node.apply(state));
@@ -233,10 +233,10 @@ class PlanMissionNodeTest {
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
 
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, null);
         var state = new WorldmindState(Map.of(
                 "request", "Test",
-                "classification", new Classification("test", 1, List.of(), "sequential"),
+                "classification", new Classification("test", 1, List.of(), "sequential", "java"),
                 "projectContext", new ProjectContext(".", List.of(), "java", "maven", Map.of(), 1, "test")
         ));
 

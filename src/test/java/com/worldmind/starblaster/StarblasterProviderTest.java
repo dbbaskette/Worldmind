@@ -17,7 +17,8 @@ class StarblasterProviderTest {
             Map.of("GOOSE_PROVIDER", "openai"),
             4096,
             2,
-            ""
+            "",
+            "base"
         );
         assertEquals("forge", request.centurionType());
         assertEquals("directive-001", request.directiveId());
@@ -32,7 +33,7 @@ class StarblasterProviderTest {
             "forge", "d-001", Path.of("/tmp"),
             "Build the feature",
             Map.of(), 2048, 1,
-            ""
+            "", "base"
         );
         assertEquals("Build the feature", request.instructionText());
     }

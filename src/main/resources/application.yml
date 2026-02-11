@@ -32,11 +32,18 @@ spring:
       - org.springframework.ai.model.google.genai.autoconfigure.chat.GoogleGenAiChatAutoConfiguration
       - org.springframework.ai.model.google.genai.autoconfigure.embedding.GoogleGenAiTextEmbeddingAutoConfiguration
       - org.springframework.ai.model.google.genai.autoconfigure.embedding.GoogleGenAiEmbeddingConnectionAutoConfiguration
+      - org.springframework.ai.mcp.client.common.autoconfigure.McpClientAutoConfiguration
+      - org.springframework.ai.mcp.client.common.autoconfigure.McpToolCallbackAutoConfiguration
+      - org.springframework.ai.mcp.client.common.autoconfigure.StdioTransportAutoConfiguration
+      - org.springframework.ai.mcp.client.common.autoconfigure.annotations.McpClientAnnotationScannerAutoConfiguration
+      - org.springframework.ai.mcp.client.httpclient.autoconfigure.SseHttpClientTransportAutoConfiguration
+      - org.springframework.ai.mcp.client.httpclient.autoconfigure.StreamableHttpHttpClientTransportAutoConfiguration
 
 logging:
   level:
     root: WARN
     com.worldmind: INFO
+    io.modelcontextprotocol.spec.McpClientSession: OFF
 
 management:
   endpoints:
@@ -63,6 +70,7 @@ worldmind:
     memory-limit-mb: 4096
     cpu-count: 2
     image-registry: ${CENTURION_IMAGE_REGISTRY:ghcr.io/dbbaskette}
+    image-prefix: ${STARBLASTER_IMAGE_PREFIX:starblaster}
     image: ${CENTURION_IMAGE_REGISTRY:ghcr.io/dbbaskette}/centurion-forge:latest
   security:
     jwt:
@@ -145,5 +153,23 @@ worldmind:
           - "pkg/**"
         read-only:
           - "**"
+  mcp:
+    enabled: ${MCP_ENABLED:false}
+    servers:
+      nexus:
+        url: ${NEXUS_MCP_URL:}
+        token: ${NEXUS_MCP_TOKEN:}
+        tokens:
+          # Core nodes
+          classify: ${NEXUS_MCP_TOKEN_CLASSIFY:}
+          upload: ${NEXUS_MCP_TOKEN_UPLOAD:}
+          plan: ${NEXUS_MCP_TOKEN_PLAN:}
+          seal: ${NEXUS_MCP_TOKEN_SEAL:}
+          # Centurions
+          forge: ${NEXUS_MCP_TOKEN_FORGE:}
+          gauntlet: ${NEXUS_MCP_TOKEN_GAUNTLET:}
+          vigil: ${NEXUS_MCP_TOKEN_VIGIL:}
+          pulse: ${NEXUS_MCP_TOKEN_PULSE:}
+          prism: ${NEXUS_MCP_TOKEN_PRISM:}
   health:
     timeout-seconds: 5

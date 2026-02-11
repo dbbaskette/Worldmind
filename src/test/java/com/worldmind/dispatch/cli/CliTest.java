@@ -51,7 +51,7 @@ class CliTest {
                 "request", "Add logging",
                 "interactionMode", InteractionMode.APPROVE_PLAN.name(),
                 "status", MissionStatus.AWAITING_APPROVAL.name(),
-                "classification", new Classification("feature", 3, List.of("api"), "sequential"),
+                "classification", new Classification("feature", 3, List.of("api"), "sequential", "java"),
                 "projectContext", new ProjectContext(".", List.of(), "java", "spring", Map.of(), 42, "test project"),
                 "executionStrategy", ExecutionStrategy.SEQUENTIAL.name(),
                 "directives", List.of(

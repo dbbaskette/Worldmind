@@ -5,9 +5,11 @@ interface MissionFormProps {
   onSubmit: (request: string, mode: string, projectPath?: string, gitRemoteUrl?: string) => Promise<void>
   submitting: boolean
   error: string | null
+  showSettings?: boolean
+  onToggleSettings?: () => void
 }
 
-export function MissionForm({ onSubmit, submitting, error }: MissionFormProps) {
+export function MissionForm({ onSubmit, submitting, error, showSettings, onToggleSettings }: MissionFormProps) {
   const [request, setRequest] = useState('')
   const [mode, setMode] = useState('APPROVE_PLAN')
   const [projectPath, setProjectPath] = useState('')
@@ -69,13 +71,31 @@ export function MissionForm({ onSubmit, submitting, error }: MissionFormProps) {
                 ? 'bg-centurion-vigil/10 border-centurion-vigil/30 text-centurion-vigil'
                 : 'bg-wm-bg border-wm-border text-wm_text-muted hover:text-wm_text-secondary'
             }`}
-            title="Options"
+            title="Mission options"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM18.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
             </svg>
           </button>
+
+          {/* Settings toggle */}
+          {onToggleSettings && (
+            <button
+              type="button"
+              onClick={onToggleSettings}
+              className={`p-2 rounded-lg border transition-colors shrink-0 ${
+                showSettings
+                  ? 'bg-centurion-vigil/10 border-centurion-vigil/30 text-centurion-vigil'
+                  : 'bg-wm-bg border-wm-border text-wm_text-muted hover:text-wm_text-secondary'
+              }`}
+              title="Settings"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
+          )}
 
           {/* Submit */}
           <button

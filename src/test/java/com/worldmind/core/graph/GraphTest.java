@@ -27,7 +27,7 @@ class GraphTest {
     void setUp() throws Exception {
         LlmService mockLlm = mock(LlmService.class);
         when(mockLlm.structuredCall(anyString(), anyString(), eq(Classification.class)))
-                .thenReturn(new Classification("feature", 3, List.of("api"), "sequential"));
+                .thenReturn(new Classification("feature", 3, List.of("api"), "sequential", "java"));
 
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class)))
                 .thenReturn(new MissionPlan(
@@ -37,6 +37,11 @@ class GraphTest {
                                 new MissionPlan.DirectivePlan("FORGE", "Implement feature", "", "Feature works", List.of()),
                                 new MissionPlan.DirectivePlan("VIGIL", "Review code", "", "Code quality ok", List.of("DIR-001"))
                         )
+                ));
+        when(mockLlm.structuredCall(anyString(), anyString(), eq(ProductSpec.class)))
+                .thenReturn(new ProductSpec(
+                        "Test Spec", "Overview", List.of("Goal 1"), List.of("Non-goal 1"),
+                        List.of("Req 1"), List.of("Criterion 1")
                 ));
 
         ProjectScanner mockScanner = mock(ProjectScanner.class);
@@ -100,10 +105,10 @@ class GraphTest {
         ));
 
         worldmindGraph = new WorldmindGraph(
-                new ClassifyRequestNode(mockLlm),
+                new ClassifyRequestNode(mockLlm, null),
                 new UploadContextNode(mockScanner),
-                new GenerateSpecNode(mockLlm, null),
-                new PlanMissionNode(mockLlm),
+                new GenerateSpecNode(mockLlm, null, null),
+                new PlanMissionNode(mockLlm, null),
                 mockScheduleWave,
                 mockParallelDispatch,
                 mockEvaluateWave,

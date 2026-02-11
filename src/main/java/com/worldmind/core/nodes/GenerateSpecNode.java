@@ -6,6 +6,7 @@ import com.worldmind.core.model.MissionStatus;
 import com.worldmind.core.model.ProductSpec;
 import com.worldmind.core.model.ProjectContext;
 import com.worldmind.core.state.WorldmindState;
+import com.worldmind.mcp.McpToolProvider;
 import com.worldmind.starblaster.cf.CloudFoundryProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,11 +44,14 @@ public class GenerateSpecNode {
 
     private final LlmService llmService;
     private final CloudFoundryProperties cfProperties;
+    private final McpToolProvider mcpToolProvider;
 
     public GenerateSpecNode(LlmService llmService,
-                            @Autowired(required = false) CloudFoundryProperties cfProperties) {
+                            @Autowired(required = false) CloudFoundryProperties cfProperties,
+                            @Autowired(required = false) McpToolProvider mcpToolProvider) {
         this.llmService = llmService;
         this.cfProperties = cfProperties;
+        this.mcpToolProvider = mcpToolProvider;
     }
 
     public Map<String, Object> apply(WorldmindState state) {
@@ -66,7 +70,9 @@ public class GenerateSpecNode {
         );
 
         String userPrompt = buildUserPrompt(request, classification, projectContext);
-        ProductSpec spec = llmService.structuredCall(SYSTEM_PROMPT, userPrompt, ProductSpec.class);
+        ProductSpec spec = (mcpToolProvider != null && mcpToolProvider.hasTools())
+                ? llmService.structuredCallWithTools(SYSTEM_PROMPT, userPrompt, ProductSpec.class, mcpToolProvider.getToolsFor("plan"))
+                : llmService.structuredCall(SYSTEM_PROMPT, userPrompt, ProductSpec.class);
         log.info("Generated product spec: {}", spec.title());
 
         writeSpecFile(state, spec);

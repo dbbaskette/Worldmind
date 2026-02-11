@@ -10,6 +10,8 @@ import com.worldmind.core.model.MissionStatus;
 import com.worldmind.core.model.ProductSpec;
 import com.worldmind.core.model.ProjectContext;
 import com.worldmind.core.state.WorldmindState;
+import com.worldmind.mcp.McpToolProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -53,9 +55,12 @@ public class PlanMissionNode {
             """;
 
     private final LlmService llmService;
+    private final McpToolProvider mcpToolProvider;
 
-    public PlanMissionNode(LlmService llmService) {
+    public PlanMissionNode(LlmService llmService,
+                           @Autowired(required = false) McpToolProvider mcpToolProvider) {
         this.llmService = llmService;
+        this.mcpToolProvider = mcpToolProvider;
     }
 
     public Map<String, Object> apply(WorldmindState state) {
@@ -74,7 +79,9 @@ public class PlanMissionNode {
         Optional<ProductSpec> productSpec = state.productSpec();
 
         String userPrompt = buildUserPrompt(request, classification, projectContext, productSpec);
-        MissionPlan plan = llmService.structuredCall(SYSTEM_PROMPT, userPrompt, MissionPlan.class);
+        MissionPlan plan = (mcpToolProvider != null && mcpToolProvider.hasTools())
+                ? llmService.structuredCallWithTools(SYSTEM_PROMPT, userPrompt, MissionPlan.class, mcpToolProvider.getToolsFor("plan"))
+                : llmService.structuredCall(SYSTEM_PROMPT, userPrompt, MissionPlan.class);
 
         List<Directive> directives = convertToDirectives(plan);
 
@@ -96,6 +103,7 @@ public class PlanMissionNode {
                 - Complexity: %d
                 - Affected Components: %s
                 - Planning Strategy: %s
+                - Runtime Tag: %s
 
                 Project Context:
                 - Language: %s
@@ -107,6 +115,7 @@ public class PlanMissionNode {
                 classification.complexity(),
                 String.join(", ", classification.affectedComponents()),
                 classification.planningStrategy(),
+                classification.runtimeTag() != null ? classification.runtimeTag() : "base",
                 projectContext.language(),
                 projectContext.framework(),
                 projectContext.fileCount()

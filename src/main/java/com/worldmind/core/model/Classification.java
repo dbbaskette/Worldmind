@@ -10,5 +10,6 @@ public record Classification(
     String category,
     int complexity,
     List<String> affectedComponents,
-    String planningStrategy
+    String planningStrategy,
+    String runtimeTag
 ) implements Serializable {}

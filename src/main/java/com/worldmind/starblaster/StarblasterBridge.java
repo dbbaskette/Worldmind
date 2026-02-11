@@ -65,11 +65,12 @@ public class StarblasterBridge {
      * @param projectPath host path to the project directory
      * @return bridge result containing updated directive, starblaster info, and output
      */
-    public BridgeResult executeDirective(Directive directive, ProjectContext context, Path projectPath, String gitRemoteUrl) {
+    public BridgeResult executeDirective(Directive directive, ProjectContext context, Path projectPath, String gitRemoteUrl, String runtimeTag) {
         log.info("Executing directive {} [{}]: {}",
                 directive.id(), directive.centurion(), directive.description());
 
         String instruction = InstructionBuilder.build(directive, context);
+        instruction = InstructionBuilder.withRuntimePreamble(instruction, runtimeTag);
         Instant startedAt = Instant.now();
 
         var execResult = manager.executeDirective(
@@ -78,7 +79,8 @@ public class StarblasterBridge {
             projectPath,
             instruction,
             Map.of(),
-            gitRemoteUrl
+            gitRemoteUrl,
+            runtimeTag
         );
 
         Instant completedAt = Instant.now();

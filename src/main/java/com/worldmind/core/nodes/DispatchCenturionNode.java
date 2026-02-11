@@ -76,7 +76,7 @@ public class DispatchCenturionNode {
 
         try {
             var result = bridge.executeDirective(
-                directiveToDispatch, projectContext, Path.of(projectPath), state.gitRemoteUrl()
+                directiveToDispatch, projectContext, Path.of(projectPath), state.gitRemoteUrl(), state.runtimeTag()
             );
 
             var updates = new HashMap<String, Object>();

@@ -93,7 +93,7 @@ class CloudFoundryStarblasterProviderTest {
         var request = new StarblasterRequest(
                 "forge", "DIR-002", Path.of("/tmp/project"),
                 "Build something", Map.of(), 8192, 4,
-                ""
+                "", "base"
         );
 
         provider.openStarblaster(request);
@@ -107,7 +107,7 @@ class CloudFoundryStarblasterProviderTest {
         var request = new StarblasterRequest(
                 "forge", "DIR-003", Path.of("/tmp/project"),
                 "Build something", Map.of(), 0, 2,
-                ""
+                "", "base"
         );
 
         provider.openStarblaster(request);
@@ -131,7 +131,7 @@ class CloudFoundryStarblasterProviderTest {
         var request = new StarblasterRequest(
                 "FORGE", "DIR-005", Path.of("/tmp/project"),
                 "Build something", Map.of(), 4096, 2,
-                ""
+                "", "base"
         );
 
         var starblasterId = provider.openStarblaster(request);
@@ -285,7 +285,7 @@ class CloudFoundryStarblasterProviderTest {
                 centurionType, directiveId, Path.of("/tmp/project"),
                 "Build the feature", Map.of("GOOSE_PROVIDER", "anthropic"),
                 4096, 2,
-                ""
+                "", "base"
         );
     }
 

@@ -39,7 +39,7 @@ class UploadContextNodeTest {
         var result = node.apply(state);
 
         assertEquals(expectedContext, result.get("projectContext"));
-        assertEquals("PLANNING", result.get("status"));
+        assertEquals("SPECIFYING", result.get("status"));
     }
 
     @Test
@@ -71,7 +71,7 @@ class UploadContextNodeTest {
         var state = new WorldmindState(Map.of("request", "test"));
         var result = node.apply(state);
 
-        assertEquals("PLANNING", result.get("status"));
+        assertEquals("SPECIFYING", result.get("status"));
 
         // Should still contain a ProjectContext (fallback)
         assertNotNull(result.get("projectContext"));

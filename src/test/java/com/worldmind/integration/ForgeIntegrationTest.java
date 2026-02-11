@@ -32,9 +32,9 @@ class ForgeIntegrationTest {
                 .build();
         var dockerClient = DockerClientImpl.getInstance(dockerConfig, httpClient);
 
-        var provider = new DockerStarblasterProvider(dockerClient, "ghcr.io/dbbaskette");
+        var provider = new DockerStarblasterProvider(dockerClient, "ghcr.io/dbbaskette", "starblaster");
         var properties = new StarblasterProperties();
-        var manager = new StarblasterManager(provider, properties);
+        var manager = new StarblasterManager(provider, properties, null);
 
         // Execute a simple file creation task
         var result = manager.executeDirective(
@@ -44,7 +44,7 @@ class ForgeIntegrationTest {
                    "GOOSE_MODEL", "qwen2.5-coder-32b",
                    "OPENAI_HOST", "http://host.docker.internal:1234/v1",
                    "OPENAI_API_KEY", "not-needed"),
-            ""
+            "", "python"
         );
 
         // Verify execution completed

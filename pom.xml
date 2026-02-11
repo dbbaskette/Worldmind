@@ -83,6 +83,12 @@
             <artifactId>spring-ai-starter-model-google-genai</artifactId>
         </dependency>
 
+        <!-- Spring AI - MCP Client (remote MCP server tool integration) -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-mcp-client</artifactId>
+        </dependency>
+
         <!-- LangGraph4j - Graph Engine (using langgraph4j-core for Java 21+) -->
         <dependency>
             <groupId>org.bsc.langgraph4j</groupId>

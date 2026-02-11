@@ -64,7 +64,7 @@ class EvaluateWaveNodeTest {
     @SuppressWarnings("unchecked")
     void singleForgeSealGranted() {
         var d = forgeDirective("DIR-001", 0, 3, FailureStrategy.RETRY);
-        when(mockBridge.executeDirective(any(), any(), any(), any())).thenReturn(bridgeResult("DIR-001", "GAUNTLET"));
+        when(mockBridge.executeDirective(any(), any(), any(), any(), any())).thenReturn(bridgeResult("DIR-001", "GAUNTLET"));
         when(mockSealService.parseTestOutput(anyString(), anyString(), anyLong()))
                 .thenReturn(new TestResult("DIR-001", true, 10, 0, "OK", 500L));
         when(mockSealService.parseReviewOutput(anyString(), anyString()))
@@ -89,7 +89,7 @@ class EvaluateWaveNodeTest {
     @SuppressWarnings("unchecked")
     void singleForgeSealDeniedRetry() {
         var d = forgeDirective("DIR-001", 0, 3, FailureStrategy.RETRY);
-        when(mockBridge.executeDirective(any(), any(), any(), any())).thenReturn(bridgeResult("DIR-001", "GAUNTLET"));
+        when(mockBridge.executeDirective(any(), any(), any(), any(), any())).thenReturn(bridgeResult("DIR-001", "GAUNTLET"));
         when(mockSealService.parseTestOutput(anyString(), anyString(), anyLong()))
                 .thenReturn(new TestResult("DIR-001", false, 10, 3, "FAIL", 500L));
         when(mockSealService.parseReviewOutput(anyString(), anyString()))
@@ -115,7 +115,7 @@ class EvaluateWaveNodeTest {
     @SuppressWarnings("unchecked")
     void singleForgeSealDeniedSkip() {
         var d = forgeDirective("DIR-001", 0, 3, FailureStrategy.SKIP);
-        when(mockBridge.executeDirective(any(), any(), any(), any())).thenReturn(bridgeResult("DIR-001", "GAUNTLET"));
+        when(mockBridge.executeDirective(any(), any(), any(), any(), any())).thenReturn(bridgeResult("DIR-001", "GAUNTLET"));
         when(mockSealService.parseTestOutput(anyString(), anyString(), anyLong()))
                 .thenReturn(new TestResult("DIR-001", false, 10, 3, "FAIL", 500L));
         when(mockSealService.parseReviewOutput(anyString(), anyString()))
@@ -139,7 +139,7 @@ class EvaluateWaveNodeTest {
     @DisplayName("ESCALATE -> mission FAILED")
     void escalateMissionFailed() {
         var d = forgeDirective("DIR-001", 3, 3, FailureStrategy.ESCALATE);
-        when(mockBridge.executeDirective(any(), any(), any(), any())).thenReturn(bridgeResult("DIR-001", "GAUNTLET"));
+        when(mockBridge.executeDirective(any(), any(), any(), any(), any())).thenReturn(bridgeResult("DIR-001", "GAUNTLET"));
         when(mockSealService.parseTestOutput(anyString(), anyString(), anyLong()))
                 .thenReturn(new TestResult("DIR-001", false, 10, 5, "FAIL", 500L));
         when(mockSealService.parseReviewOutput(anyString(), anyString()))
@@ -175,7 +175,7 @@ class EvaluateWaveNodeTest {
         var completedIds = (List<String>) result.get("completedDirectiveIds");
         assertTrue(completedIds.contains("DIR-001"));
         // No bridge calls for non-FORGE (GAUNTLET/VIGIL not dispatched)
-        verify(mockBridge, never()).executeDirective(any(), any(), any(), any());
+        verify(mockBridge, never()).executeDirective(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -185,7 +185,7 @@ class EvaluateWaveNodeTest {
         var d1 = forgeDirective("DIR-001", 0, 3, FailureStrategy.RETRY);
         var d2 = nonForgeDirective("DIR-002");
 
-        when(mockBridge.executeDirective(any(), any(), any(), any())).thenReturn(bridgeResult("DIR-001", "GAUNTLET"));
+        when(mockBridge.executeDirective(any(), any(), any(), any(), any())).thenReturn(bridgeResult("DIR-001", "GAUNTLET"));
         when(mockSealService.parseTestOutput(anyString(), anyString(), anyLong()))
                 .thenReturn(new TestResult("DIR-001", true, 5, 0, "OK", 200L));
         when(mockSealService.parseReviewOutput(anyString(), anyString()))
@@ -225,7 +225,7 @@ class EvaluateWaveNodeTest {
         assertFalse(completedIds.contains("DIR-001"));
         assertTrue(((String) result.get("retryContext")).contains("DIR-001"));
         // No GAUNTLET/VIGIL dispatch for a failed directive
-        verify(mockBridge, never()).executeDirective(any(), any(), any(), any());
+        verify(mockBridge, never()).executeDirective(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -236,10 +236,10 @@ class EvaluateWaveNodeTest {
 
         // GAUNTLET throws, VIGIL succeeds
         when(mockBridge.executeDirective(
-                argThat(dir -> dir != null && dir.id().contains("GAUNTLET")), any(), any(), any()))
+                argThat(dir -> dir != null && dir.id().contains("GAUNTLET")), any(), any(), any(), any()))
                 .thenThrow(new RuntimeException("Docker down"));
         when(mockBridge.executeDirective(
-                argThat(dir -> dir != null && dir.id().contains("VIGIL")), any(), any(), any()))
+                argThat(dir -> dir != null && dir.id().contains("VIGIL")), any(), any(), any(), any()))
                 .thenReturn(bridgeResult("DIR-001-VIGIL", "VIGIL"));
         when(mockSealService.parseReviewOutput(anyString(), anyString()))
                 .thenReturn(new ReviewFeedback("DIR-001", true, "OK", List.of(), List.of(), 8));
@@ -264,7 +264,7 @@ class EvaluateWaveNodeTest {
         // iteration >= maxIterations means retries are exhausted
         var d = forgeDirective("DIR-001", 3, 3, FailureStrategy.RETRY);
 
-        when(mockBridge.executeDirective(any(), any(), any(), any())).thenReturn(bridgeResult("DIR-001", "GAUNTLET"));
+        when(mockBridge.executeDirective(any(), any(), any(), any(), any())).thenReturn(bridgeResult("DIR-001", "GAUNTLET"));
         when(mockSealService.parseTestOutput(anyString(), anyString(), anyLong()))
                 .thenReturn(new TestResult("DIR-001", false, 10, 3, "FAIL", 500L));
         when(mockSealService.parseReviewOutput(anyString(), anyString()))

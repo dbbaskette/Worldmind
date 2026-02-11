@@ -88,3 +88,26 @@ export type InteractionMode =
   | 'FULL_AUTO'
   | 'APPROVE_PLAN'
   | 'STEP_BY_STEP'
+
+export interface McpSettingsResponse {
+  enabled: boolean
+  servers: McpServerInfo[]
+}
+
+export interface McpServerInfo {
+  name: string
+  url: string
+  status: 'UP' | 'DOWN'
+  consumers: McpConsumerInfo[]
+}
+
+export interface McpConsumerInfo {
+  name: string
+  hasToken: boolean
+  tools: McpToolInfo[]
+}
+
+export interface McpToolInfo {
+  name: string
+  description: string
+}

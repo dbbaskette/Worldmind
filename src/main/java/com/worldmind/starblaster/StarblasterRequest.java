@@ -23,5 +23,6 @@ public record StarblasterRequest(
     Map<String, String> envVars,
     int memoryLimitMb,
     int cpuCount,
-    String gitRemoteUrl
+    String gitRemoteUrl,
+    String runtimeTag
 ) implements Serializable {}

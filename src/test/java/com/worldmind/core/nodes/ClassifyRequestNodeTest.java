@@ -25,14 +25,14 @@ class ClassifyRequestNodeTest {
     @DisplayName("classifies request and updates status to UPLOADING")
     void classifiesRequestAndUpdatesStatus() {
         var expectedClassification = new Classification(
-                "feature", 3, List.of("api", "service"), "parallel"
+                "feature", 3, List.of("api", "service"), "parallel", "base"
         );
 
         LlmService mockLlm = mock(LlmService.class);
         when(mockLlm.structuredCall(anyString(), anyString(), eq(Classification.class)))
                 .thenReturn(expectedClassification);
 
-        var node = new ClassifyRequestNode(mockLlm);
+        var node = new ClassifyRequestNode(mockLlm, null);
         var state = new WorldmindState(Map.of("request", "Add a REST endpoint for users"));
 
         Map<String, Object> result = node.apply(state);
@@ -45,14 +45,14 @@ class ClassifyRequestNodeTest {
     @DisplayName("passes the user request text to LlmService")
     void passesUserRequestToLlm() {
         var classification = new Classification(
-                "bugfix", 2, List.of("service"), "sequential"
+                "bugfix", 2, List.of("service"), "sequential", "base"
         );
 
         LlmService mockLlm = mock(LlmService.class);
         when(mockLlm.structuredCall(anyString(), anyString(), eq(Classification.class)))
                 .thenReturn(classification);
 
-        var node = new ClassifyRequestNode(mockLlm);
+        var node = new ClassifyRequestNode(mockLlm, null);
         String requestText = "Fix the null pointer in UserService.findById";
         var state = new WorldmindState(Map.of("request", requestText));
 
@@ -68,19 +68,19 @@ class ClassifyRequestNodeTest {
 
         // Simulate a docs classification
         var docsClassification = new Classification(
-                "docs", 1, List.of("docs"), "sequential"
+                "docs", 1, List.of("docs"), "sequential", "base"
         );
         when(mockLlm.structuredCall(anyString(), eq("Update the README"), eq(Classification.class)))
                 .thenReturn(docsClassification);
 
         // Simulate a refactor classification
         var refactorClassification = new Classification(
-                "refactor", 4, List.of("service", "model", "api"), "adaptive"
+                "refactor", 4, List.of("service", "model", "api"), "adaptive", "base"
         );
         when(mockLlm.structuredCall(anyString(), eq("Refactor the entire persistence layer"), eq(Classification.class)))
                 .thenReturn(refactorClassification);
 
-        var node = new ClassifyRequestNode(mockLlm);
+        var node = new ClassifyRequestNode(mockLlm, null);
 
         // Test docs request
         var docsState = new WorldmindState(Map.of("request", "Update the README"));
@@ -100,14 +100,14 @@ class ClassifyRequestNodeTest {
     @DisplayName("result map contains exactly classification and status keys")
     void resultContainsExpectedKeys() {
         var classification = new Classification(
-                "test", 2, List.of("test"), "sequential"
+                "test", 2, List.of("test"), "sequential", "base"
         );
 
         LlmService mockLlm = mock(LlmService.class);
         when(mockLlm.structuredCall(anyString(), anyString(), eq(Classification.class)))
                 .thenReturn(classification);
 
-        var node = new ClassifyRequestNode(mockLlm);
+        var node = new ClassifyRequestNode(mockLlm, null);
         var state = new WorldmindState(Map.of("request", "Write unit tests for UserService"));
 
         Map<String, Object> result = node.apply(state);

@@ -19,6 +19,7 @@ public class StarblasterProperties {
     public int getWaveCooldownSeconds() { return starblaster.waveCooldownSeconds; }
     public String getImage() { return starblaster.image; }
     public String getImageRegistry() { return starblaster.imageRegistry; }
+    public String getImagePrefix() { return starblaster.imagePrefix; }
 
     // -- Goose accessors (delegate to nested) --
     public String getGooseProvider() { return goose.provider; }
@@ -38,6 +39,7 @@ public class StarblasterProperties {
         private int memoryLimitMb = 4096;
         private int cpuCount = 2;
         private String imageRegistry = "ghcr.io/dbbaskette";
+        private String imagePrefix = "starblaster";
         private String image = "ghcr.io/dbbaskette/centurion-forge:latest";
 
         public String getProvider() { return provider; }
@@ -54,6 +56,8 @@ public class StarblasterProperties {
         public void setCpuCount(int cpuCount) { this.cpuCount = cpuCount; }
         public String getImageRegistry() { return imageRegistry; }
         public void setImageRegistry(String imageRegistry) { this.imageRegistry = imageRegistry; }
+        public String getImagePrefix() { return imagePrefix; }
+        public void setImagePrefix(String imagePrefix) { this.imagePrefix = imagePrefix; }
         public String getImage() { return image; }
         public void setImage(String image) { this.image = image; }
     }

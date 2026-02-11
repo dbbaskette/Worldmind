@@ -39,7 +39,7 @@ class CheckpointerTest {
     void setUp() throws Exception {
         mockLlm = mock(LlmService.class);
         when(mockLlm.structuredCall(anyString(), anyString(), eq(Classification.class)))
-                .thenReturn(new Classification("feature", 3, List.of("api"), "sequential"));
+                .thenReturn(new Classification("feature", 3, List.of("api"), "sequential", "java"));
 
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class)))
                 .thenReturn(new MissionPlan(
@@ -49,6 +49,11 @@ class CheckpointerTest {
                                 new MissionPlan.DirectivePlan("FORGE", "Implement feature", "", "Feature works", List.of()),
                                 new MissionPlan.DirectivePlan("VIGIL", "Review code", "", "Code quality ok", List.of("DIR-001"))
                         )
+                ));
+        when(mockLlm.structuredCall(anyString(), anyString(), eq(ProductSpec.class)))
+                .thenReturn(new ProductSpec(
+                        "Test Spec", "Overview", List.of("Goal 1"), List.of("Non-goal 1"),
+                        List.of("Req 1"), List.of("Criterion 1")
                 ));
 
         mockScanner = mock(ProjectScanner.class);
@@ -112,10 +117,10 @@ class CheckpointerTest {
 
     private WorldmindGraph buildGraph(BaseCheckpointSaver saver) throws Exception {
         return new WorldmindGraph(
-                new ClassifyRequestNode(mockLlm),
+                new ClassifyRequestNode(mockLlm, null),
                 new UploadContextNode(mockScanner),
-                new GenerateSpecNode(mockLlm, null),
-                new PlanMissionNode(mockLlm),
+                new GenerateSpecNode(mockLlm, null, null),
+                new PlanMissionNode(mockLlm, null),
                 mockScheduleWave,
                 mockParallelDispatch,
                 mockEvaluateWave,

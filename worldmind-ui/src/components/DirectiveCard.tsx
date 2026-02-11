@@ -90,13 +90,13 @@ function PhasePipeline({ directive, events }: { directive: DirectiveResponse; ev
                     ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40 animate-pulse'
                     : isFailed
                     ? 'bg-red-500/20 text-red-400 border border-red-500/40'
-                    : 'bg-wm-elevated text-wm_text-dim border border-wm-border'
+                    : 'bg-wm-elevated text-wm_text-muted border border-wm-border'
                 }`}
               >
                 {isCompleted ? '\u2713' : isFailed ? '\u2717' : (idx + 1)}
               </div>
               <span className={`text-[8px] font-mono uppercase tracking-wider ${
-                isActive ? 'text-blue-400' : isFailed ? 'text-red-400' : isCompleted ? 'text-emerald-400/60' : 'text-wm_text-dim'
+                isActive ? 'text-blue-400' : isFailed ? 'text-red-400' : isCompleted ? 'text-emerald-400/60' : 'text-wm_text-muted'
               }`}>
                 {phase}
               </span>

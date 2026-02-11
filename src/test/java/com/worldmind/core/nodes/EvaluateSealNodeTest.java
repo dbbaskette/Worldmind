@@ -85,7 +85,7 @@ class EvaluateSealNodeTest {
         var vigilResult = bridgeResult("VIGIL", "DIR-001-VIGIL",
                 "Score: 9/10\nApproved: yes");
 
-        when(bridge.executeDirective(any(), any(), any(), any()))
+        when(bridge.executeDirective(any(), any(), any(), any(), any()))
                 .thenReturn(gauntletResult)
                 .thenReturn(vigilResult);
 
@@ -144,7 +144,7 @@ class EvaluateSealNodeTest {
         assertTrue(reviewFeedbacks.get(0).approved());
 
         // Verify bridge was called exactly twice (GAUNTLET + VIGIL)
-        verify(bridge, times(2)).executeDirective(any(), any(), any(), any());
+        verify(bridge, times(2)).executeDirective(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -235,7 +235,7 @@ class EvaluateSealNodeTest {
 
         // GAUNTLET throws, VIGIL succeeds
         var vigilResult = bridgeResult("VIGIL", "DIR-001-VIGIL", "Score: 8/10\nApproved: yes");
-        when(bridge.executeDirective(any(), any(), any(), any()))
+        when(bridge.executeDirective(any(), any(), any(), any(), any()))
                 .thenThrow(new RuntimeException("Docker connection refused"))
                 .thenReturn(vigilResult);
 
@@ -248,7 +248,7 @@ class EvaluateSealNodeTest {
         var result = node.apply(state);
 
         // Should still have dispatched VIGIL (second call)
-        verify(bridge, times(2)).executeDirective(any(), any(), any(), any());
+        verify(bridge, times(2)).executeDirective(any(), any(), any(), any(), any());
 
         // testResults should contain the error info
         assertTrue(result.containsKey("testResults"));
@@ -271,7 +271,7 @@ class EvaluateSealNodeTest {
         // GAUNTLET succeeds, VIGIL throws
         var gauntletResult = bridgeResult("GAUNTLET", "DIR-001-GAUNTLET",
                 "Tests run: 10, Failures: 0");
-        when(bridge.executeDirective(any(), any(), any(), any()))
+        when(bridge.executeDirective(any(), any(), any(), any(), any()))
                 .thenReturn(gauntletResult)
                 .thenThrow(new RuntimeException("VIGIL container timeout"));
 
@@ -283,7 +283,7 @@ class EvaluateSealNodeTest {
         var result = node.apply(state);
 
         // Should have tried both bridge calls
-        verify(bridge, times(2)).executeDirective(any(), any(), any(), any());
+        verify(bridge, times(2)).executeDirective(any(), any(), any(), any(), any());
 
         // reviewFeedback should contain the error info
         assertTrue(result.containsKey("reviewFeedback"));

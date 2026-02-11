@@ -228,6 +228,21 @@ public final class InstructionBuilder {
         return sb.toString();
     }
 
+    /**
+     * Prepends a runtime environment preamble when runtimeTag is "base",
+     * informing the centurion that it may need to install tools at runtime.
+     */
+    public static String withRuntimePreamble(String instruction, String runtimeTag) {
+        if (!"base".equals(runtimeTag)) return instruction;
+        return """
+                ## Runtime Environment Note
+                Your container has basic build tools (git, curl, shell) but may not have the specific
+                language runtime needed. If a required tool is missing, install it using apt-get, curl,
+                or the appropriate package manager before proceeding.
+
+                """ + instruction;
+    }
+
     private static String formatFileChanges(List<FileRecord> fileChanges) {
         if (fileChanges == null || fileChanges.isEmpty()) {
             return "- No file changes recorded\n";

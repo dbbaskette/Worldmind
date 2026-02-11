@@ -1,4 +1,4 @@
-import { MissionResponse, DirectiveResponse, TimelineEntry } from './types'
+import { MissionResponse, DirectiveResponse, TimelineEntry, McpSettingsResponse } from './types'
 
 const API_BASE = '/api/v1'
 
@@ -98,6 +98,16 @@ class ApiClient {
 
     if (!response.ok) {
       throw new Error('Failed to fetch directive')
+    }
+
+    return response.json()
+  }
+
+  async getMcpSettings(): Promise<McpSettingsResponse> {
+    const response = await fetch(`${API_BASE}/settings/mcp`)
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch MCP settings')
     }
 
     return response.json()

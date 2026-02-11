@@ -67,9 +67,22 @@ centurion-prism-app: ${CENTURION_PRISM_APP:-centurion-prism}
 cf-username: ${CF_USERNAME}
 cf-password: ${CF_PASSWORD}
 git-token: ${GIT_TOKEN:-${CF_DOCKER_PASSWORD:-}}
+mcp-enabled: ${MCP_ENABLED:-false}
+nexus-mcp-url: ${NEXUS_MCP_URL:-}
+nexus-mcp-token: ${NEXUS_MCP_TOKEN:-}
+nexus-mcp-token-classify: ${NEXUS_MCP_TOKEN_CLASSIFY:-}
+nexus-mcp-token-upload: ${NEXUS_MCP_TOKEN_UPLOAD:-}
+nexus-mcp-token-plan: ${NEXUS_MCP_TOKEN_PLAN:-}
+nexus-mcp-token-seal: ${NEXUS_MCP_TOKEN_SEAL:-}
+nexus-mcp-token-forge: ${NEXUS_MCP_TOKEN_FORGE:-}
+nexus-mcp-token-gauntlet: ${NEXUS_MCP_TOKEN_GAUNTLET:-}
+nexus-mcp-token-vigil: ${NEXUS_MCP_TOKEN_VIGIL:-}
+nexus-mcp-token-pulse: ${NEXUS_MCP_TOKEN_PULSE:-}
+nexus-mcp-token-prism: ${NEXUS_MCP_TOKEN_PRISM:-}
 EOVARS
 
   echo "Building JAR..."
+  rm -rf src/main/resources/static/assets src/main/resources/static/index.html
   ./mvnw -q clean package -DskipTests
 
   # Remove stale dotted env vars from previous manifests (CF keeps old env vars across pushes)
@@ -129,6 +142,7 @@ fi
 if [ ! -f "$JAR" ] || \
    [ -n "$(find src worldmind-ui/src -newer "$JAR" -print -quit 2>/dev/null)" ]; then
   echo "Building Worldmind..."
+  rm -rf src/main/resources/static/assets src/main/resources/static/index.html
   mvn -q package -DskipTests
 fi
 

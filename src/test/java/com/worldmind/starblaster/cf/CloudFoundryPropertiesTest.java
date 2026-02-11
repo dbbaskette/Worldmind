@@ -17,7 +17,7 @@ class CloudFoundryPropertiesTest {
         assertEquals("", props.getSpace());
         assertEquals("", props.getGitRemoteUrl());
         assertTrue(props.getCenturionApps().isEmpty());
-        assertEquals(600, props.getTaskTimeoutSeconds());
+        assertEquals(1200, props.getTaskTimeoutSeconds());
         assertEquals(2048, props.getTaskMemoryMb());
         assertEquals(4096, props.getTaskDiskMb());
     }

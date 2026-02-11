@@ -55,7 +55,7 @@ class ParallelDispatchNodeTest {
     @SuppressWarnings("unchecked")
     void singleDirectiveWave() {
         var d1 = directive("DIR-001");
-        when(mockBridge.executeDirective(any(), any(), any(), any())).thenReturn(successResult(d1));
+        when(mockBridge.executeDirective(any(), any(), any(), any(), any())).thenReturn(successResult(d1));
 
         var state = new WorldmindState(Map.of(
                 "waveDirectiveIds", List.of("DIR-001"),
@@ -81,11 +81,11 @@ class ParallelDispatchNodeTest {
         var d2 = directive("DIR-002");
         var d3 = directive("DIR-003");
 
-        when(mockBridge.executeDirective(argThat(d -> d != null && d.id().equals("DIR-001")), any(), any(), any()))
+        when(mockBridge.executeDirective(argThat(d -> d != null && d.id().equals("DIR-001")), any(), any(), any(), any()))
                 .thenReturn(successResult(d1));
-        when(mockBridge.executeDirective(argThat(d -> d != null && d.id().equals("DIR-002")), any(), any(), any()))
+        when(mockBridge.executeDirective(argThat(d -> d != null && d.id().equals("DIR-002")), any(), any(), any(), any()))
                 .thenReturn(successResult(d2));
-        when(mockBridge.executeDirective(argThat(d -> d != null && d.id().equals("DIR-003")), any(), any(), any()))
+        when(mockBridge.executeDirective(argThat(d -> d != null && d.id().equals("DIR-003")), any(), any(), any(), any()))
                 .thenReturn(successResult(d3));
 
         var state = new WorldmindState(Map.of(
@@ -101,7 +101,7 @@ class ParallelDispatchNodeTest {
         var starblasters = (List<StarblasterInfo>) result.get("starblasters");
         assertEquals(3, starblasters.size());
 
-        verify(mockBridge, times(3)).executeDirective(any(), any(), any(), any());
+        verify(mockBridge, times(3)).executeDirective(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -111,9 +111,9 @@ class ParallelDispatchNodeTest {
         var d1 = directive("DIR-001");
         var d2 = directive("DIR-002");
 
-        when(mockBridge.executeDirective(argThat(d -> d != null && d.id().equals("DIR-001")), any(), any(), any()))
+        when(mockBridge.executeDirective(argThat(d -> d != null && d.id().equals("DIR-001")), any(), any(), any(), any()))
                 .thenReturn(successResult(d1));
-        when(mockBridge.executeDirective(argThat(d -> d != null && d.id().equals("DIR-002")), any(), any(), any()))
+        when(mockBridge.executeDirective(argThat(d -> d != null && d.id().equals("DIR-002")), any(), any(), any(), any()))
                 .thenReturn(failureResult(d2));
 
         var state = new WorldmindState(Map.of(
@@ -141,9 +141,9 @@ class ParallelDispatchNodeTest {
         var d1 = directive("DIR-001");
         var d2 = directive("DIR-002");
 
-        when(mockBridge.executeDirective(argThat(d -> d != null && d.id().equals("DIR-001")), any(), any(), any()))
+        when(mockBridge.executeDirective(argThat(d -> d != null && d.id().equals("DIR-001")), any(), any(), any(), any()))
                 .thenThrow(new RuntimeException("Docker unavailable"));
-        when(mockBridge.executeDirective(argThat(d -> d != null && d.id().equals("DIR-002")), any(), any(), any()))
+        when(mockBridge.executeDirective(argThat(d -> d != null && d.id().equals("DIR-002")), any(), any(), any(), any()))
                 .thenReturn(successResult(d2));
 
         var state = new WorldmindState(Map.of(
@@ -179,7 +179,7 @@ class ParallelDispatchNodeTest {
         var waveResults = (List<WaveDispatchResult>) result.get("waveDispatchResults");
         assertTrue(waveResults.isEmpty());
 
-        verify(mockBridge, never()).executeDirective(any(), any(), any(), any());
+        verify(mockBridge, never()).executeDirective(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -189,7 +189,7 @@ class ParallelDispatchNodeTest {
         var d1 = new Directive("DIR-001", "FORGE", "Do something", "original context", "Done", List.of(),
                 DirectiveStatus.FAILED, 1, 3, FailureStrategy.RETRY, List.of(), null);
 
-        when(mockBridge.executeDirective(any(), any(), any(), any())).thenAnswer(inv -> {
+        when(mockBridge.executeDirective(any(), any(), any(), any(), any())).thenAnswer(inv -> {
             Directive dispatched = inv.getArgument(0);
             assertTrue(dispatched.inputContext().contains("Retry Context"));
             return successResult(dispatched);

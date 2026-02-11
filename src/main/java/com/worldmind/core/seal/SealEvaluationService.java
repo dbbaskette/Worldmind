@@ -6,8 +6,10 @@ import com.worldmind.core.model.FailureStrategy;
 import com.worldmind.core.model.ReviewFeedback;
 import com.worldmind.core.model.SealDecision;
 import com.worldmind.core.model.TestResult;
+import com.worldmind.mcp.McpToolProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -52,9 +54,12 @@ public class SealEvaluationService {
             "Also extract the summary, list of issues, and list of suggestions from the review.";
 
     private final LlmService llmService;
+    private final McpToolProvider mcpToolProvider;
 
-    public SealEvaluationService(LlmService llmService) {
+    public SealEvaluationService(LlmService llmService,
+                                 @Autowired(required = false) McpToolProvider mcpToolProvider) {
         this.llmService = llmService;
+        this.mcpToolProvider = mcpToolProvider;
     }
 
     /**
@@ -128,11 +133,10 @@ public class SealEvaluationService {
         }
 
         log.info("Parsing review output for directive {} via LLM", directiveId);
-        var parsed = llmService.structuredCall(
-                REVIEW_PARSE_SYSTEM_PROMPT,
-                "Directive: " + directiveId + "\n\nReview Output:\n" + vigilOutput,
-                ReviewFeedback.class
-        );
+        String userPrompt = "Directive: " + directiveId + "\n\nReview Output:\n" + vigilOutput;
+        var parsed = (mcpToolProvider != null && mcpToolProvider.hasTools())
+                ? llmService.structuredCallWithTools(REVIEW_PARSE_SYSTEM_PROMPT, userPrompt, ReviewFeedback.class, mcpToolProvider.getToolsFor("seal"))
+                : llmService.structuredCall(REVIEW_PARSE_SYSTEM_PROMPT, userPrompt, ReviewFeedback.class);
 
         // Reconstruct with the correct directiveId since the LLM may not preserve it
         return new ReviewFeedback(directiveId, parsed.approved(), parsed.summary(),

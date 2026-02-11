@@ -30,12 +30,12 @@ class ModelTest {
         @DisplayName("MissionStatus has all expected values")
         void missionStatusValues() {
             MissionStatus[] expected = {
-                MissionStatus.CLASSIFYING, MissionStatus.UPLOADING, MissionStatus.PLANNING,
-                MissionStatus.AWAITING_APPROVAL, MissionStatus.EXECUTING, MissionStatus.CONVERGING,
-                MissionStatus.COMPLETED, MissionStatus.FAILED, MissionStatus.CANCELLED
+                MissionStatus.CLASSIFYING, MissionStatus.UPLOADING, MissionStatus.SPECIFYING,
+                MissionStatus.PLANNING, MissionStatus.AWAITING_APPROVAL, MissionStatus.EXECUTING,
+                MissionStatus.CONVERGING, MissionStatus.COMPLETED, MissionStatus.FAILED, MissionStatus.CANCELLED
             };
             assertArrayEquals(expected, MissionStatus.values());
-            assertEquals(9, MissionStatus.values().length);
+            assertEquals(10, MissionStatus.values().length);
         }
 
         @Test
@@ -106,11 +106,12 @@ class ModelTest {
         @Test
         @DisplayName("Classification record construction and accessors")
         void classificationRecord() {
-            var c = new Classification("refactor", 3, List.of("service", "controller"), "iterative");
+            var c = new Classification("refactor", 3, List.of("service", "controller"), "iterative", "java");
             assertEquals("refactor", c.category());
             assertEquals(3, c.complexity());
             assertEquals(List.of("service", "controller"), c.affectedComponents());
             assertEquals("iterative", c.planningStrategy());
+            assertEquals("java", c.runtimeTag());
         }
 
         @Test
@@ -266,7 +267,7 @@ class ModelTest {
             var keys = WorldmindState.SCHEMA.keySet();
             var expected = List.of(
                 "missionId", "request", "interactionMode", "status",
-                "classification", "projectContext", "executionStrategy",
+                "classification", "projectContext", "productSpec", "executionStrategy",
                 "directives", "currentDirectiveIndex", "starblasters",
                 "testResults", "reviewFeedback", "sealGranted",
                 "retryContext", "metrics", "errors", "projectPath", "gitRemoteUrl",
@@ -319,7 +320,7 @@ class ModelTest {
         @Test
         @DisplayName("Classification can be set and retrieved")
         void classificationInState() {
-            var classification = new Classification("feature", 5, List.of("api"), "comprehensive");
+            var classification = new Classification("feature", 5, List.of("api"), "comprehensive", "base");
             var state = new WorldmindState(Map.of("classification", classification));
             assertTrue(state.classification().isPresent());
             assertEquals("feature", state.classification().get().category());

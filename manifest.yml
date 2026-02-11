@@ -25,6 +25,18 @@ applications:
       CENTURION_VIGIL_APP: ((centurion-vigil-app))
       CENTURION_PULSE_APP: ((centurion-pulse-app))
       CENTURION_PRISM_APP: ((centurion-prism-app))
+      MCP_ENABLED: ((mcp-enabled))
+      NEXUS_MCP_URL: ((nexus-mcp-url))
+      NEXUS_MCP_TOKEN: ((nexus-mcp-token))
+      NEXUS_MCP_TOKEN_CLASSIFY: ((nexus-mcp-token-classify))
+      NEXUS_MCP_TOKEN_UPLOAD: ((nexus-mcp-token-upload))
+      NEXUS_MCP_TOKEN_PLAN: ((nexus-mcp-token-plan))
+      NEXUS_MCP_TOKEN_SEAL: ((nexus-mcp-token-seal))
+      NEXUS_MCP_TOKEN_FORGE: ((nexus-mcp-token-forge))
+      NEXUS_MCP_TOKEN_GAUNTLET: ((nexus-mcp-token-gauntlet))
+      NEXUS_MCP_TOKEN_VIGIL: ((nexus-mcp-token-vigil))
+      NEXUS_MCP_TOKEN_PULSE: ((nexus-mcp-token-pulse))
+      NEXUS_MCP_TOKEN_PRISM: ((nexus-mcp-token-prism))
     services:
       - worldmind-postgres
       - worldmind-model

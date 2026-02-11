@@ -2,6 +2,7 @@ package com.worldmind.starblaster;
 
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.WaitContainerResultCallback;
+import com.github.dockerjava.api.exception.NotFoundException;
 import com.github.dockerjava.api.model.*;
 import com.github.dockerjava.core.command.LogContainerResultCallback;
 import org.slf4j.Logger;
@@ -26,21 +27,32 @@ import java.util.concurrent.TimeUnit;
 public class DockerStarblasterProvider implements StarblasterProvider {
 
     private static final Logger log = LoggerFactory.getLogger(DockerStarblasterProvider.class);
-    private static final String IMAGE_TAG = ":latest";
 
     private final DockerClient dockerClient;
     private final String imageRegistry;
+    private final String imagePrefix;
 
-    public DockerStarblasterProvider(DockerClient dockerClient, String imageRegistry) {
+    public DockerStarblasterProvider(DockerClient dockerClient, String imageRegistry, String imagePrefix) {
         this.dockerClient = dockerClient;
         this.imageRegistry = imageRegistry;
+        this.imagePrefix = imagePrefix != null ? imagePrefix : "starblaster";
     }
 
     @Override
     public String openStarblaster(StarblasterRequest request) {
         String type = request.centurionType().toLowerCase();
         String containerName = "starblaster-" + type + "-" + request.directiveId();
-        String imageName = imageRegistry + "/centurion-" + type + IMAGE_TAG;
+        String runtimeTag = request.runtimeTag() != null ? request.runtimeTag() : "base";
+        String imageName = imageRegistry + "/" + imagePrefix + ":" + runtimeTag;
+
+        // Fallback: if the tagged image doesn't exist locally, use base
+        try {
+            dockerClient.inspectImageCmd(imageName).exec();
+        } catch (NotFoundException e) {
+            log.warn("Image {} not found locally, falling back to base", imageName);
+            imageName = imageRegistry + "/" + imagePrefix + ":base";
+        }
+
         log.info("Opening Starblaster {} for directive {} (image: {})",
                 containerName, request.directiveId(), imageName);
 

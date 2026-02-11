@@ -122,7 +122,7 @@ public class EvaluateWaveNode {
                 try {
                     var gauntletDirective = createGauntletDirective(directive);
                     log.info("Dispatching GAUNTLET for directive {}", id);
-                    var gauntletResult = bridge.executeDirective(gauntletDirective, projectContext, Path.of(projectPath), state.gitRemoteUrl());
+                    var gauntletResult = bridge.executeDirective(gauntletDirective, projectContext, Path.of(projectPath), state.gitRemoteUrl(), state.runtimeTag());
                     starblasterInfos.add(gauntletResult.starblasterInfo());
                     testResult = sealService.parseTestOutput(id, gauntletResult.output(),
                             gauntletResult.directive().elapsedMs() != null ? gauntletResult.directive().elapsedMs() : 0L);
@@ -140,7 +140,7 @@ public class EvaluateWaveNode {
                 try {
                     var vigilDirective = createVigilDirective(directive);
                     log.info("Dispatching VIGIL for directive {}", id);
-                    var vigilResult = bridge.executeDirective(vigilDirective, projectContext, Path.of(projectPath), state.gitRemoteUrl());
+                    var vigilResult = bridge.executeDirective(vigilDirective, projectContext, Path.of(projectPath), state.gitRemoteUrl(), state.runtimeTag());
                     starblasterInfos.add(vigilResult.starblasterInfo());
                     reviewFeedback = sealService.parseReviewOutput(id, vigilResult.output());
                 } catch (Exception e) {

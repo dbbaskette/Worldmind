@@ -2,6 +2,7 @@ package com.worldmind.starblaster;
 
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.*;
+import com.github.dockerjava.api.exception.NotFoundException;
 import com.github.dockerjava.api.model.HostConfig;
 import com.github.dockerjava.core.command.LogContainerResultCallback;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,7 +34,9 @@ class DockerStarblasterProviderTest {
     @BeforeEach
     void setUp() {
         dockerClient = mock(DockerClient.class);
-        provider = new DockerStarblasterProvider(dockerClient, "ghcr.io/dbbaskette");
+        provider = new DockerStarblasterProvider(dockerClient, "ghcr.io/dbbaskette", "starblaster");
+        // Default: inspectImageCmd succeeds (image exists locally)
+        mockInspectImageSuccess();
     }
 
     // ── openStarblaster tests ──────────────────────────────────────────────
@@ -48,32 +51,56 @@ class DockerStarblasterProviderTest {
             "forge", "DIR-001", Path.of("/tmp/project"),
             "Create hello.py", Map.of("GOOSE_PROVIDER", "openai"),
             4096, 2,
-            ""
+            "", "java"
         );
 
         String containerId = provider.openStarblaster(request);
 
         assertEquals("container-abc123", containerId);
-        verify(dockerClient).createContainerCmd("ghcr.io/dbbaskette/centurion-forge:latest");
+        verify(dockerClient).createContainerCmd("ghcr.io/dbbaskette/starblaster:java");
         verify(dockerClient).startContainerCmd("container-abc123");
         verify(startCmd).exec();
     }
 
     @Test
-    void openStarblasterUsesCorrectImageForCenturionType() {
-        mockCreateContainerCmd("container-vigil-001");
+    void openStarblasterUsesCorrectImageForRuntimeTag() {
+        mockCreateContainerCmd("container-python-001");
         when(dockerClient.startContainerCmd(anyString())).thenReturn(mock(StartContainerCmd.class));
 
         var request = new StarblasterRequest(
             "vigil", "DIR-002", Path.of("/tmp/project"),
             "Review code", Map.of(),
             2048, 1,
-            ""
+            "", "python"
         );
 
         provider.openStarblaster(request);
 
-        verify(dockerClient).createContainerCmd("ghcr.io/dbbaskette/centurion-vigil:latest");
+        verify(dockerClient).createContainerCmd("ghcr.io/dbbaskette/starblaster:python");
+    }
+
+    @Test
+    void openStarblasterFallsBackToBaseWhenImageNotFound() {
+        // First inspectImageCmd for "starblaster:node" throws NotFoundException
+        var inspectCmd = mock(InspectImageCmd.class);
+        when(dockerClient.inspectImageCmd("ghcr.io/dbbaskette/starblaster:node"))
+                .thenReturn(inspectCmd);
+        when(inspectCmd.exec()).thenThrow(new NotFoundException("not found"));
+        // Second inspectImageCmd for base succeeds (default mock already set up)
+
+        mockCreateContainerCmd("container-fallback");
+        when(dockerClient.startContainerCmd(anyString())).thenReturn(mock(StartContainerCmd.class));
+
+        var request = new StarblasterRequest(
+            "forge", "DIR-003", Path.of("/tmp/project"),
+            "Build feature", Map.of(),
+            4096, 2,
+            "", "node"
+        );
+
+        provider.openStarblaster(request);
+
+        verify(dockerClient).createContainerCmd("ghcr.io/dbbaskette/starblaster:base");
     }
 
     @Test
@@ -85,7 +112,7 @@ class DockerStarblasterProviderTest {
             "forge", "DIR-001", Path.of("/tmp/project"),
             "Create hello.py", Map.of(),
             4096, 2,
-            ""
+            "", "base"
         );
 
         provider.openStarblaster(request);
@@ -106,7 +133,7 @@ class DockerStarblasterProviderTest {
             "forge", "DIR-003", Path.of("/tmp/project"),
             "Build feature", envVars,
             4096, 2,
-            ""
+            "", "base"
         );
 
         provider.openStarblaster(request);
@@ -128,7 +155,7 @@ class DockerStarblasterProviderTest {
             "forge", "DIR-004", Path.of("/tmp/project"),
             "Create a REST API", Map.of(),
             4096, 2,
-            ""
+            "", "base"
         );
 
         provider.openStarblaster(request);
@@ -145,7 +172,7 @@ class DockerStarblasterProviderTest {
             "forge", "DIR-005", Path.of("/tmp/project"),
             "Build feature", Map.of(),
             4096, 2,
-            ""
+            "", "base"
         );
 
         provider.openStarblaster(request);
@@ -162,7 +189,7 @@ class DockerStarblasterProviderTest {
             "forge", "DIR-006", Path.of("/tmp/project"),
             "Build feature", Map.of(),
             4096, 2,
-            ""
+            "", "base"
         );
 
         provider.openStarblaster(request);
@@ -308,5 +335,14 @@ class DockerStarblasterProviderTest {
         when(createCmd.exec()).thenReturn(createResponse);
 
         return createCmd;
+    }
+
+    /**
+     * Mocks inspectImageCmd to succeed for any image name (image exists locally).
+     */
+    private void mockInspectImageSuccess() {
+        var inspectCmd = mock(InspectImageCmd.class);
+        when(dockerClient.inspectImageCmd(anyString())).thenReturn(inspectCmd);
+        when(inspectCmd.exec()).thenReturn(mock(InspectImageResponse.class));
     }
 }

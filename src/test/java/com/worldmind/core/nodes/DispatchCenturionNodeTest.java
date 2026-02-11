@@ -52,7 +52,7 @@ class DispatchCenturionNodeTest {
             Instant.now(), Instant.now());
         var bridgeResult = new StarblasterBridge.BridgeResult(updatedDirective, starblasterInfo, "ok");
 
-        when(bridge.executeDirective(any(), any(), any(), any())).thenReturn(bridgeResult);
+        when(bridge.executeDirective(any(), any(), any(), any(), any())).thenReturn(bridgeResult);
 
         var context = new ProjectContext("/tmp/p", List.of(), "java", "spring", Map.of(), 5, "");
         var state = new WorldmindState(Map.of(
@@ -143,7 +143,7 @@ class DispatchCenturionNodeTest {
             Instant.now(), Instant.now());
         var bridgeResult = new StarblasterBridge.BridgeResult(failedDirective, starblasterInfo, "compilation error");
 
-        when(bridge.executeDirective(any(), any(), any(), any())).thenReturn(bridgeResult);
+        when(bridge.executeDirective(any(), any(), any(), any(), any())).thenReturn(bridgeResult);
 
         var context = new ProjectContext("/tmp/p", List.of(), "java", "spring", Map.of(), 5, "");
         var state = new WorldmindState(Map.of(
@@ -181,7 +181,7 @@ class DispatchCenturionNodeTest {
             Instant.now(), Instant.now());
         var bridgeResult = new StarblasterBridge.BridgeResult(updatedDirective, starblasterInfo, "ok");
 
-        when(bridge.executeDirective(any(), any(), any(), any())).thenReturn(bridgeResult);
+        when(bridge.executeDirective(any(), any(), any(), any(), any())).thenReturn(bridgeResult);
 
         var context = new ProjectContext("/tmp/project", List.of("src/Main.java"), "java", "spring", Map.of(), 5, "summary");
         var state = new WorldmindState(Map.of(
@@ -196,6 +196,7 @@ class DispatchCenturionNodeTest {
             eq(directive),
             eq(context),
             eq(Path.of("/tmp/project")),
+            any(),
             any()
         );
     }
@@ -219,7 +220,7 @@ class DispatchCenturionNodeTest {
             Instant.now(), Instant.now());
         var bridgeResult = new StarblasterBridge.BridgeResult(updatedDirective, starblasterInfo, "ok");
 
-        when(bridge.executeDirective(any(), any(), any(), any())).thenReturn(bridgeResult);
+        when(bridge.executeDirective(any(), any(), any(), any(), any())).thenReturn(bridgeResult);
 
         var state = new WorldmindState(Map.of(
             "directives", List.of(directive),
@@ -232,6 +233,7 @@ class DispatchCenturionNodeTest {
             eq(directive),
             isNull(),
             eq(Path.of(".")),
+            any(),
             any()
         );
     }
@@ -257,7 +259,7 @@ class DispatchCenturionNodeTest {
             Instant.now(), Instant.now());
         var bridgeResult = new StarblasterBridge.BridgeResult(updatedDirective, starblasterInfo, "ok");
 
-        when(bridge.executeDirective(any(), any(), any(), any())).thenReturn(bridgeResult);
+        when(bridge.executeDirective(any(), any(), any(), any(), any())).thenReturn(bridgeResult);
 
         var context = new ProjectContext("/tmp/p", List.of(), "java", "spring", Map.of(), 5, "");
         var state = new WorldmindState(Map.of(
@@ -270,7 +272,7 @@ class DispatchCenturionNodeTest {
         var result = node.apply(state);
 
         // Bridge should have been called (not skipped)
-        verify(bridge).executeDirective(any(), any(), any(), any());
+        verify(bridge).executeDirective(any(), any(), any(), any(), any());
         assertNotNull(result);
         assertTrue(result.containsKey("starblasters"));
         assertEquals(1, result.get("currentDirectiveIndex"));
@@ -319,7 +321,7 @@ class DispatchCenturionNodeTest {
             Instant.now(), Instant.now());
         var bridgeResult = new StarblasterBridge.BridgeResult(updatedDirective, starblasterInfo, "ok");
 
-        when(bridge.executeDirective(any(), any(), any(), any())).thenReturn(bridgeResult);
+        when(bridge.executeDirective(any(), any(), any(), any(), any())).thenReturn(bridgeResult);
 
         var context = new ProjectContext("/tmp/p", List.of(), "java", "spring", Map.of(), 5, "");
         var state = new WorldmindState(Map.of(
@@ -354,7 +356,7 @@ class DispatchCenturionNodeTest {
             Instant.now(), Instant.now());
         var bridgeResult = new StarblasterBridge.BridgeResult(updatedDirective, starblasterInfo, "ok");
 
-        when(bridge.executeDirective(any(), any(), any(), any())).thenReturn(bridgeResult);
+        when(bridge.executeDirective(any(), any(), any(), any(), any())).thenReturn(bridgeResult);
 
         var context = new ProjectContext("/tmp/p", List.of(), "java", "spring", Map.of(), 5, "");
         var state = new WorldmindState(Map.of(
@@ -373,6 +375,7 @@ class DispatchCenturionNodeTest {
                       && d.inputContext().contains("original context")),
             eq(context),
             eq(Path.of("/tmp/p")),
+            any(),
             any()
         );
     }

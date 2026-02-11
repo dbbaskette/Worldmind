@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { useMissionList } from './hooks/useMissionList'
 import { MissionForm } from './components/MissionForm'
 import { MissionList } from './components/MissionList'
 import { MissionDetail } from './components/MissionDetail'
+import { SettingsPanel } from './components/SettingsPanel'
 
 function App() {
   const {
@@ -12,6 +14,8 @@ function App() {
     submitMission,
     selectMission,
   } = useMissionList()
+
+  const [showSettings, setShowSettings] = useState(false)
 
   const handleSubmit = async (request: string, mode: string, projectPath?: string, gitRemoteUrl?: string) => {
     await submitMission(request, mode, projectPath, gitRemoteUrl)
@@ -24,6 +28,8 @@ function App() {
         onSubmit={handleSubmit}
         submitting={submitting}
         error={submitError}
+        showSettings={showSettings}
+        onToggleSettings={() => setShowSettings(s => !s)}
       />
 
       {/* Main */}
@@ -44,7 +50,9 @@ function App() {
 
         {/* Detail */}
         <div className="flex-1 bg-wm-bg">
-          {selectedMissionId ? (
+          {showSettings ? (
+            <SettingsPanel />
+          ) : selectedMissionId ? (
             <MissionDetail missionId={selectedMissionId} />
           ) : (
             <div className="flex items-center justify-center h-full">

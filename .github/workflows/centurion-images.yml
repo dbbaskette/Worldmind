@@ -68,3 +68,29 @@ jobs:
           context: docker/centurion-prism
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/centurion-prism:latest
+
+      # ── Starblaster runtime images ────────────────────────────────────
+
+      - name: Build and push starblaster:base
+        uses: docker/build-push-action@v6
+        with:
+          context: docker/starblasters
+          file: docker/starblasters/Dockerfile.base
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/starblaster:base
+
+      - name: Build and push starblaster:java
+        uses: docker/build-push-action@v6
+        with:
+          context: docker/starblasters
+          file: docker/starblasters/Dockerfile.java
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/starblaster:java
+
+      - name: Build and push starblaster:python
+        uses: docker/build-push-action@v6
+        with:
+          context: docker/starblasters
+          file: docker/starblasters/Dockerfile.python
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/starblaster:python

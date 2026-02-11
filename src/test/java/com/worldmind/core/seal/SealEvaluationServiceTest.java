@@ -31,7 +31,7 @@ class SealEvaluationServiceTest {
     @BeforeEach
     void setUp() {
         mockLlmService = mock(LlmService.class);
-        service = new SealEvaluationService(mockLlmService);
+        service = new SealEvaluationService(mockLlmService, null);
     }
 
     // ── parseTestOutput tests ───────────────────────────────────────────

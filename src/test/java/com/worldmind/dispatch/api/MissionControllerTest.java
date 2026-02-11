@@ -44,6 +44,15 @@ class MissionControllerTest {
     @MockitoBean
     private SseStreamingService sseStreamingService;
 
+    @MockitoBean
+    private com.worldmind.core.scheduler.OscillationDetector oscillationDetector;
+
+    @MockitoBean
+    private com.worldmind.core.events.EventBus eventBus;
+
+    @MockitoBean
+    private com.worldmind.starblaster.InstructionStore instructionStore;
+
     // ── POST /api/v1/missions ────────────────────────────────────────
 
     @Test
