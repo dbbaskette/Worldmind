@@ -278,12 +278,12 @@ Docker images are located in `docker/`:
 
 ```
 docker/
-├── centurion-base/        # Legacy shared base with Goose + entrypoint
-├── centurion-forge/       # Legacy code generation image
-├── centurion-gauntlet/    # Legacy test execution image
-├── centurion-vigil/       # Legacy code review image
-├── centurion-pulse/       # Legacy research image
-├── centurion-prism/       # Legacy refactoring image
+├── centurion-base/        # Shared base with Goose + entrypoint
+├── centurion-forge/       # Code generation
+├── centurion-gauntlet/    # Test execution
+├── centurion-vigil/       # Code review
+├── centurion-pulse/       # Research (read-only)
+├── centurion-prism/       # Refactoring
 └── starblasters/          # Runtime-tagged images
     ├── Dockerfile.base    # Base image (Goose + git + shell)
     ├── Dockerfile.java    # JDK 21 + Maven + Gradle
