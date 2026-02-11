@@ -4,10 +4,11 @@ FROM python:3.12-slim
 RUN apt-get update && apt-get install -y curl git ca-certificates && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install Goose CLI v1.x (Rust binary)
-RUN curl -fsSL https://github.com/block/goose/releases/download/stable/download_cli.sh | CONFIGURE=false bash && \
-    cp /root/.goose/bin/goose /usr/local/bin/goose && \
-    rm -rf /root/.goose && \
+# Install Goose CLI v1.x (Rust binary) — download directly from GitHub releases
+RUN ARCH=$(uname -m) && \
+    curl -fsSL "https://github.com/block/goose/releases/download/stable/goose-${ARCH}-unknown-linux-gnu.tar.bz2" \
+      | tar xj -C /usr/local/bin && \
+    chmod +x /usr/local/bin/goose && \
     goose --version
 
 # Copy entrypoint script (generates config.yaml from env vars, then runs goose)
