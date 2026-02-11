@@ -90,37 +90,43 @@ EOF
 
 echo "[entrypoint] Goose config written: provider=$PROVIDER, model=$MODEL"
 
-# Add MCP server extensions to Goose config (injected by Worldmind orchestrator)
+# MCP server extensions for Goose (injected by Worldmind orchestrator).
 # NOTE: Must be POSIX-compatible — CF tasks eval this under /bin/sh, not bash.
+# Only add extensions if the installed Goose version supports them
+# (goose-ai Profile class must accept 'extensions' kwarg).
 if [ -n "$MCP_SERVERS" ]; then
-  echo "  extensions:" >> "$PROFILES_FILE"
-  OLDIFS="$IFS"
-  IFS=','
-  for SERVER in $MCP_SERVERS; do
-    IFS="$OLDIFS"
-    URL_VAR="MCP_SERVER_${SERVER}_URL"
-    TOKEN_VAR="MCP_SERVER_${SERVER}_TOKEN"
-    eval "URL=\${$URL_VAR}"
-    eval "TOKEN=\${$TOKEN_VAR}"
-    if [ -n "$URL" ]; then
-      NAME=$(echo "$SERVER" | tr '[:upper:]' '[:lower:]')
-      cat >> "$PROFILES_FILE" <<MCP_EOF
+  if python3 -c "from goose.cli.config import Profile; Profile(provider='test',processor='test',accelerator='test',moderator='passive',toolkits=[],extensions={})" 2>/dev/null; then
+    echo "  extensions:" >> "$PROFILES_FILE"
+    OLDIFS="$IFS"
+    IFS=','
+    for SERVER in $MCP_SERVERS; do
+      IFS="$OLDIFS"
+      URL_VAR="MCP_SERVER_${SERVER}_URL"
+      TOKEN_VAR="MCP_SERVER_${SERVER}_TOKEN"
+      eval "URL=\${$URL_VAR}"
+      eval "TOKEN=\${$TOKEN_VAR}"
+      if [ -n "$URL" ]; then
+        NAME=$(echo "$SERVER" | tr '[:upper:]' '[:lower:]')
+        cat >> "$PROFILES_FILE" <<MCP_EOF
     ${NAME}:
       name: ${NAME}
       type: streamablehttp
       uri: ${URL}
 MCP_EOF
-      if [ -n "$TOKEN" ]; then
-        export "${TOKEN_VAR}"
-        cat >> "$PROFILES_FILE" <<MCP_TOKEN_EOF
+        if [ -n "$TOKEN" ]; then
+          export "${TOKEN_VAR}"
+          cat >> "$PROFILES_FILE" <<MCP_TOKEN_EOF
       env_keys:
         - ${TOKEN_VAR}
 MCP_TOKEN_EOF
+        fi
+        echo "[entrypoint] MCP extension '${NAME}' configured: ${URL}"
       fi
-      echo "[entrypoint] MCP extension '${NAME}' configured: ${URL}"
-    fi
-  done
-  IFS="$OLDIFS"
+    done
+    IFS="$OLDIFS"
+  else
+    echo "[entrypoint] Goose version does not support MCP extensions, skipping"
+  fi
 fi
 
 # Append CF platform CA certs to Python's trust store (internal CAs use self-signed certs)
