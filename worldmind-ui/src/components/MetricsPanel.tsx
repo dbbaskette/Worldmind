@@ -6,34 +6,31 @@ interface MetricsPanelProps {
 }
 
 export function MetricsPanel({ metrics }: MetricsPanelProps) {
-  if (!metrics) {
-    return null
-  }
+  if (!metrics) return null
 
-  const metricsData = [
-    { label: 'Total Duration', value: formatDuration(metrics.totalDurationMs) },
-    { label: 'Directives Completed', value: formatNumber(metrics.directivesCompleted) },
-    { label: 'Directives Failed', value: formatNumber(metrics.directivesFailed) },
-    { label: 'Total Iterations', value: formatNumber(metrics.totalIterations) },
-    { label: 'Files Created', value: formatNumber(metrics.filesCreated) },
-    { label: 'Files Modified', value: formatNumber(metrics.filesModified) },
-    { label: 'Tests Run', value: formatNumber(metrics.testsRun) },
-    { label: 'Tests Passed', value: formatNumber(metrics.testsPassed) },
-    { label: 'Waves Executed', value: formatNumber(metrics.wavesExecuted) },
+  const items = [
+    { label: 'Duration', value: formatDuration(metrics.totalDurationMs) },
+    { label: 'Completed', value: formatNumber(metrics.directivesCompleted) },
+    { label: 'Failed', value: formatNumber(metrics.directivesFailed), warn: metrics.directivesFailed > 0 },
+    { label: 'Iterations', value: formatNumber(metrics.totalIterations) },
+    { label: 'Files', value: formatNumber(metrics.filesCreated + metrics.filesModified) },
+    { label: 'Tests', value: `${formatNumber(metrics.testsPassed)}/${formatNumber(metrics.testsRun)}` },
+    { label: 'Waves', value: formatNumber(metrics.wavesExecuted) },
   ]
 
   return (
-    <div className="bg-white border rounded-lg p-4">
-      <h3 className="text-sm font-semibold text-gray-700 mb-3">Mission Metrics</h3>
-
-      <div className="grid grid-cols-3 gap-4">
-        {metricsData.map(({ label, value }) => (
-          <div key={label}>
-            <div className="text-2xl font-bold text-gray-900">{value}</div>
-            <div className="text-xs text-gray-500">{label}</div>
+    <div className="flex items-center gap-5 py-3 px-4 bg-wm-card rounded-lg border border-wm-border mb-5 overflow-x-auto">
+      {items.map(({ label, value, warn }, idx) => (
+        <div key={label} className="flex items-center gap-5">
+          <div className="shrink-0">
+            <div className={`text-sm font-mono font-semibold ${warn ? 'text-red-400' : 'text-wm_text-primary'}`}>
+              {value}
+            </div>
+            <div className="text-[10px] text-wm_text-dim uppercase tracking-wider">{label}</div>
           </div>
-        ))}
-      </div>
+          {idx < items.length - 1 && <div className="w-px h-6 bg-wm-border shrink-0" />}
+        </div>
+      ))}
     </div>
   )
 }

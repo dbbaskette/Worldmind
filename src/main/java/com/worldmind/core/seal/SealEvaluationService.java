@@ -46,8 +46,10 @@ public class SealEvaluationService {
 
     private static final String REVIEW_PARSE_SYSTEM_PROMPT =
             "You are a code review parser. Extract structured feedback from the following code review output. " +
-            "Determine if the review approves the code, provide a brief summary, list specific issues found, " +
-            "list improvement suggestions, and assign a quality score from 1-10.";
+            "Extract the reviewer's approval decision and score exactly as stated in the output. " +
+            "If the review contains an explicit score (e.g. 'Score: 8/10'), use that exact number. " +
+            "Do NOT re-evaluate or override the reviewer's score — extract it faithfully. " +
+            "Also extract the summary, list of issues, and list of suggestions from the review.";
 
     private final LlmService llmService;
 

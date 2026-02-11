@@ -6,6 +6,7 @@ package com.worldmind.core.model;
 public enum MissionStatus {
     CLASSIFYING,
     UPLOADING,
+    SPECIFYING,
     PLANNING,
     AWAITING_APPROVAL,
     EXECUTING,

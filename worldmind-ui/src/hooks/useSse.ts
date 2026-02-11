@@ -29,6 +29,7 @@ export function useSse(missionId: string | null, onRefresh?: () => void) {
       'directive.fulfilled': addEvent,
       'directive.failed': addEvent,
       'directive.progress': addEvent,
+      'directive.phase': addEvent,
       'starblaster.opened': addEvent,
       'seal.denied': addEvent,
       'seal.granted': addEvent,

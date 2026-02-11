@@ -65,6 +65,7 @@ public class EvaluateWaveNode {
             for (var r : waveResults) resultMap.put(r.directiveId(), r);
 
             var completedIds = new ArrayList<String>();
+            var updatedDirectives = new ArrayList<Directive>();
             var testResultsList = new ArrayList<TestResult>();
             var reviewFeedbackList = new ArrayList<ReviewFeedback>();
             var starblasterInfos = new ArrayList<StarblasterInfo>();
@@ -85,6 +86,7 @@ public class EvaluateWaveNode {
                 if (!"FORGE".equalsIgnoreCase(directive.centurion())) {
                     log.info("Auto-passing non-FORGE directive {} [{}]", id, directive.centurion());
                     completedIds.add(id);
+                    updatedDirectives.add(withResult(directive, dispatchResult, DirectiveStatus.PASSED));
                     continue;
                 }
 
@@ -98,6 +100,11 @@ public class EvaluateWaveNode {
                     var outcome = applyFailureStrategy(id, directive, action,
                             "FORGE directive failed during execution");
                     completedIds.addAll(outcome.completedIds);
+                    if (!outcome.completedIds.isEmpty()) {
+                        updatedDirectives.add(withResult(directive, dispatchResult, DirectiveStatus.SKIPPED));
+                    } else if (outcome.missionFailed) {
+                        updatedDirectives.add(withResult(directive, dispatchResult, DirectiveStatus.FAILED));
+                    }
                     if (outcome.retryContext != null) retryContext = outcome.retryContext;
                     if (outcome.missionFailed) missionStatus = MissionStatus.FAILED;
                     errors.addAll(outcome.errors);
@@ -108,6 +115,9 @@ public class EvaluateWaveNode {
                 var fileChanges = dispatchResult.filesAffected() != null ? dispatchResult.filesAffected() : List.<FileRecord>of();
 
                 // Step 1: GAUNTLET
+                eventBus.publish(new WorldmindEvent("directive.phase",
+                        state.missionId(), id,
+                        Map.of("phase", "GAUNTLET"), Instant.now()));
                 TestResult testResult;
                 try {
                     var gauntletDirective = createGauntletDirective(directive);
@@ -123,6 +133,9 @@ public class EvaluateWaveNode {
                 }
 
                 // Step 2: VIGIL
+                eventBus.publish(new WorldmindEvent("directive.phase",
+                        state.missionId(), id,
+                        Map.of("phase", "VIGIL"), Instant.now()));
                 ReviewFeedback reviewFeedback;
                 try {
                     var vigilDirective = createVigilDirective(directive);
@@ -141,6 +154,9 @@ public class EvaluateWaveNode {
                 reviewFeedbackList.add(reviewFeedback);
 
                 // Step 3: Evaluate seal
+                eventBus.publish(new WorldmindEvent("directive.phase",
+                        state.missionId(), id,
+                        Map.of("phase", "SEAL"), Instant.now()));
                 var sealDecision = sealService.evaluateSeal(testResult, reviewFeedback, directive);
                 log.info("Seal evaluation for {}: {} — {}", id,
                         sealDecision.sealGranted() ? "GRANTED" : "DENIED", sealDecision.reason());
@@ -148,16 +164,32 @@ public class EvaluateWaveNode {
 
                 if (sealDecision.sealGranted()) {
                     completedIds.add(id);
+                    updatedDirectives.add(withResult(directive, dispatchResult, DirectiveStatus.PASSED));
+                    eventBus.publish(new WorldmindEvent("seal.granted",
+                            state.missionId(), id,
+                            Map.of("reason", sealDecision.reason(),
+                                   "score", reviewFeedback.score(),
+                                   "summary", reviewFeedback.summary() != null ? reviewFeedback.summary() : ""),
+                            Instant.now()));
                 } else {
                     eventBus.publish(new WorldmindEvent("seal.denied",
                             state.missionId(), id,
                             Map.of("reason", sealDecision.reason(),
-                                   "action", sealDecision.action() != null ? sealDecision.action().name() : "UNKNOWN"),
+                                   "action", sealDecision.action() != null ? sealDecision.action().name() : "UNKNOWN",
+                                   "score", reviewFeedback.score(),
+                                   "summary", reviewFeedback.summary() != null ? reviewFeedback.summary() : ""),
                             Instant.now()));
                     var outcome = applyFailureStrategy(id, directive, sealDecision.action(),
                             sealDecision.reason());
                     completedIds.addAll(outcome.completedIds);
-                    if (outcome.retryContext != null) retryContext = outcome.retryContext;
+                    if (!outcome.completedIds.isEmpty()) {
+                        updatedDirectives.add(withResult(directive, dispatchResult, DirectiveStatus.SKIPPED));
+                    } else if (outcome.missionFailed) {
+                        updatedDirectives.add(withResult(directive, dispatchResult, DirectiveStatus.FAILED));
+                    }
+                    if (outcome.retryContext != null) {
+                        retryContext = enrichRetryContext(outcome.retryContext, reviewFeedback);
+                    }
                     if (outcome.missionFailed) missionStatus = MissionStatus.FAILED;
                     errors.addAll(outcome.errors);
                 }
@@ -166,6 +198,7 @@ public class EvaluateWaveNode {
             // Build state updates
             var updates = new HashMap<String, Object>();
             updates.put("completedDirectiveIds", completedIds);
+            if (!updatedDirectives.isEmpty()) updates.put("directives", updatedDirectives);
             if (!testResultsList.isEmpty()) updates.put("testResults", testResultsList);
             if (!reviewFeedbackList.isEmpty()) updates.put("reviewFeedback", reviewFeedbackList);
             if (!starblasterInfos.isEmpty()) updates.put("starblasters", starblasterInfos);
@@ -177,6 +210,17 @@ public class EvaluateWaveNode {
         } finally {
             MdcContext.clear();
         }
+    }
+
+    private Directive withResult(Directive d, WaveDispatchResult result, DirectiveStatus status) {
+        return new Directive(
+                d.id(), d.centurion(), d.description(),
+                d.inputContext(), d.successCriteria(), d.dependencies(),
+                status, d.iteration(), d.maxIterations(),
+                d.onFailure(),
+                result != null && result.filesAffected() != null ? result.filesAffected() : d.filesAffected(),
+                result != null ? result.elapsedMs() : d.elapsedMs()
+        );
     }
 
     private FailureOutcome applyFailureStrategy(String id, Directive directive,
@@ -215,6 +259,32 @@ public class EvaluateWaveNode {
             }
         }
         return outcome;
+    }
+
+    /**
+     * Appends vigil review details to retry context so FORGE knows what to fix.
+     */
+    private String enrichRetryContext(String baseContext, ReviewFeedback feedback) {
+        var sb = new StringBuilder(baseContext);
+        sb.append("\n\n## Review Feedback (score: ").append(feedback.score()).append("/10)\n\n");
+
+        if (feedback.summary() != null && !feedback.summary().isBlank()) {
+            sb.append("**Summary:** ").append(feedback.summary()).append("\n\n");
+        }
+        if (feedback.issues() != null && !feedback.issues().isEmpty()) {
+            sb.append("**Issues to fix:**\n");
+            for (var issue : feedback.issues()) {
+                sb.append("- ").append(issue).append("\n");
+            }
+            sb.append("\n");
+        }
+        if (feedback.suggestions() != null && !feedback.suggestions().isEmpty()) {
+            sb.append("**Suggestions:**\n");
+            for (var suggestion : feedback.suggestions()) {
+                sb.append("- ").append(suggestion).append("\n");
+            }
+        }
+        return sb.toString();
     }
 
     private Directive createGauntletDirective(Directive forgeDirective) {

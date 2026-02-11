@@ -40,7 +40,14 @@ public final class InstructionBuilder {
             }
             if (context.fileTree() != null && !context.fileTree().isEmpty()) {
                 sb.append("\n### File Structure\n\n```\n");
-                sb.append(String.join("\n", context.fileTree())).append("\n```\n");
+                var tree = context.fileTree();
+                if (tree.size() > MAX_FILE_TREE_ENTRIES) {
+                    sb.append(String.join("\n", tree.subList(0, MAX_FILE_TREE_ENTRIES)));
+                    sb.append("\n... and ").append(tree.size() - MAX_FILE_TREE_ENTRIES).append(" more files\n");
+                } else {
+                    sb.append(String.join("\n", tree));
+                }
+                sb.append("\n```\n");
             }
             sb.append("\n");
         }
@@ -233,6 +240,9 @@ public final class InstructionBuilder {
         return sb.toString();
     }
 
+    private static final int MAX_FILE_TREE_ENTRIES = 200;
+    private static final int MAX_DEPENDENCIES = 50;
+
     private static void appendProjectContext(StringBuilder sb, ProjectContext context) {
         if (context != null) {
             sb.append("## Project Context\n\n");
@@ -243,16 +253,28 @@ public final class InstructionBuilder {
             }
             if (context.fileTree() != null && !context.fileTree().isEmpty()) {
                 sb.append("\n### File Structure\n\n```\n");
-                sb.append(String.join("\n", context.fileTree())).append("\n```\n");
+                var tree = context.fileTree();
+                if (tree.size() > MAX_FILE_TREE_ENTRIES) {
+                    sb.append(String.join("\n", tree.subList(0, MAX_FILE_TREE_ENTRIES)));
+                    sb.append("\n... and ").append(tree.size() - MAX_FILE_TREE_ENTRIES).append(" more files\n");
+                } else {
+                    sb.append(String.join("\n", tree));
+                }
+                sb.append("\n```\n");
             }
             sb.append("\n");
         }
     }
 
     private static String formatDependencies(ProjectContext context) {
-        return String.join(", ", context.dependencies().entrySet().stream()
+        var entries = context.dependencies().entrySet().stream()
             .map(e -> e.getKey() + ":" + e.getValue())
             .sorted()
-            .toList());
+            .toList();
+        if (entries.size() > MAX_DEPENDENCIES) {
+            entries = entries.subList(0, MAX_DEPENDENCIES);
+            return String.join(", ", entries) + " ... and more";
+        }
+        return String.join(", ", entries);
     }
 }

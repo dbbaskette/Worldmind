@@ -105,6 +105,7 @@ class MissionEngineTest {
         WorldmindGraph graph = new WorldmindGraph(
                 new ClassifyRequestNode(mockLlm),
                 new UploadContextNode(mockScanner),
+                new GenerateSpecNode(mockLlm, null),
                 new PlanMissionNode(mockLlm),
                 mockScheduleWave,
                 mockParallelDispatch,

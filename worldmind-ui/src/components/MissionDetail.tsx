@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMission } from '../hooks/useMission'
 import { useSse } from '../hooks/useSse'
+import { apiClient } from '../api/client'
 import { StatusBadge } from './StatusBadge'
 import { DirectiveTimeline } from './DirectiveTimeline'
 import { DirectiveCard } from './DirectiveCard'
@@ -17,19 +18,19 @@ function ErrorPanel({ errors, status }: { errors: string[]; status: string }) {
   const [expanded, setExpanded] = useState(!isOldCompleted)
 
   return (
-    <div className={`mt-6 rounded-lg border p-4 ${
-      isOldCompleted ? 'bg-gray-50 border-gray-200' : 'bg-red-50 border-red-300'
+    <div className={`mt-4 rounded-lg border p-3 ${
+      isOldCompleted ? 'bg-wm-card border-wm-border' : 'bg-red-500/5 border-red-500/20'
     }`}>
       <button
         onClick={() => setExpanded(!expanded)}
         className="flex items-center justify-between w-full text-left"
       >
-        <h3 className={`text-sm font-semibold ${isOldCompleted ? 'text-gray-600' : 'text-red-900'}`}>
-          Errors ({errors.length})
-        </h3>
+        <span className={`text-xs font-mono ${isOldCompleted ? 'text-wm_text-muted' : 'text-red-400'}`}>
+          {errors.length} error{errors.length !== 1 ? 's' : ''}
+        </span>
         <svg
-          className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''} ${
-            isOldCompleted ? 'text-gray-400' : 'text-red-400'
+          className={`w-3 h-3 transition-transform ${expanded ? 'rotate-180' : ''} ${
+            isOldCompleted ? 'text-wm_text-dim' : 'text-red-400/60'
           }`}
           fill="none" stroke="currentColor" viewBox="0 0 24 24"
         >
@@ -37,9 +38,9 @@ function ErrorPanel({ errors, status }: { errors: string[]; status: string }) {
         </svg>
       </button>
       {expanded && (
-        <ul className={`mt-2 space-y-1 text-sm ${isOldCompleted ? 'text-gray-600' : 'text-red-700'}`}>
+        <ul className={`mt-2 space-y-1 text-xs font-mono ${isOldCompleted ? 'text-wm_text-muted' : 'text-red-400/80'}`}>
           {errors.map((error, idx) => (
-            <li key={idx}>{error}</li>
+            <li key={idx} className="leading-relaxed">{error}</li>
           ))}
         </ul>
       )}
@@ -50,13 +51,40 @@ function ErrorPanel({ errors, status }: { errors: string[]; status: string }) {
 export function MissionDetail({ missionId }: MissionDetailProps) {
   const { mission, loading, error, refresh } = useMission(missionId)
   const { events, connectionStatus } = useSse(missionId, refresh)
+  const [retrying, setRetrying] = useState(false)
+
+  const handleRetryDirective = async (directiveId: string) => {
+    if (!mission) return
+    setRetrying(true)
+    try {
+      await apiClient.retryMission(mission.mission_id, [directiveId])
+      refresh()
+    } catch (err) {
+      console.error('Retry failed:', err)
+    } finally {
+      setRetrying(false)
+    }
+  }
+
+  const handleRetryAllFailed = async () => {
+    if (!mission) return
+    setRetrying(true)
+    try {
+      await apiClient.retryMission(mission.mission_id)
+      refresh()
+    } catch (err) {
+      console.error('Retry all failed:', err)
+    } finally {
+      setRetrying(false)
+    }
+  }
 
   if (loading && !mission) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading mission...</p>
+        <div className="flex items-center gap-3 text-wm_text-muted">
+          <div className="w-5 h-5 border-2 border-wm-border border-t-centurion-vigil rounded-full animate-spin" />
+          <span className="text-xs font-mono">Loading mission...</span>
         </div>
       </div>
     )
@@ -65,9 +93,9 @@ export function MissionDetail({ missionId }: MissionDetailProps) {
   if (error) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-center text-red-600">
-          <p className="text-lg font-semibold mb-2">Error</p>
-          <p>{error}</p>
+        <div className="text-center">
+          <div className="text-red-400 text-xs font-mono mb-1">ERROR</div>
+          <p className="text-sm text-wm_text-secondary">{error}</p>
         </div>
       </div>
     )
@@ -76,76 +104,83 @@ export function MissionDetail({ missionId }: MissionDetailProps) {
   if (!mission) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-gray-500">Select a mission to view details</p>
+        <p className="text-xs text-wm_text-dim font-mono">Select a mission</p>
       </div>
     )
   }
 
+  const hasFailedDirectives = mission.directives.some(d => d.status === 'FAILED')
+  const isTerminal = mission.status === 'COMPLETED' || mission.status === 'FAILED'
+  const showRetryAll = isTerminal && hasFailedDirectives
+
   return (
-    <div className="p-6 overflow-y-auto h-full">
+    <div className="p-5 overflow-y-auto h-full">
       {/* Header */}
-      <div className="mb-6">
+      <div className="mb-5">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-xl font-bold text-gray-900">
-            Mission {mission.mission_id}
-          </h2>
-          <StatusBadge status={mission.status} type="mission" />
+          <div className="flex items-center gap-3">
+            <h2 className="text-sm font-mono font-semibold text-wm_text-primary">
+              {mission.mission_id}
+            </h2>
+            <StatusBadge status={mission.status} type="mission" />
+          </div>
+          {showRetryAll && (
+            <button
+              onClick={handleRetryAllFailed}
+              disabled={retrying}
+              className="px-3 py-1.5 bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-lg text-[10px] font-mono hover:bg-amber-500/20 disabled:opacity-30 transition-colors"
+            >
+              {retrying ? 'retrying...' : 'retry failed'}
+            </button>
+          )}
         </div>
 
-        <p className="text-gray-700 mb-4">{mission.request}</p>
+        <p className="text-sm text-wm_text-secondary leading-relaxed mb-3">{mission.request}</p>
 
-        <div className="flex gap-4 text-sm text-gray-600">
-          <div>
-            <span className="font-medium">Mode:</span>{' '}
-            {mission.interaction_mode.replace(/_/g, ' ')}
-          </div>
-          <div>
-            <span className="font-medium">Strategy:</span>{' '}
-            {mission.execution_strategy}
-          </div>
+        <div className="flex items-center gap-4 text-[10px] font-mono text-wm_text-dim">
+          <span>mode: {mission.interaction_mode.replace(/_/g, ' ').toLowerCase()}</span>
+          <span>strategy: {mission.execution_strategy.toLowerCase()}</span>
           {mission.seal_granted && (
-            <div className="text-green-600 font-medium">
-              ✓ Seal of Approval Granted
-            </div>
+            <span className="text-emerald-400 flex items-center gap-1">
+              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              seal granted
+            </span>
           )}
         </div>
       </div>
 
-      {/* Approval Panel (conditional) */}
       {mission.status === 'AWAITING_APPROVAL' && (
         <ApprovalPanel mission={mission} onRefresh={refresh} />
       )}
 
-      {/* Metrics Panel */}
-      {mission.metrics && (
-        <div className="mb-6">
-          <MetricsPanel metrics={mission.metrics} />
-        </div>
+      {mission.metrics && <MetricsPanel metrics={mission.metrics} />}
+
+      {mission.directives.length > 0 && (
+        <DirectiveTimeline directives={mission.directives} waveCount={mission.wave_count} />
       )}
 
-      {/* Directive Timeline */}
       {mission.directives.length > 0 && (
-        <DirectiveTimeline directives={mission.directives} />
-      )}
-
-      {/* Directives */}
-      {mission.directives.length > 0 && (
-        <div className="mb-6">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">
+        <div className="mb-5">
+          <div className="text-[10px] font-mono uppercase tracking-wider text-wm_text-dim mb-3">
             Directives ({mission.directives.length})
-          </h3>
-          <div className="space-y-3">
+          </div>
+          <div className="space-y-2">
             {mission.directives.map(directive => (
-              <DirectiveCard key={directive.id} directive={directive} />
+              <DirectiveCard
+                key={directive.id}
+                directive={directive}
+                events={events.filter(e => e.directiveId === directive.id)}
+                onRetry={isTerminal ? handleRetryDirective : undefined}
+              />
             ))}
           </div>
         </div>
       )}
 
-      {/* Event Log */}
       <EventLog events={events} connectionStatus={connectionStatus} />
 
-      {/* Errors — expanded for active missions, collapsed for terminal ones */}
       {mission.errors.length > 0 && (
         <ErrorPanel errors={mission.errors} status={mission.status} />
       )}

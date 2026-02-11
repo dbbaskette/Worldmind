@@ -28,6 +28,16 @@ class ApiClient {
     return response.json()
   }
 
+  async listMissions(): Promise<MissionResponse[]> {
+    const response = await fetch(`${API_BASE}/missions`)
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch missions')
+    }
+
+    return response.json()
+  }
+
   async getMission(id: string): Promise<MissionResponse> {
     const response = await fetch(`${API_BASE}/missions/${id}`)
 
@@ -88,6 +98,23 @@ class ApiClient {
 
     if (!response.ok) {
       throw new Error('Failed to fetch directive')
+    }
+
+    return response.json()
+  }
+
+  async retryMission(id: string, directiveIds?: string[]): Promise<{ mission_id: string; status: string }> {
+    const response = await fetch(`${API_BASE}/missions/${id}/retry`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(
+        directiveIds ? { directive_ids: directiveIds } : {}
+      )
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || 'Failed to retry mission')
     }
 
     return response.json()

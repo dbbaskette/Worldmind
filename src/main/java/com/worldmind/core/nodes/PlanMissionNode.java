@@ -7,6 +7,7 @@ import com.worldmind.core.model.DirectiveStatus;
 import com.worldmind.core.model.FailureStrategy;
 import com.worldmind.core.model.MissionPlan;
 import com.worldmind.core.model.MissionStatus;
+import com.worldmind.core.model.ProductSpec;
 import com.worldmind.core.model.ProjectContext;
 import com.worldmind.core.state.WorldmindState;
 import org.springframework.stereotype.Component;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Generates a mission plan consisting of one or more {@link Directive}s
@@ -57,6 +59,11 @@ public class PlanMissionNode {
     }
 
     public Map<String, Object> apply(WorldmindState state) {
+        // Early-exit for retry: if directives already exist, skip re-planning
+        if (!state.directives().isEmpty()) {
+            return Map.of("status", MissionStatus.AWAITING_APPROVAL.name());
+        }
+
         String request = state.request();
         Classification classification = state.classification().orElseThrow(
                 () -> new IllegalStateException("Classification must be present before planning")
@@ -64,8 +71,9 @@ public class PlanMissionNode {
         ProjectContext projectContext = state.projectContext().orElseThrow(
                 () -> new IllegalStateException("ProjectContext must be present before planning")
         );
+        Optional<ProductSpec> productSpec = state.productSpec();
 
-        String userPrompt = buildUserPrompt(request, classification, projectContext);
+        String userPrompt = buildUserPrompt(request, classification, projectContext, productSpec);
         MissionPlan plan = llmService.structuredCall(SYSTEM_PROMPT, userPrompt, MissionPlan.class);
 
         List<Directive> directives = convertToDirectives(plan);
@@ -77,8 +85,10 @@ public class PlanMissionNode {
         );
     }
 
-    private String buildUserPrompt(String request, Classification classification, ProjectContext projectContext) {
-        return String.format("""
+    private String buildUserPrompt(String request, Classification classification,
+                                   ProjectContext projectContext, Optional<ProductSpec> productSpec) {
+        var sb = new StringBuilder();
+        sb.append(String.format("""
                 Request: %s
 
                 Classification:
@@ -100,7 +110,32 @@ public class PlanMissionNode {
                 projectContext.language(),
                 projectContext.framework(),
                 projectContext.fileCount()
-        );
+        ));
+
+        productSpec.ifPresent(spec -> {
+            sb.append(String.format("""
+
+                Product Specification:
+                - Title: %s
+                - Overview: %s
+                - Goals: %s
+                - Non-Goals: %s
+                - Technical Requirements: %s
+                - Acceptance Criteria: %s
+
+                Use this specification to generate focused, well-scoped directives
+                that address the goals and meet the acceptance criteria.
+                """,
+                spec.title(),
+                spec.overview(),
+                String.join("; ", spec.goals()),
+                String.join("; ", spec.nonGoals()),
+                String.join("; ", spec.technicalRequirements()),
+                String.join("; ", spec.acceptanceCriteria())
+            ));
+        });
+
+        return sb.toString();
     }
 
     private List<Directive> convertToDirectives(MissionPlan plan) {

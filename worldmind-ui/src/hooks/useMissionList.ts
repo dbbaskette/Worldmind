@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { apiClient } from '../api/client'
 import { MissionResponse } from '../api/types'
 
@@ -7,6 +7,19 @@ export function useMissionList() {
   const [selectedMissionId, setSelectedMissionId] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+
+  // Load existing missions from the backend on mount
+  useEffect(() => {
+    apiClient.listMissions().then(list => {
+      if (list.length > 0) {
+        const map = new Map<string, MissionResponse>()
+        for (const m of list) {
+          map.set(m.mission_id, m)
+        }
+        setMissions(map)
+      }
+    }).catch(() => { /* ignore — backend may be unreachable on first load */ })
+  }, [])
 
   const submitMission = useCallback(async (request: string, mode: string, projectPath?: string, gitRemoteUrl?: string): Promise<string> => {
     setSubmitting(true)
@@ -27,7 +40,8 @@ export function useMissionList() {
         directives: [],
         seal_granted: false,
         metrics: null,
-        errors: []
+        errors: [],
+        wave_count: 0
       }
 
       setMissions(prev => new Map(prev).set(missionId, placeholderMission))

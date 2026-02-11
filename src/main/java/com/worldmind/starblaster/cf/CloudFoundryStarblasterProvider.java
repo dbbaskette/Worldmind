@@ -43,6 +43,9 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
      */
     private final ConcurrentHashMap<String, String> starblasterAppNames = new ConcurrentHashMap<>();
 
+    /** Tracks starblasterId to CF task GUID so we poll the exact task, not stale ones with the same name. */
+    private final ConcurrentHashMap<String, String> starblasterTaskGuids = new ConcurrentHashMap<>();
+
     public CloudFoundryStarblasterProvider(CloudFoundryProperties cfProperties,
                                            GitWorkspaceManager gitWorkspaceManager,
                                            CfApiClient cfApiClient,
@@ -65,6 +68,12 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
                 ? request.gitRemoteUrl()
                 : cfProperties.getGitRemoteUrl();
 
+        // Embed git token into HTTPS URLs for push authentication
+        var gitToken = cfProperties.getGitToken();
+        if (gitToken != null && !gitToken.isBlank() && gitRemoteUrl.startsWith("https://")) {
+            gitRemoteUrl = gitRemoteUrl.replace("https://", "https://x-access-token:" + gitToken + "@");
+        }
+
         var memoryMb = request.memoryLimitMb() > 0
                 ? request.memoryLimitMb()
                 : cfProperties.getTaskMemoryMb();
@@ -79,29 +88,46 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
         var instructionUrl = orchestratorUrl + "/api/internal/instructions/" + instructionKey;
 
         // Build the task command that runs inside the CF app container.
-        // Clone from default branch, create a directive branch, fetch the
-        // instruction from the orchestrator, run Goose, commit, and push.
+        // CF tasks bypass Docker ENTRYPOINT, so we source entrypoint.sh
+        // (minus its final 'exec goose run' line) to set up OPENAI_API_KEY,
+        // Goose profiles.yaml, etc. from VCAP_SERVICES.
+        // Goose wrapper: patches SSL (CF Docker lacks CA certs) and httpx auth
+        // (exchange library sends Basic auth instead of Bearer — Tanzu proxy rejects it).
+        // Exec's goose in-process so patches take effect. Base64-encoded to avoid escaping.
+        var gooseWrapper = "aW1wb3J0IHNzbDtvPXNzbC5jcmVhdGVfZGVmYXVsdF9jb250ZXh0CmRlZiBuKCphLCoq"
+                + "ayk6Yz1vKCphLCoqayk7Yy5jaGVja19ob3N0bmFtZT0wO2MudmVyaWZ5X21vZGU9c3Ns"
+                + "LkNFUlRfTk9ORTtyZXR1cm4gYwpzc2wuY3JlYXRlX2RlZmF1bHRfY29udGV4dD1uO3Nz"
+                + "bC5fY3JlYXRlX2RlZmF1bHRfaHR0cHNfY29udGV4dD1zc2wuX2NyZWF0ZV91bnZlcmlm"
+                + "aWVkX2NvbnRleHQKaW1wb3J0IGh0dHB4O2k9aHR0cHguQ2xpZW50Ll9faW5pdF9fCmRl"
+                + "ZiBwKHMsKmEsKiprKToKIGF1PWsuZ2V0KCdhdXRoJykKIGlmIHR5cGUoYXUpPT10dXBs"
+                + "ZSBhbmQgbGVuKGF1KT09MiBhbmQgYXVbMF09PSdCZWFyZXInOmRlbCBrWydhdXRoJ107"
+                + "aD1kaWN0KGsuZ2V0KCdoZWFkZXJzJylvcnt9KTtoWydBdXRob3JpemF0aW9uJ109J0Jl"
+                + "YXJlciAnK2F1WzFdO2tbJ2hlYWRlcnMnXT1oCiBpKHMsKmEsKiprKQpodHRweC5DbGll"
+                + "bnQuX19pbml0X189cAppbXBvcnQgc3lzO3N5cy5hcmd2PVsnZ29vc2UnLCdydW4nLHN5"
+                + "cy5hcmd2WzFdXTtleGVjKG9wZW4oJy91c3IvbG9jYWwvYmluL2dvb3NlJykucmVhZCgp"
+                + "KQo=";
+
         var taskCommand = String.join(" && ",
-                "git clone %s /workspace".formatted(gitRemoteUrl),
-                "cd /workspace",
-                "git config user.name 'Worldmind Centurion'",
-                "git config user.email 'centurion@worldmind.local'",
-                "git checkout -b %s".formatted(branchName),
-                "mkdir -p .worldmind/directives",
-                "curl -sfk '%s' > .worldmind/directives/%s.md".formatted(instructionUrl, directiveId),
-                "goose run .worldmind/directives/%s.md".formatted(directiveId),
-                "git add -A",
-                "git commit -m 'DIR-%s'".formatted(directiveId),
-                "git push -u origin %s".formatted(branchName)
+                // Source entrypoint.sh for VCAP_SERVICES env setup; fix OPENAI_HOST trailing slash
+                "eval \"$(sed '$d' /usr/local/bin/entrypoint.sh)\" && { [ -z \"$OPENAI_HOST\" ] || export OPENAI_HOST=\"${OPENAI_HOST%/}/\"; }",
+                // Write goose wrapper script (SSL + auth patches)
+                "echo '%s' | base64 -d > /tmp/g.py".formatted(gooseWrapper),
+                "git clone %s /workspace && cd /workspace".formatted(gitRemoteUrl),
+                "git config user.name 'Worldmind Centurion' && git config user.email 'centurion@worldmind.local'",
+                "git checkout -B %s".formatted(branchName),
+                "mkdir -p .worldmind/directives && curl --retry 3 -fk '%s' > .worldmind/directives/%s.md".formatted(instructionUrl, directiveId),
+                "python3 /tmp/g.py .worldmind/directives/%s.md".formatted(directiveId),
+                "git add -A && git commit -m '%s' && git push -uf origin %s".formatted(directiveId, branchName)
         );
 
         log.info("Opening Starblaster {} for directive {} on app {}", taskName, directiveId, appName);
         log.debug("Task command: {}", taskCommand);
 
-        cfApiClient.createTask(appName, taskCommand, taskName, memoryMb, diskMb);
+        var taskGuid = cfApiClient.createTask(appName, taskCommand, taskName, memoryMb, diskMb);
 
-        log.info("CF task {} started on app {}", taskName, appName);
+        log.info("CF task {} started on app {} (guid={})", taskName, appName, taskGuid);
         starblasterAppNames.put(taskName, appName);
+        starblasterTaskGuids.put(taskName, taskGuid);
 
         return taskName;
     }
@@ -109,13 +135,17 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
     @Override
     public int waitForCompletion(String starblasterId, int timeoutSeconds) {
         var appName = getAppNameFromStarblasterId(starblasterId);
-        log.info("Waiting for task {} on app {} (timeout: {}s)", starblasterId, appName, timeoutSeconds);
+        var taskGuid = starblasterTaskGuids.get(starblasterId);
+        log.info("Waiting for task {} (guid={}) on app {} (timeout: {}s)",
+                starblasterId, taskGuid, appName, timeoutSeconds);
 
         long deadline = System.currentTimeMillis() + (timeoutSeconds * 1000L);
 
         while (System.currentTimeMillis() < deadline) {
             try {
-                var state = cfApiClient.getTaskState(appName, starblasterId);
+                var state = taskGuid != null
+                        ? cfApiClient.getTaskState(taskGuid)
+                        : cfApiClient.getTaskState(appName, starblasterId);
 
                 if ("SUCCEEDED".equals(state)) {
                     log.info("Task {} completed successfully", starblasterId);
@@ -152,7 +182,10 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
     public String captureOutput(String starblasterId) {
         try {
             var appName = getAppNameFromStarblasterId(starblasterId);
-            var failureReason = cfApiClient.getTaskFailureReason(appName, starblasterId);
+            var taskGuid = starblasterTaskGuids.get(starblasterId);
+            var failureReason = taskGuid != null
+                    ? cfApiClient.getTaskFailureReason(taskGuid)
+                    : cfApiClient.getTaskFailureReason(appName, starblasterId);
             if (!failureReason.isEmpty()) {
                 return "Task failed: " + failureReason;
             }
@@ -166,14 +199,20 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
     @Override
     public void teardownStarblaster(String starblasterId) {
         try {
-            var appName = getAppNameFromStarblasterId(starblasterId);
-            cfApiClient.cancelTask(appName, starblasterId);
-            log.info("Task {} cancelled on app {}", starblasterId, appName);
+            var taskGuid = starblasterTaskGuids.get(starblasterId);
+            if (taskGuid != null) {
+                cfApiClient.cancelTask(taskGuid);
+            } else {
+                var appName = getAppNameFromStarblasterId(starblasterId);
+                cfApiClient.cancelTask(appName, starblasterId);
+            }
+            log.info("Task {} cancelled", starblasterId);
         } catch (Exception e) {
             log.debug("Could not cancel task {} (may already be done): {}",
                     starblasterId, e.getMessage());
         } finally {
             starblasterAppNames.remove(starblasterId);
+            starblasterTaskGuids.remove(starblasterId);
             instructionStore.remove(starblasterId);
         }
     }

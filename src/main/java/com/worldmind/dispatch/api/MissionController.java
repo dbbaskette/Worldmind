@@ -1,10 +1,15 @@
 package com.worldmind.dispatch.api;
 
 import com.worldmind.core.engine.MissionEngine;
+import com.worldmind.core.events.EventBus;
 import com.worldmind.core.model.Directive;
+import com.worldmind.core.model.DirectiveStatus;
 import com.worldmind.core.model.InteractionMode;
 import com.worldmind.core.model.MissionStatus;
+import com.worldmind.core.model.ReviewFeedback;
+import com.worldmind.core.scheduler.OscillationDetector;
 import com.worldmind.core.state.WorldmindState;
+import com.worldmind.starblaster.InstructionStore;
 import org.bsc.langgraph4j.RunnableConfig;
 import org.bsc.langgraph4j.checkpoint.BaseCheckpointSaver;
 import org.bsc.langgraph4j.checkpoint.Checkpoint;
@@ -31,6 +36,9 @@ public class MissionController {
     private final MissionEngine missionEngine;
     private final BaseCheckpointSaver checkpointSaver;
     private final SseStreamingService sseStreamingService;
+    private final OscillationDetector oscillationDetector;
+    private final EventBus eventBus;
+    private final InstructionStore instructionStore;
 
     /** In-memory store of running/completed mission states, keyed by missionId. */
     private final ConcurrentHashMap<String, WorldmindState> missionStates = new ConcurrentHashMap<>();
@@ -40,10 +48,16 @@ public class MissionController {
 
     public MissionController(MissionEngine missionEngine,
                              BaseCheckpointSaver checkpointSaver,
-                             SseStreamingService sseStreamingService) {
+                             SseStreamingService sseStreamingService,
+                             OscillationDetector oscillationDetector,
+                             EventBus eventBus,
+                             InstructionStore instructionStore) {
         this.missionEngine = missionEngine;
         this.checkpointSaver = checkpointSaver;
         this.sseStreamingService = sseStreamingService;
+        this.oscillationDetector = oscillationDetector;
+        this.eventBus = eventBus;
+        this.instructionStore = instructionStore;
     }
 
     /**
@@ -70,6 +84,15 @@ public class MissionController {
         String missionId = missionEngine.generateMissionId();
         log.info("Accepted mission {} — launching async execution", missionId);
 
+        // Clear stale checkpoints from previous runs with the same ID
+        // (counter resets on app restart, so IDs can collide)
+        try {
+            RunnableConfig cleanupConfig = RunnableConfig.builder().threadId(missionId).build();
+            checkpointSaver.release(cleanupConfig);
+        } catch (Exception e) {
+            log.debug("Failed to clear old checkpoints for {}: {}", missionId, e.getMessage());
+        }
+
         // Store a placeholder state while the mission runs
         missionStates.put(missionId, new WorldmindState(Map.of(
                 "missionId", missionId,
@@ -78,7 +101,7 @@ public class MissionController {
                 "status", MissionStatus.CLASSIFYING.name()
         )));
 
-        // Run mission asynchronously
+        // Run mission asynchronously (uses overload with projectPath/gitRemoteUrl)
         CompletableFuture<WorldmindState> future = CompletableFuture.supplyAsync(() -> {
             try {
                 WorldmindState result = missionEngine.runMission(missionId, request.request(), mode, request.projectPath(), request.gitRemoteUrl());
@@ -98,9 +121,9 @@ public class MissionController {
                 return failedState;
             } finally {
                 missionFutures.remove(missionId);
+                cleanupMissionResources(missionId);
             }
         });
-
         missionFutures.put(missionId, future);
 
         return ResponseEntity.accepted().body(Map.of(
@@ -110,7 +133,19 @@ public class MissionController {
     }
 
     /**
+     * GET /api/v1/missions — List all tracked missions (summary).
+     */
+    @GetMapping
+    public ResponseEntity<List<MissionResponse>> listMissions() {
+        List<MissionResponse> list = missionStates.values().stream()
+                .map(this::toResponse)
+                .toList();
+        return ResponseEntity.ok(list);
+    }
+
+    /**
      * GET /api/v1/missions/{id} — Get mission status with all directive statuses.
+     * During active execution, reads the latest checkpoint for live directive progress.
      */
     @GetMapping("/{id}")
     public ResponseEntity<MissionResponse> getMission(@PathVariable String id) {
@@ -118,7 +153,35 @@ public class MissionController {
         if (state == null) {
             return ResponseEntity.notFound().build();
         }
+
+        // During active execution, read the latest checkpoint for live state.
+        // Only use checkpoint if it has directives — early checkpoints from graph
+        // re-invocation may be partial and would erase the in-memory directives.
+        if (isActiveStatus(state.status())) {
+            try {
+                RunnableConfig config = RunnableConfig.builder().threadId(id).build();
+                Optional<Checkpoint> latest = checkpointSaver.get(config);
+                if (latest.isPresent()) {
+                    var checkpointState = new WorldmindState(latest.get().getState());
+                    if (!checkpointState.directives().isEmpty()) {
+                        state = checkpointState;
+                        missionStates.put(id, state);
+                    }
+                }
+            } catch (Exception e) {
+                log.debug("Failed to read checkpoint for {}, using in-memory state", id);
+            }
+        }
+
         return ResponseEntity.ok(toResponse(state));
+    }
+
+    private boolean isActiveStatus(MissionStatus status) {
+        return status == MissionStatus.CLASSIFYING
+                || status == MissionStatus.UPLOADING
+                || status == MissionStatus.SPECIFYING
+                || status == MissionStatus.PLANNING
+                || status == MissionStatus.EXECUTING;
     }
 
     /**
@@ -149,38 +212,11 @@ public class MissionController {
 
         log.info("Approving mission {} — launching execution", id);
 
-        // Transition to EXECUTING immediately so the UI sees the status change
-        WorldmindState executingState = new WorldmindState(Map.of(
-                "missionId", id,
-                "request", state.request(),
-                "interactionMode", InteractionMode.FULL_AUTO.name(),
-                "status", MissionStatus.EXECUTING.name()
-        ));
-        missionStates.put(id, executingState);
+        // Transition to EXECUTING, preserving all existing state so the UI keeps showing directives
+        missionStates.put(id, new WorldmindState(buildExecutionStateMap(state)));
 
-        // Re-invoke the graph with FULL_AUTO so it runs all the way through
-        CompletableFuture<WorldmindState> future = CompletableFuture.supplyAsync(() -> {
-            try {
-                WorldmindState result = missionEngine.runMission(id, state.request(), InteractionMode.FULL_AUTO);
-                if (result != null) {
-                    missionStates.put(id, result);
-                }
-                return result;
-            } catch (Exception e) {
-                log.error("Mission {} execution failed after approval", id, e);
-                WorldmindState failedState = new WorldmindState(Map.of(
-                        "missionId", id,
-                        "request", state.request(),
-                        "status", MissionStatus.FAILED.name(),
-                        "errors", List.of(e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName())
-                ));
-                missionStates.put(id, failedState);
-                return failedState;
-            } finally {
-                missionFutures.remove(id);
-            }
-        });
-        missionFutures.put(id, future);
+        launchAsync(id, state.request(), InteractionMode.FULL_AUTO,
+                state.projectPath(), state.gitRemoteUrl());
 
         return ResponseEntity.ok(Map.of(
                 "mission_id", id,
@@ -245,6 +281,85 @@ public class MissionController {
     }
 
     /**
+     * POST /api/v1/missions/{id}/retry — Retry failed directives.
+     * Accepts optional { "directive_ids": ["DIR-002"] } body.
+     * If no body or empty list, retries ALL failed directives.
+     */
+    @PostMapping("/{id}/retry")
+    public ResponseEntity<Map<String, String>> retryMission(
+            @PathVariable String id,
+            @RequestBody(required = false) RetryRequest retryRequest) {
+        WorldmindState state = missionStates.get(id);
+        if (state == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        // Only allow retry when mission is COMPLETED or FAILED
+        if (state.status() != MissionStatus.COMPLETED && state.status() != MissionStatus.FAILED) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("error", "Retry only allowed when mission is COMPLETED or FAILED; current status: " + state.status()));
+        }
+
+        // Determine which directives to retry
+        List<String> targetIds;
+        if (retryRequest != null && retryRequest.directiveIds() != null && !retryRequest.directiveIds().isEmpty()) {
+            targetIds = retryRequest.directiveIds();
+        } else {
+            // Retry all failed directives
+            targetIds = state.directives().stream()
+                    .filter(d -> d.status() == DirectiveStatus.FAILED)
+                    .map(Directive::id)
+                    .toList();
+        }
+
+        if (targetIds.isEmpty()) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("error", "No failed directives to retry"));
+        }
+
+        log.info("Retrying mission {} — directives: {}", id, targetIds);
+
+        // Reset directives: status→PENDING, iteration→0
+        List<Directive> resetDirectives = state.directives().stream()
+                .map(d -> {
+                    if (targetIds.contains(d.id())) {
+                        return new Directive(
+                                d.id(), d.centurion(), d.description(),
+                                d.inputContext(), d.successCriteria(), d.dependencies(),
+                                DirectiveStatus.PENDING, 0, d.maxIterations(),
+                                d.onFailure(), d.filesAffected(), null
+                        );
+                    }
+                    return d;
+                })
+                .toList();
+
+        // Build completed IDs excluding the ones being retried
+        List<String> completedIds = state.completedDirectiveIds().stream()
+                .filter(cid -> !targetIds.contains(cid))
+                .toList();
+
+        // Clear oscillation history for retried directives
+        for (String directiveId : targetIds) {
+            oscillationDetector.clearHistory(directiveId);
+        }
+
+        // Build new state for retry — start from shared base, override directives/completedIds
+        var retryState = buildExecutionStateMap(state);
+        retryState.put("directives", resetDirectives);
+        retryState.put("completedDirectiveIds", completedIds);
+        missionStates.put(id, new WorldmindState(retryState));
+
+        launchAsync(id, state.request(), InteractionMode.FULL_AUTO,
+                state.projectPath(), state.gitRemoteUrl());
+
+        return ResponseEntity.ok(Map.of(
+                "mission_id", id,
+                "status", MissionStatus.EXECUTING.name()
+        ));
+    }
+
+    /**
      * GET /api/v1/missions/{id}/timeline — Checkpointed state history.
      */
     @GetMapping("/{id}/timeline")
@@ -285,16 +400,87 @@ public class MissionController {
         return state.directives().stream()
                 .filter(d -> d.id().equals(did))
                 .findFirst()
-                .map(d -> ResponseEntity.ok(toDirectiveResponse(d)))
+                .map(d -> ResponseEntity.ok(toDirectiveResponse(d, state)))
                 .orElse(ResponseEntity.notFound().build());
     }
 
     // ── Helpers ──────────────────────────────────────────────────────
 
+    /**
+     * Launches async graph execution for a mission, storing the result on completion.
+     */
+    private void launchAsync(String missionId, String request, InteractionMode mode,
+                             String projectPath, String gitRemoteUrl) {
+        CompletableFuture<WorldmindState> future = CompletableFuture.supplyAsync(() -> {
+            try {
+                WorldmindState result = missionEngine.runMission(missionId, request, mode, projectPath, gitRemoteUrl);
+                if (result != null) {
+                    missionStates.put(missionId, result);
+                }
+                return result;
+            } catch (Exception e) {
+                log.error("Mission {} failed", missionId, e);
+                WorldmindState failedState = new WorldmindState(Map.of(
+                        "missionId", missionId,
+                        "request", request,
+                        "status", MissionStatus.FAILED.name(),
+                        "errors", List.of(e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName())
+                ));
+                missionStates.put(missionId, failedState);
+                return failedState;
+            } finally {
+                missionFutures.remove(missionId);
+                cleanupMissionResources(missionId);
+            }
+        });
+        missionFutures.put(missionId, future);
+    }
+
+    /**
+     * Copies all essential fields from an existing state into a mutable map,
+     * overriding interactionMode and status for execution.
+     */
+    private HashMap<String, Object> buildExecutionStateMap(WorldmindState state) {
+        var map = new HashMap<String, Object>();
+        map.put("missionId", state.missionId());
+        map.put("request", state.request());
+        map.put("interactionMode", InteractionMode.FULL_AUTO.name());
+        map.put("status", MissionStatus.EXECUTING.name());
+        map.put("executionStrategy", state.executionStrategy().name());
+        map.put("directives", state.directives());
+        state.classification().ifPresent(c -> map.put("classification", c));
+        state.projectContext().ifPresent(pc -> map.put("projectContext", pc));
+        String pp = state.projectPath();
+        if (pp != null && !pp.isBlank()) map.put("projectPath", pp);
+        String gru = state.gitRemoteUrl();
+        if (gru != null && !gru.isBlank()) map.put("gitRemoteUrl", gru);
+        return map;
+    }
+
+    /**
+     * Frees memory-heavy resources after a mission completes (success or failure).
+     */
+    private void cleanupMissionResources(String missionId) {
+        try {
+            eventBus.clearMission(missionId);
+            instructionStore.clear();
+            // Release checkpoints — state is already in missionStates map
+            RunnableConfig config = RunnableConfig.builder().threadId(missionId).build();
+            checkpointSaver.release(config);
+            log.debug("Cleaned up resources for mission {}", missionId);
+        } catch (Exception e) {
+            log.warn("Error cleaning up mission {}: {}", missionId, e.getMessage());
+        }
+    }
+
     private MissionResponse toResponse(WorldmindState state) {
         List<MissionResponse.DirectiveResponse> directives = state.directives().stream()
-                .map(this::toDirectiveResponse)
+                .map(d -> toDirectiveResponse(d, state))
                 .toList();
+
+        int waveCount = state.metrics()
+                .map(m -> m.wavesExecuted())
+                .orElse(state.waveCount());
 
         return new MissionResponse(
                 state.missionId(),
@@ -306,20 +492,48 @@ public class MissionController {
                 directives,
                 state.sealGranted(),
                 state.metrics().orElse(null),
-                state.errors()
+                state.errors(),
+                waveCount
         );
     }
 
-    private MissionResponse.DirectiveResponse toDirectiveResponse(Directive d) {
+    private MissionResponse.DirectiveResponse toDirectiveResponse(Directive d, WorldmindState state) {
+        // Find review feedback for this directive
+        Integer reviewScore = null;
+        String reviewSummary = null;
+        for (ReviewFeedback rf : state.reviewFeedback()) {
+            if (d.id().equals(rf.directiveId())) {
+                reviewScore = rf.score();
+                reviewSummary = rf.summary();
+                break;
+            }
+        }
+
         return new MissionResponse.DirectiveResponse(
                 d.id(),
                 d.centurion(),
                 d.description(),
-                d.status() != null ? d.status().name() : null,
+                mapDirectiveStatus(d.status()),
                 d.iteration(),
                 d.maxIterations(),
                 d.elapsedMs(),
-                d.filesAffected()
+                d.filesAffected(),
+                d.onFailure() != null ? d.onFailure().name() : null,
+                reviewScore,
+                reviewSummary
         );
+    }
+
+    /**
+     * Maps internal DirectiveStatus enum names to UI-expected status strings.
+     * Java: PASSED/RUNNING → UI: FULFILLED/EXECUTING
+     */
+    private String mapDirectiveStatus(DirectiveStatus status) {
+        if (status == null) return null;
+        return switch (status) {
+            case PASSED -> "FULFILLED";
+            case RUNNING -> "EXECUTING";
+            default -> status.name();
+        };
     }
 }

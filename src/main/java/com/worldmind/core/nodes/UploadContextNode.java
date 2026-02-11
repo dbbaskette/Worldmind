@@ -28,6 +28,11 @@ public class UploadContextNode {
     }
 
     public Map<String, Object> apply(WorldmindState state) {
+        // Early-exit for retry: if project context already exists, skip re-scanning
+        if (state.projectContext().isPresent()) {
+            return Map.of("status", MissionStatus.SPECIFYING.name());
+        }
+
         // When running inside Docker, always use /workspace regardless of the
         // client-supplied path (host paths don't exist inside the container).
         String workspaceVolume = System.getenv("WORKSPACE_VOLUME");
@@ -44,7 +49,7 @@ public class UploadContextNode {
             ProjectContext context = scanner.scan(projectRoot);
             return Map.of(
                     "projectContext", context,
-                    "status", MissionStatus.PLANNING.name()
+                    "status", MissionStatus.SPECIFYING.name()
             );
         } catch (IOException e) {
             return Map.of(
@@ -52,7 +57,7 @@ public class UploadContextNode {
                             projectRoot.toString(), List.of(), "unknown", "unknown",
                             Map.of(), 0, "Failed to scan: " + e.getMessage()
                     ),
-                    "status", MissionStatus.PLANNING.name(),
+                    "status", MissionStatus.SPECIFYING.name(),
                     "errors", List.of("Project scan failed: " + e.getMessage())
             );
         }

@@ -22,6 +22,7 @@ worldmind:
     provider: cloudfoundry
     image-registry: ${CENTURION_IMAGE_REGISTRY:ghcr.io/dbbaskette}
     max-parallel: 3
+    timeout-seconds: 1200
     wave-cooldown-seconds: 30
   cf:
     api-url: ${CF_API_URL:}
@@ -29,6 +30,7 @@ worldmind:
     space: ${CF_SPACE:}
     cf-username: ${CF_USERNAME:}
     cf-password: ${CF_PASSWORD:}
+    git-token: ${GIT_TOKEN:}
     orchestrator-url: https://${vcap.application.uris[0]:localhost:8080}
     centurion-apps:
       forge: ${CENTURION_FORGE_APP:centurion-forge}

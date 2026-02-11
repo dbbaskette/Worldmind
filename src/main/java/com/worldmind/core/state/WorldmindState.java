@@ -35,6 +35,7 @@ public class WorldmindState extends AgentState {
         Map.entry("sealGranted",           Channels.base(() -> false)),
         Map.entry("retryContext",          Channels.base(() -> "")),
         Map.entry("metrics",               Channels.base((Reducer<MissionMetrics>) null)),
+        Map.entry("productSpec",            Channels.base((Reducer<ProductSpec>) null)),
         Map.entry("projectPath",           Channels.base(() -> "")),
         Map.entry("gitRemoteUrl",          Channels.base(() -> "")),
 
@@ -45,7 +46,13 @@ public class WorldmindState extends AgentState {
 
         // ── Appender channels (list accumulation) ────────────────────
         Map.entry("directives",            Channels.appender(ArrayList::new)),
-        Map.entry("completedDirectiveIds", Channels.appender(ArrayList::new)),
+        Map.entry("completedDirectiveIds", Channels.base(
+            (Reducer<List<String>>) (old, update) -> {
+                var merged = new java.util.LinkedHashSet<>(old != null ? old : List.of());
+                merged.addAll(update != null ? update : List.of());
+                return List.copyOf(merged);
+            },
+            ArrayList::new)),
         Map.entry("starblasters",             Channels.appender(ArrayList::new)),
         Map.entry("testResults",           Channels.appender(ArrayList::new)),
         Map.entry("reviewFeedback",        Channels.appender(ArrayList::new)),
@@ -93,8 +100,44 @@ public class WorldmindState extends AgentState {
         });
     }
 
+    @SuppressWarnings("unchecked")
     public Optional<ProjectContext> projectContext() {
-        return value("projectContext");
+        Optional<Object> raw = value("projectContext");
+        return raw.map(obj -> {
+            if (obj instanceof ProjectContext pc) return pc;
+            if (obj instanceof Map<?, ?> m) {
+                var map = (Map<String, Object>) m;
+                return new ProjectContext(
+                        (String) map.get("rootPath"),
+                        map.get("fileTree") instanceof List<?> l ? (List<String>) l : List.of(),
+                        (String) map.get("language"),
+                        (String) map.get("framework"),
+                        map.get("dependencies") instanceof Map<?, ?> d ? (Map<String, String>) d : Map.of(),
+                        map.get("fileCount") instanceof Number n ? n.intValue() : 0,
+                        (String) map.get("summary"));
+            }
+            return (ProjectContext) obj;
+        });
+    }
+
+    @SuppressWarnings("unchecked")
+    public Optional<ProductSpec> productSpec() {
+        Optional<Object> raw = value("productSpec");
+        return raw.map(obj -> {
+            if (obj instanceof ProductSpec ps) return ps;
+            if (obj instanceof Map<?, ?> m) {
+                var map = (Map<String, Object>) m;
+                return new ProductSpec(
+                    (String) map.get("title"),
+                    (String) map.get("overview"),
+                    map.get("goals") instanceof List<?> l ? (List<String>) l : List.of(),
+                    map.get("nonGoals") instanceof List<?> l ? (List<String>) l : List.of(),
+                    map.get("technicalRequirements") instanceof List<?> l ? (List<String>) l : List.of(),
+                    map.get("acceptanceCriteria") instanceof List<?> l ? (List<String>) l : List.of()
+                );
+            }
+            return (ProductSpec) obj;
+        });
     }
 
     public ExecutionStrategy executionStrategy() {

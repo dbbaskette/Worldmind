@@ -36,7 +36,7 @@ export function useMission(missionId: string | null) {
 
     const interval = setInterval(() => {
       const current = missionRef.current
-      if (current && ['CLASSIFYING', 'UPLOADING', 'PLANNING', 'EXECUTING'].includes(current.status)) {
+      if (current && ['CLASSIFYING', 'UPLOADING', 'SPECIFYING', 'PLANNING', 'EXECUTING'].includes(current.status)) {
         fetchMission()
       }
     }, 5000)

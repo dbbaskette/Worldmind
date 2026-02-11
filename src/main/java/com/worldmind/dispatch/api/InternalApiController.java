@@ -1,6 +1,8 @@
 package com.worldmind.dispatch.api;
 
 import com.worldmind.starblaster.InstructionStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,6 +17,8 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/internal")
 public class InternalApiController {
 
+    private static final Logger log = LoggerFactory.getLogger(InternalApiController.class);
+
     private final InstructionStore instructionStore;
 
     public InternalApiController(InstructionStore instructionStore) {
@@ -25,8 +29,11 @@ public class InternalApiController {
     public ResponseEntity<String> getInstruction(@PathVariable String key) {
         String instruction = instructionStore.get(key);
         if (instruction == null) {
+            log.warn("Instruction not found for key: {} (store has {} entries)",
+                    key, instructionStore.size());
             return ResponseEntity.notFound().build();
         }
+        log.info("Serving instruction for key: {} ({} chars)", key, instruction.length());
         return ResponseEntity.ok(instruction);
     }
 }

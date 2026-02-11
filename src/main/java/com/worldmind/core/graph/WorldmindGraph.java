@@ -26,7 +26,7 @@ import static org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
  * <p>
  * Phase 4 graph topology (wave-based parallel execution):
  * <pre>
- *   START -> classify_request -> upload_context -> plan_mission
+ *   START -> classify_request -> upload_context -> generate_spec -> plan_mission
  *         -> [routeAfterPlan]
  *            -> await_approval -> END
  *            -> schedule_wave -> [routeAfterSchedule]
@@ -46,6 +46,7 @@ public class WorldmindGraph {
     public WorldmindGraph(
             ClassifyRequestNode classifyNode,
             UploadContextNode uploadNode,
+            GenerateSpecNode generateSpecNode,
             PlanMissionNode planNode,
             ScheduleWaveNode scheduleWaveNode,
             ParallelDispatchNode parallelDispatchNode,
@@ -56,6 +57,7 @@ public class WorldmindGraph {
         var graph = new StateGraph<>(WorldmindState.SCHEMA, WorldmindState::new)
                 .addNode("classify_request", node_async(classifyNode::apply))
                 .addNode("upload_context", node_async(uploadNode::apply))
+                .addNode("generate_spec", node_async(generateSpecNode::apply))
                 .addNode("plan_mission", node_async(planNode::apply))
                 .addNode("await_approval", node_async(
                         state -> Map.of("status", MissionStatus.AWAITING_APPROVAL.name())))
@@ -65,7 +67,8 @@ public class WorldmindGraph {
                 .addNode("converge_results", node_async(convergeNode::apply))
                 .addEdge(START, "classify_request")
                 .addEdge("classify_request", "upload_context")
-                .addEdge("upload_context", "plan_mission")
+                .addEdge("upload_context", "generate_spec")
+                .addEdge("generate_spec", "plan_mission")
                 .addConditionalEdges("plan_mission",
                         edge_async(this::routeAfterPlan),
                         Map.of("await_approval", "await_approval",

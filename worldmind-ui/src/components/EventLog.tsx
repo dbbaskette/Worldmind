@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { WorldmindEvent } from '../api/types'
 import { EVENT_COLORS } from '../utils/constants'
-import { formatTimestamp } from '../utils/formatting'
 
 interface EventLogProps {
   events: WorldmindEvent[]
@@ -11,59 +10,50 @@ interface EventLogProps {
 export function EventLog({ events, connectionStatus }: EventLogProps) {
   const logEndRef = useRef<HTMLDivElement>(null)
 
-  // Auto-scroll to latest event
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [events])
 
-  const statusColor = {
-    connected: 'bg-green-500',
+  const statusIndicator = {
+    connected: 'bg-emerald-500',
     disconnected: 'bg-red-500',
-    reconnecting: 'bg-yellow-500'
+    reconnecting: 'bg-amber-500 animate-pulse',
   }[connectionStatus]
 
   return (
-    <div className="bg-gray-50 rounded-lg p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-gray-700">Event Stream</h3>
-        <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full ${statusColor}`} />
-          <span className="text-xs text-gray-500 capitalize">{connectionStatus}</span>
+    <div className="bg-wm-bg rounded-lg border border-wm-border overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-wm-border bg-wm-card">
+        <span className="text-[10px] font-mono uppercase tracking-wider text-wm_text-dim">Event Stream</span>
+        <div className="flex items-center gap-1.5">
+          <span className={`w-1.5 h-1.5 rounded-full ${statusIndicator}`} />
+          <span className="text-[10px] font-mono text-wm_text-dim">{connectionStatus}</span>
         </div>
       </div>
 
-      <div className="space-y-2 max-h-64 overflow-y-auto">
+      <div className="max-h-48 overflow-y-auto p-2 scan-lines font-mono text-[11px] space-y-0.5">
         {events.length === 0 && (
-          <p className="text-xs text-gray-400 text-center py-4">
-            Waiting for events...
-          </p>
+          <div className="text-wm_text-dim text-center py-6">
+            <span className="cursor-blink">_</span> awaiting events...
+          </div>
         )}
 
         {events.map((event, idx) => {
-          const eventColor = EVENT_COLORS[event.eventType as keyof typeof EVENT_COLORS] || 'text-gray-600'
+          const color = EVENT_COLORS[event.eventType as keyof typeof EVENT_COLORS] || 'text-wm_text-muted'
+          const time = new Date(event.timestamp).toLocaleTimeString('en-US', {
+            hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit'
+          })
 
           return (
-            <div key={idx} className="text-xs border-l-2 border-gray-300 pl-2 py-1">
-              <div className="flex items-center justify-between">
-                <span className={`font-semibold ${eventColor}`}>
-                  {event.eventType}
-                </span>
-                <span className="text-gray-400">
-                  {formatTimestamp(event.timestamp)}
-                </span>
-              </div>
-
+            <div key={idx} className="flex gap-2 py-0.5 hover:bg-wm-surface/50 px-1 rounded">
+              <span className="text-wm_text-dim shrink-0">{time}</span>
+              <span className={`shrink-0 ${color}`}>{event.eventType}</span>
               {event.directiveId && (
-                <div className="text-gray-500 mt-1">
-                  Directive: {event.directiveId}
-                </div>
+                <span className="text-wm_text-muted">{event.directiveId}</span>
               )}
-
               {event.payload && Object.keys(event.payload).length > 0 && (
-                <div className="text-gray-600 mt-1 font-mono text-xs bg-gray-100 px-2 py-1 rounded">
-                  {JSON.stringify(event.payload, null, 2).slice(0, 200)}
-                  {JSON.stringify(event.payload).length > 200 && '...'}
-                </div>
+                <span className="text-wm_text-dim truncate">
+                  {Object.entries(event.payload).map(([k, v]) => `${k}=${v}`).join(' ')}
+                </span>
               )}
             </div>
           )

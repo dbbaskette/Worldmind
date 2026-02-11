@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { MissionResponse } from '../api/types'
 import { apiClient } from '../api/client'
+import { CENTURION_ACCENT } from '../utils/constants'
 
 interface ApprovalPanelProps {
   mission: MissionResponse
@@ -15,7 +16,6 @@ export function ApprovalPanel({ mission, onRefresh }: ApprovalPanelProps) {
   const handleApprove = async () => {
     setApproving(true)
     setError(null)
-
     try {
       await apiClient.approveMission(mission.mission_id)
       onRefresh()
@@ -27,13 +27,9 @@ export function ApprovalPanel({ mission, onRefresh }: ApprovalPanelProps) {
   }
 
   const handleCancel = async () => {
-    if (!confirm('Are you sure you want to cancel this mission?')) {
-      return
-    }
-
+    if (!confirm('Are you sure you want to cancel this mission?')) return
     setCancelling(true)
     setError(null)
-
     try {
       await apiClient.cancelMission(mission.mission_id)
       onRefresh()
@@ -45,73 +41,80 @@ export function ApprovalPanel({ mission, onRefresh }: ApprovalPanelProps) {
   }
 
   return (
-    <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4 mb-6">
-      <div className="flex items-start justify-between mb-4">
-        <div>
-          <h3 className="text-lg font-semibold text-yellow-900 mb-1">
-            Plan Approval Required
-          </h3>
-          <p className="text-sm text-yellow-700">
-            Review the mission plan below and approve to begin execution.
-          </p>
-        </div>
+    <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-4 mb-5 animate-fade-in">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+        <h3 className="text-sm font-semibold text-amber-400">Awaiting Approval</h3>
       </div>
 
       {mission.classification && (
-        <div className="bg-white rounded p-3 mb-4">
-          <h4 className="text-sm font-semibold text-gray-700 mb-2">Classification</h4>
-          <div className="text-sm space-y-1">
-            <div><span className="font-medium">Category:</span> {mission.classification.category}</div>
-            <div><span className="font-medium">Complexity:</span> {mission.classification.complexity}/10</div>
-            <div><span className="font-medium">Strategy:</span> {mission.classification.planningStrategy}</div>
+        <div className="bg-wm-surface rounded-lg p-3 mb-3 border border-wm-border">
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div>
+              <span className="text-wm_text-dim">Category:</span>{' '}
+              <span className="text-wm_text-secondary">{mission.classification.category}</span>
+            </div>
+            <div>
+              <span className="text-wm_text-dim">Complexity:</span>{' '}
+              <span className="text-wm_text-secondary font-mono">{mission.classification.complexity}/10</span>
+            </div>
+            <div>
+              <span className="text-wm_text-dim">Strategy:</span>{' '}
+              <span className="text-wm_text-secondary">{mission.classification.planningStrategy}</span>
+            </div>
             {mission.classification.affectedComponents.length > 0 && (
               <div>
-                <span className="font-medium">Affected:</span>{' '}
-                {mission.classification.affectedComponents.join(', ')}
+                <span className="text-wm_text-dim">Affects:</span>{' '}
+                <span className="text-wm_text-secondary">{mission.classification.affectedComponents.join(', ')}</span>
               </div>
             )}
           </div>
         </div>
       )}
 
-      <div className="bg-white rounded p-3 mb-4">
-        <h4 className="text-sm font-semibold text-gray-700 mb-2">
-          Plan ({mission.directives.length} directives)
-        </h4>
-        <ul className="space-y-2">
-          {mission.directives.map(directive => (
-            <li key={directive.id} className="text-sm">
-              <span className="font-mono text-gray-600">{directive.id}</span>
-              {' '}
-              <span className="font-semibold text-blue-600">[{directive.centurion}]</span>
-              {' '}
-              {directive.description}
-            </li>
-          ))}
-        </ul>
+      <div className="bg-wm-surface rounded-lg p-3 mb-4 border border-wm-border">
+        <div className="text-[10px] font-mono uppercase tracking-wider text-wm_text-dim mb-2">
+          Execution Plan ({mission.directives.length} directives)
+        </div>
+        <div className="space-y-1.5">
+          {mission.directives.map((d, idx) => {
+            const accent = CENTURION_ACCENT[d.centurion] || '#6B7280'
+            return (
+              <div key={d.id} className="flex items-start gap-2 text-xs">
+                <span className="font-mono text-wm_text-dim w-4 shrink-0 text-right">{idx + 1}.</span>
+                <span
+                  className="font-mono text-[10px] px-1 py-0.5 rounded shrink-0"
+                  style={{ backgroundColor: `${accent}20`, color: accent }}
+                >
+                  {d.centurion}
+                </span>
+                <span className="text-wm_text-secondary">{d.description}</span>
+              </div>
+            )
+          })}
+        </div>
       </div>
 
       {error && (
-        <div className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded mb-4">
+        <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-1.5 rounded mb-3">
           {error}
         </div>
       )}
 
-      <div className="flex gap-3">
+      <div className="flex gap-2">
         <button
           onClick={handleApprove}
           disabled={approving || cancelling}
-          className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+          className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-xs font-medium hover:bg-emerald-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
         >
           {approving ? 'Approving...' : 'Approve & Execute'}
         </button>
-
         <button
           onClick={handleCancel}
           disabled={approving || cancelling}
-          className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+          className="px-4 py-2 bg-wm-elevated text-wm_text-muted rounded-lg text-xs font-medium hover:text-red-400 hover:bg-red-500/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all border border-wm-border"
         >
-          {cancelling ? 'Cancelling...' : 'Cancel Mission'}
+          {cancelling ? 'Cancelling...' : 'Cancel'}
         </button>
       </div>
     </div>

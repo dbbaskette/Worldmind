@@ -51,7 +51,7 @@ cf_push() {
     exit 1
   fi
 
-  VARS_FILE=$(mktemp /tmp/cf-vars-XXXXXX.yml)
+  VARS_FILE=$(mktemp /tmp/cf-vars-XXXXXX)
   trap "rm -f $VARS_FILE" EXIT
   cat > "$VARS_FILE" <<EOVARS
 cf-api-url: ${CF_API_URL}
@@ -66,6 +66,7 @@ centurion-pulse-app: ${CENTURION_PULSE_APP:-centurion-pulse}
 centurion-prism-app: ${CENTURION_PRISM_APP:-centurion-prism}
 cf-username: ${CF_USERNAME}
 cf-password: ${CF_PASSWORD}
+git-token: ${GIT_TOKEN:-${CF_DOCKER_PASSWORD:-}}
 EOVARS
 
   echo "Building JAR..."

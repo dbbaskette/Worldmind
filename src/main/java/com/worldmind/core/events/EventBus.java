@@ -88,6 +88,17 @@ public class EventBus {
         void unsubscribe();
     }
 
+    /**
+     * Removes all subscribers for a given mission. Call when a mission completes
+     * to prevent subscriber map from growing without bound.
+     */
+    public void clearMission(String missionId) {
+        var removed = missionSubscribers.remove(missionId);
+        if (removed != null) {
+            log.debug("Cleared {} subscribers for mission {}", removed.size(), missionId);
+        }
+    }
+
     private void deliverSafely(Consumer<WorldmindEvent> subscriber, WorldmindEvent event) {
         try {
             subscriber.accept(event);

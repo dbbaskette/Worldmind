@@ -27,6 +27,9 @@ public class CloudFoundryProperties {
     /** Git remote URL for workspace sharing between orchestrator and centurions */
     private String gitRemoteUrl = "";
 
+    /** Git token (e.g. GitHub PAT) for push authentication — injected into HTTPS URLs */
+    private String gitToken = "";
+
     /**
      * Centurion app names — maps centurion type to CF app name.
      * e.g. {"forge": "centurion-forge", "gauntlet": "centurion-gauntlet"}
@@ -43,8 +46,8 @@ public class CloudFoundryProperties {
         centurionApps.putIfAbsent("prism", "centurion-prism");
     }
 
-    /** Task timeout in seconds (default 10 minutes) */
-    private int taskTimeoutSeconds = 600;
+    /** Task timeout in seconds (default 20 minutes) */
+    private int taskTimeoutSeconds = 1200;
 
     /** Task memory limit in MB (default 2 GB) */
     private int taskMemoryMb = 2048;
@@ -93,6 +96,14 @@ public class CloudFoundryProperties {
 
     public void setGitRemoteUrl(String gitRemoteUrl) {
         this.gitRemoteUrl = gitRemoteUrl;
+    }
+
+    public String getGitToken() {
+        return gitToken;
+    }
+
+    public void setGitToken(String gitToken) {
+        this.gitToken = gitToken;
     }
 
     public Map<String, String> getCenturionApps() {

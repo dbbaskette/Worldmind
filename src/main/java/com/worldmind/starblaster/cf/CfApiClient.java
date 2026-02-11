@@ -79,42 +79,30 @@ public class CfApiClient {
     }
 
     /**
-     * Gets the current state of a task by name on a given app.
+     * Gets the current state of a task by its GUID.
      *
-     * @param appName  the CF app name
-     * @param taskName the task name to look up
+     * @param taskGuid the task GUID returned by {@link #createTask}
      * @return the task state (PENDING, RUNNING, SUCCEEDED, FAILED, CANCELING)
-     *         or null if not found
      */
-    public String getTaskState(String appName, String taskName) {
-        var appGuid = resolveAppGuid(appName);
-        var response = cfGet("/v3/apps/" + appGuid + "/tasks?names=" + encode(taskName));
+    public String getTaskState(String taskGuid) {
+        var response = cfGet("/v3/tasks/" + taskGuid);
+        return response.get("state").asText();
+    }
 
-        var resources = response.get("resources");
-        if (resources == null || resources.isEmpty()) {
-            return null;
-        }
-        return resources.get(0).get("state").asText();
+    // Overload retained for backward compatibility (tests)
+    public String getTaskState(String appName, String taskName) {
+        return getTaskState(resolveTaskGuid(appName, taskName));
     }
 
     /**
-     * Gets the failure reason for a task, if it failed.
+     * Gets the failure reason for a task by its GUID.
      *
-     * @param appName  the CF app name
-     * @param taskName the task name to look up
-     * @return the failure reason, or empty string if not failed or not found
+     * @param taskGuid the task GUID
+     * @return the failure reason, or empty string if not failed
      */
-    public String getTaskFailureReason(String appName, String taskName) {
-        var appGuid = resolveAppGuid(appName);
-        var response = cfGet("/v3/apps/" + appGuid + "/tasks?names=" + encode(taskName));
-
-        var resources = response.get("resources");
-        if (resources == null || resources.isEmpty()) {
-            return "";
-        }
-
-        var task = resources.get(0);
-        var result = task.get("result");
+    public String getTaskFailureReason(String taskGuid) {
+        var response = cfGet("/v3/tasks/" + taskGuid);
+        var result = response.get("result");
         if (result != null && result.has("failure_reason")) {
             var reason = result.get("failure_reason");
             return reason.isNull() ? "" : reason.asText();
@@ -122,25 +110,39 @@ public class CfApiClient {
         return "";
     }
 
+    // Overload retained for backward compatibility (tests)
+    public String getTaskFailureReason(String appName, String taskName) {
+        return getTaskFailureReason(resolveTaskGuid(appName, taskName));
+    }
+
     /**
-     * Cancels a CF task by name.
+     * Cancels a CF task by its GUID.
      *
-     * @param appName  the CF app name
-     * @param taskName the task name to cancel
+     * @param taskGuid the task GUID to cancel
      */
+    public void cancelTask(String taskGuid) {
+        cfPost("/v3/tasks/" + taskGuid + "/actions/cancel", "{}");
+        log.info("Cancelled CF task (guid={})", taskGuid);
+    }
+
+    // Overload retained for backward compatibility (tests)
     public void cancelTask(String appName, String taskName) {
+        cancelTask(resolveTaskGuid(appName, taskName));
+    }
+
+    /**
+     * Resolves a task name to its GUID via the CF API (finds the most recent task with that name).
+     */
+    private String resolveTaskGuid(String appName, String taskName) {
         var appGuid = resolveAppGuid(appName);
-        var response = cfGet("/v3/apps/" + appGuid + "/tasks?names=" + encode(taskName));
+        var response = cfGet("/v3/apps/" + appGuid + "/tasks?names=" + encode(taskName)
+                + "&order_by=-created_at&per_page=1");
 
         var resources = response.get("resources");
         if (resources == null || resources.isEmpty()) {
-            log.debug("Task '{}' not found on app '{}', nothing to cancel", taskName, appName);
-            return;
+            throw new RuntimeException("Task not found: " + taskName + " on app " + appName);
         }
-
-        var taskGuid = resources.get(0).get("guid").asText();
-        cfPost("/v3/tasks/" + taskGuid + "/actions/cancel", "{}");
-        log.info("Cancelled CF task '{}' (guid={})", taskName, taskGuid);
+        return resources.get(0).get("guid").asText();
     }
 
     /**

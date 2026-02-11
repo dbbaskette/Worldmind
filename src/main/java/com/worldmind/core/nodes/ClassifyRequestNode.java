@@ -36,6 +36,11 @@ public class ClassifyRequestNode {
     }
 
     public Map<String, Object> apply(WorldmindState state) {
+        // Early-exit for retry: if classification already exists, skip re-classifying
+        if (state.classification().isPresent()) {
+            return Map.of("status", MissionStatus.UPLOADING.name());
+        }
+
         String request = state.request();
         Classification classification = llmService.structuredCall(
                 SYSTEM_PROMPT, request, Classification.class

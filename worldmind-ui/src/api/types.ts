@@ -9,6 +9,7 @@ export interface MissionResponse {
   seal_granted: boolean
   metrics: MissionMetrics | null
   errors: string[]
+  wave_count: number
 }
 
 export interface DirectiveResponse {
@@ -20,6 +21,9 @@ export interface DirectiveResponse {
   max_iterations: number
   elapsed_ms: number | null
   files_affected: FileRecord[]
+  on_failure: string | null
+  review_score: number | null
+  review_summary: string | null
 }
 
 export interface FileRecord {
@@ -66,6 +70,7 @@ export interface TimelineEntry {
 export type MissionStatus =
   | 'CLASSIFYING'
   | 'UPLOADING'
+  | 'SPECIFYING'
   | 'PLANNING'
   | 'AWAITING_APPROVAL'
   | 'EXECUTING'

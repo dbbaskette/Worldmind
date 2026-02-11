@@ -38,7 +38,8 @@ export class SseConnection {
       'seal.denied',
       'seal.granted',
       'wave.scheduled',
-      'wave.completed'
+      'wave.completed',
+      'directive.phase'
     ]
 
     eventTypes.forEach(eventType => {

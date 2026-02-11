@@ -18,7 +18,8 @@ public record MissionResponse(
     List<DirectiveResponse> directives,
     @JsonProperty("seal_granted") boolean sealGranted,
     MissionMetrics metrics,
-    List<String> errors
+    List<String> errors,
+    @JsonProperty("wave_count") int waveCount
 ) {
 
     /**
@@ -32,6 +33,9 @@ public record MissionResponse(
         int iteration,
         @JsonProperty("max_iterations") int maxIterations,
         @JsonProperty("elapsed_ms") Long elapsedMs,
-        @JsonProperty("files_affected") List<FileRecord> filesAffected
+        @JsonProperty("files_affected") List<FileRecord> filesAffected,
+        @JsonProperty("on_failure") String onFailure,
+        @JsonProperty("review_score") Integer reviewScore,
+        @JsonProperty("review_summary") String reviewSummary
     ) {}
 }

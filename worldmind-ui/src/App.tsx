@@ -18,25 +18,23 @@ function App() {
   }
 
   return (
-    <div className="flex flex-col h-screen">
-      {/* Header with Mission Form */}
+    <div className="flex flex-col h-screen bg-wm-bg noise-overlay">
+      {/* Header */}
       <MissionForm
         onSubmit={handleSubmit}
         submitting={submitting}
         error={submitError}
       />
 
-      {/* Main Content: Sidebar + Detail Panel */}
+      {/* Main */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar: Mission List */}
-        <div className="w-96 border-r bg-white overflow-y-auto">
-          {/* Missions Header */}
-          <div className="px-4 py-3 border-b bg-gray-50">
-            <h2 className="text-sm font-semibold text-gray-700">
+        {/* Sidebar */}
+        <div className="w-72 border-r border-wm-border bg-wm-surface overflow-y-auto shrink-0">
+          <div className="px-3 py-2.5 border-b border-wm-border">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-wm_text-dim">
               Missions ({missions.size})
-            </h2>
+            </span>
           </div>
-
           <MissionList
             missions={missions}
             selectedMissionId={selectedMissionId}
@@ -44,30 +42,22 @@ function App() {
           />
         </div>
 
-        {/* Detail Panel */}
-        <div className="flex-1 bg-gray-50">
+        {/* Detail */}
+        <div className="flex-1 bg-wm-bg">
           {selectedMissionId ? (
             <MissionDetail missionId={selectedMissionId} />
           ) : (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
-                <svg
-                  className="w-24 h-24 mx-auto mb-4 text-gray-300"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
-                <p className="text-gray-500 text-lg">
+                <div className="w-16 h-16 rounded-2xl bg-wm-surface border border-wm-border flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-7 h-7 text-wm_text-dim" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                  </svg>
+                </div>
+                <p className="text-xs text-wm_text-dim font-mono">
                   {missions.size === 0
-                    ? 'Submit your first mission to get started'
-                    : 'Select a mission to view details'}
+                    ? 'launch your first mission'
+                    : 'select a mission to view'}
                 </p>
               </div>
             </div>

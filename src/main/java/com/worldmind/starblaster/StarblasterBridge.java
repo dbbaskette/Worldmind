@@ -33,12 +33,15 @@ public class StarblasterBridge {
         this.manager = manager;
     }
 
+    /** Max output size kept in memory per directive. Tail is preserved for error context. */
+    private static final int MAX_OUTPUT_BYTES = 10_000;
+
     /**
      * Composite result returned after executing a directive through a Starblaster.
      *
      * @param directive    the directive with updated status, iteration count, file changes, and timing
      * @param starblasterInfo metadata about the Starblaster container that executed the directive
-     * @param output       captured stdout/stderr from the container
+     * @param output       captured stdout/stderr from the container (truncated to ~10KB)
      */
     public record BridgeResult(
         Directive directive,
@@ -111,6 +114,18 @@ public class StarblasterBridge {
         log.info("Directive {} {} in {}ms",
                 directive.id(), success ? "PASSED" : "FAILED", execResult.elapsedMs());
 
-        return new BridgeResult(updatedDirective, starblasterInfo, execResult.output());
+        return new BridgeResult(updatedDirective, starblasterInfo, truncateOutput(execResult.output()));
+    }
+
+    /**
+     * Truncates output to ~10KB keeping the head and tail for context.
+     */
+    static String truncateOutput(String output) {
+        if (output == null || output.length() <= MAX_OUTPUT_BYTES) return output;
+        int headSize = MAX_OUTPUT_BYTES / 2;
+        int tailSize = MAX_OUTPUT_BYTES / 2;
+        return output.substring(0, headSize)
+                + "\n\n... [truncated " + (output.length() - MAX_OUTPUT_BYTES) + " chars] ...\n\n"
+                + output.substring(output.length() - tailSize);
     }
 }

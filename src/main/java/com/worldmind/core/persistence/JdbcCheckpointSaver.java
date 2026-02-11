@@ -63,6 +63,7 @@ public class JdbcCheckpointSaver implements BaseCheckpointSaver {
             FROM %s
             WHERE thread_id = ?
             ORDER BY created_at ASC
+            LIMIT 20
             """.formatted(TABLE_NAME);
 
     private static final String SELECT_BY_ID_SQL = """
@@ -178,9 +179,7 @@ public class JdbcCheckpointSaver implements BaseCheckpointSaver {
     public Tag release(RunnableConfig config) throws Exception {
         String threadId = resolveThreadId(config);
 
-        // Collect checkpoints before deleting
-        Collection<Checkpoint> released = list(config);
-
+        // Delete directly without loading checkpoint data into memory (avoids OOM)
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(DELETE_BY_THREAD_SQL)) {
             stmt.setString(1, threadId);
@@ -188,7 +187,7 @@ public class JdbcCheckpointSaver implements BaseCheckpointSaver {
             log.debug("Released {} checkpoints for thread '{}'", deleted, threadId);
         }
 
-        return new Tag(threadId, released);
+        return new Tag(threadId, List.of());
     }
 
     // ── Query helpers for CLI ────────────────────────────────────────────

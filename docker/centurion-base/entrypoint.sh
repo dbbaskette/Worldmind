@@ -55,8 +55,10 @@ for label in vcap:
     if [ "$PROVIDER" = "openai" ]; then
         [ -n "$API_KEY" ] && export OPENAI_API_KEY="$API_KEY"
         if [ -n "$API_URL" ]; then
-            # Goose uses OPENAI_HOST for custom endpoints
-            export OPENAI_HOST="$API_URL"
+            # Goose uses OPENAI_HOST for custom endpoints.
+            # Trailing slash is required so URL path joins correctly
+            # (e.g. .../openai/ + v1/chat vs .../openaiv1/chat).
+            export OPENAI_HOST="${API_URL%/}/"
         fi
     elif [ "$PROVIDER" = "anthropic" ]; then
         [ -n "$API_KEY" ] && export ANTHROPIC_API_KEY="$API_KEY"
@@ -87,4 +89,19 @@ default:
 EOF
 
 echo "[entrypoint] Goose config written: provider=$PROVIDER, model=$MODEL"
+
+# Append CF platform CA certs to Python's trust store (internal CAs use self-signed certs)
+if [ -n "$CF_SYSTEM_CERT_PATH" ]; then
+    python3 -c "
+import certifi, glob, os
+p = certifi.where()
+certs = glob.glob(os.environ['CF_SYSTEM_CERT_PATH'] + '/*.crt')
+if certs:
+    with open(p, 'a') as f:
+        for c in certs:
+            f.write(open(c).read())
+    print(f'[entrypoint] Appended {len(certs)} CF CA certs to {p}')
+" 2>/dev/null || true
+fi
+
 exec goose run "$@"
