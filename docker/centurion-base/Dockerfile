@@ -4,7 +4,7 @@ FROM python:3.12-slim
 RUN apt-get update && apt-get install -y curl git ca-certificates && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install Goose CLI v1.x (Rust binary) — replaces Python goose-ai
+# Install Goose CLI v1.x (Rust binary)
 RUN curl -fsSL https://github.com/block/goose/releases/download/stable/download_cli.sh | CONFIGURE=false bash && \
     cp /root/.goose/bin/goose /usr/local/bin/goose && \
     rm -rf /root/.goose && \
