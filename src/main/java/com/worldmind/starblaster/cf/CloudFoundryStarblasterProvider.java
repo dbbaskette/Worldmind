@@ -110,9 +110,11 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
                 // Export MCP server env vars (no-op if none configured)
                 mcpExports.isEmpty() ? "true" : mcpExports,
                 // Source entrypoint.sh to parse VCAP_SERVICES and set up Goose config.
-                // Bridge API_KEY to OPENAI_API_KEY — older entrypoint images export
-                // GOOSE_PROVIDER__API_KEY which Goose v1.x doesn't read.
-                "sed '$d' /usr/local/bin/entrypoint.sh > /tmp/_entrypoint_setup.sh && . /tmp/_entrypoint_setup.sh && [ -n \"$API_KEY\" ] && export OPENAI_API_KEY=\"${OPENAI_API_KEY:-$API_KEY}\"",
+                // Bridge env vars for older entrypoint images that export GOOSE_PROVIDER__*
+                // instead of the standard OPENAI_API_KEY / OPENAI_HOST that Goose v1.x reads.
+                "sed '$d' /usr/local/bin/entrypoint.sh > /tmp/_entrypoint_setup.sh && . /tmp/_entrypoint_setup.sh"
+                        + " && [ -n \"$API_KEY\" ] && export OPENAI_API_KEY=\"${OPENAI_API_KEY:-$API_KEY}\""
+                        + " && [ -n \"$API_URL\" ] && export OPENAI_HOST=\"${OPENAI_HOST:-${API_URL%/}/}\"",
                 "git clone %s /workspace && cd /workspace".formatted(gitRemoteUrl),
                 "git config user.name 'Worldmind Centurion' && git config user.email 'centurion@worldmind.local'",
                 "git checkout -B %s".formatted(branchName),
