@@ -58,8 +58,8 @@ else
     # --- Local/Docker environment ---
     PROVIDER="${GOOSE_PROVIDER:-openai}"
     MODEL="${GOOSE_MODEL:-qwen2.5-coder-32b}"
-    API_KEY="${GOOSE_PROVIDER__API_KEY:-}"
-    API_URL="${GOOSE_PROVIDER__HOST:-}"
+    API_KEY="${OPENAI_API_KEY:-${ANTHROPIC_API_KEY:-${GOOGLE_API_KEY:-}}}"
+    API_URL="${OPENAI_HOST:-}"
 fi
 
 # Allow explicit env vars to override CF-detected values
@@ -73,14 +73,14 @@ export GOOSE_MODE=auto
 export GOOSE_CONTEXT_STRATEGY=summarize
 export GOOSE_MAX_TURNS=50
 
-# Set provider auth via Goose v1.x env vars
+# Set provider auth via standard provider env vars (Goose v1.x reads these directly)
 if [ "$PROVIDER" = "openai" ]; then
-    [ -n "$API_KEY" ] && export GOOSE_PROVIDER__API_KEY="$API_KEY"
-    [ -n "$API_URL" ] && export GOOSE_PROVIDER__HOST="${API_URL%/}/"
+    [ -n "$API_KEY" ] && export OPENAI_API_KEY="$API_KEY"
+    [ -n "$API_URL" ] && export OPENAI_HOST="${API_URL%/}/"
 elif [ "$PROVIDER" = "anthropic" ]; then
-    [ -n "$API_KEY" ] && export GOOSE_PROVIDER__API_KEY="$API_KEY"
+    [ -n "$API_KEY" ] && export ANTHROPIC_API_KEY="$API_KEY"
 elif [ "$PROVIDER" = "google" ]; then
-    [ -n "$API_KEY" ] && export GOOSE_PROVIDER__API_KEY="$API_KEY"
+    [ -n "$API_KEY" ] && export GOOGLE_API_KEY="$API_KEY"
 fi
 
 # Write config.yaml with developer extension

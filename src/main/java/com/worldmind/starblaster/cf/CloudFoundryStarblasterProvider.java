@@ -109,11 +109,10 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
         var taskCommand = String.join(" && ",
                 // Export MCP server env vars (no-op if none configured)
                 mcpExports.isEmpty() ? "true" : mcpExports,
-                // Source entrypoint.sh for VCAP_SERVICES env setup and config.yaml generation.
-                // Write to a temp file and source it — eval "$(sed ...)" breaks because
-                // double-quoted command substitution expands $VCAP_SERVICES prematurely,
-                // and the JSON double quotes corrupt the shell quoting context.
-                "sed '$d' /usr/local/bin/entrypoint.sh > /tmp/_entrypoint_setup.sh && . /tmp/_entrypoint_setup.sh",
+                // Source entrypoint.sh to parse VCAP_SERVICES and set up Goose config.
+                // Bridge API_KEY to OPENAI_API_KEY — older entrypoint images export
+                // GOOSE_PROVIDER__API_KEY which Goose v1.x doesn't read.
+                "sed '$d' /usr/local/bin/entrypoint.sh > /tmp/_entrypoint_setup.sh && . /tmp/_entrypoint_setup.sh && [ -n \"$API_KEY\" ] && export OPENAI_API_KEY=\"${OPENAI_API_KEY:-$API_KEY}\"",
                 "git clone %s /workspace && cd /workspace".formatted(gitRemoteUrl),
                 "git config user.name 'Worldmind Centurion' && git config user.email 'centurion@worldmind.local'",
                 "git checkout -B %s".formatted(branchName),
