@@ -1,11 +1,17 @@
 package com.worldmind.starblaster.cf;
 
+import com.worldmind.core.model.FileRecord;
 import com.worldmind.starblaster.InstructionStore;
 import com.worldmind.starblaster.StarblasterProvider;
 import com.worldmind.starblaster.StarblasterRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -103,8 +109,11 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
         var taskCommand = String.join(" && ",
                 // Export MCP server env vars (no-op if none configured)
                 mcpExports.isEmpty() ? "true" : mcpExports,
-                // Source entrypoint.sh for VCAP_SERVICES env setup and config.yaml generation
-                "eval \"$(sed '$d' /usr/local/bin/entrypoint.sh)\"",
+                // Source entrypoint.sh for VCAP_SERVICES env setup and config.yaml generation.
+                // Write to a temp file and source it — eval "$(sed ...)" breaks because
+                // double-quoted command substitution expands $VCAP_SERVICES prematurely,
+                // and the JSON double quotes corrupt the shell quoting context.
+                "sed '$d' /usr/local/bin/entrypoint.sh > /tmp/_entrypoint_setup.sh && . /tmp/_entrypoint_setup.sh",
                 "git clone %s /workspace && cd /workspace".formatted(gitRemoteUrl),
                 "git config user.name 'Worldmind Centurion' && git config user.email 'centurion@worldmind.local'",
                 "git checkout -B %s".formatted(branchName),
@@ -208,6 +217,57 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
             starblasterTaskGuids.remove(starblasterId);
             instructionStore.remove(starblasterId);
         }
+    }
+
+    /**
+     * Detects file changes by cloning the directive branch and diffing against main.
+     *
+     * <p>CF centurions push changes to {@code worldmind/{directiveId}} branches.
+     * This method shallow-clones that branch into a temp directory and runs
+     * {@code git diff --stat origin/main..HEAD} to detect what files changed.
+     */
+    @Override
+    public List<FileRecord> detectChanges(String directiveId, Path projectPath) {
+        String branchName = gitWorkspaceManager.getBranchName(directiveId);
+        String gitUrl = resolveAuthenticatedGitUrl();
+        Path tempDir = null;
+        try {
+            tempDir = Files.createTempDirectory("worldmind-diff-");
+            gitWorkspaceManager.runGit(tempDir, "clone", "--depth", "1", "--branch", branchName, gitUrl, ".");
+            gitWorkspaceManager.runGit(tempDir, "fetch", "--depth", "1", "origin", "main");
+            String diffOutput = gitWorkspaceManager.runGitOutput(tempDir, "diff", "--stat", "origin/main..HEAD");
+            return gitWorkspaceManager.parseDiffStat(diffOutput);
+        } catch (Exception e) {
+            log.warn("Git-based change detection failed for {}: {}", directiveId, e.getMessage());
+            return List.of();
+        } finally {
+            if (tempDir != null) {
+                deleteDirectory(tempDir);
+            }
+        }
+    }
+
+    /**
+     * Builds an authenticated git URL by embedding the git token into the HTTPS URL.
+     * Reuses the same logic as {@link #openStarblaster}.
+     */
+    String resolveAuthenticatedGitUrl() {
+        String gitUrl = cfProperties.getGitRemoteUrl();
+        String gitToken = cfProperties.getGitToken();
+        if (gitToken != null && !gitToken.isBlank() && gitUrl.startsWith("https://")) {
+            gitUrl = gitUrl.replace("https://", "https://x-access-token:" + gitToken + "@");
+        }
+        return gitUrl;
+    }
+
+    private static void deleteDirectory(Path dir) {
+        try (var walk = Files.walk(dir)) {
+            walk.sorted(Comparator.reverseOrder())
+                    .forEach(p -> {
+                        try { Files.deleteIfExists(p); }
+                        catch (IOException ignored) {}
+                    });
+        } catch (IOException ignored) {}
     }
 
     /**
