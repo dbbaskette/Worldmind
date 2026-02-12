@@ -53,8 +53,18 @@ for label in vcap:
     fi
 fi
 
-# Resolve provider: GOOSE_PROVIDER (from orchestrator) > VCAP binding > default
-PROVIDER="${GOOSE_PROVIDER:-${VCAP_PROVIDER:-openai}}"
+# Resolve provider: GOOSE_PROVIDER > auto-detect from API key > VCAP binding > default
+if [ -n "${GOOSE_PROVIDER:-}" ]; then
+    PROVIDER="$GOOSE_PROVIDER"
+elif [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+    PROVIDER=anthropic
+elif [ -n "${GOOGLE_API_KEY:-}" ]; then
+    PROVIDER=google
+elif [ -n "${VCAP_PROVIDER:-}" ]; then
+    PROVIDER="$VCAP_PROVIDER"
+else
+    PROVIDER=openai
+fi
 MODEL="${GOOSE_MODEL:-${VCAP_MODEL:-}}"
 
 # Export Goose v1.x environment variables

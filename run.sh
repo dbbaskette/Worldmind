@@ -11,6 +11,18 @@ if [ -f .env ]; then
   set +a
 fi
 
+# Auto-detect GOOSE_PROVIDER from whichever API key is set (if not explicitly configured)
+if [ -z "${GOOSE_PROVIDER:-}" ]; then
+  if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+    GOOSE_PROVIDER=anthropic
+  elif [ -n "${GOOGLE_API_KEY:-}" ]; then
+    GOOSE_PROVIDER=google
+  elif [ -n "${OPENAI_API_KEY:-}" ]; then
+    GOOSE_PROVIDER=openai
+  fi
+  export GOOSE_PROVIDER="${GOOSE_PROVIDER:-openai}"
+fi
+
 JAR="target/worldmind-0.1.0-SNAPSHOT.jar"
 PROFILE="${WORLDMIND_PROFILE:-local}"
 

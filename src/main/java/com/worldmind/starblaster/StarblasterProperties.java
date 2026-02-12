@@ -22,7 +22,17 @@ public class StarblasterProperties {
     public String getImagePrefix() { return starblaster.imagePrefix; }
 
     // -- Goose accessors (delegate to nested) --
-    public String getGooseProvider() { return goose.provider; }
+    public String getGooseProvider() {
+        if (goose.provider != null && !goose.provider.isBlank()) {
+            return goose.provider;
+        }
+        // Auto-detect from API key env vars when GOOSE_PROVIDER isn't set
+        String anthropicKey = System.getenv("ANTHROPIC_API_KEY");
+        if (anthropicKey != null && !anthropicKey.isBlank()) return "anthropic";
+        String googleKey = System.getenv("GOOGLE_API_KEY");
+        if (googleKey != null && !googleKey.isBlank()) return "google";
+        return "openai";
+    }
     public String getGooseModel() { return goose.model; }
     public String getLmStudioUrl() { return goose.lmStudioUrl; }
 
@@ -63,7 +73,7 @@ public class StarblasterProperties {
     }
 
     public static class Goose {
-        private String provider = "openai";
+        private String provider = "";
         private String model = "qwen2.5-coder-32b";
         private String lmStudioUrl = "http://host.docker.internal:1234/v1";
 
