@@ -53,6 +53,9 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
     /** Tracks starblasterId to CF task GUID so we poll the exact task, not stale ones with the same name. */
     private final ConcurrentHashMap<String, String> starblasterTaskGuids = new ConcurrentHashMap<>();
 
+    /** Caches the effective git URL per directive so detectChanges can reuse it. */
+    private final ConcurrentHashMap<String, String> directiveGitUrls = new ConcurrentHashMap<>();
+
     public CloudFoundryStarblasterProvider(CloudFoundryProperties cfProperties,
                                            GitWorkspaceManager gitWorkspaceManager,
                                            CfApiClient cfApiClient,
@@ -80,6 +83,9 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
         if (gitToken != null && !gitToken.isBlank() && gitRemoteUrl.startsWith("https://")) {
             gitRemoteUrl = gitRemoteUrl.replace("https://", "https://x-access-token:" + gitToken + "@");
         }
+
+        // Cache the authenticated URL so detectChanges() can clone the directive branch later
+        directiveGitUrls.put(directiveId, gitRemoteUrl);
 
         var memoryMb = request.memoryLimitMb() > 0
                 ? request.memoryLimitMb()
@@ -269,7 +275,8 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
     @Override
     public List<FileRecord> detectChanges(String directiveId, Path projectPath) {
         String branchName = gitWorkspaceManager.getBranchName(directiveId);
-        String gitUrl = resolveAuthenticatedGitUrl();
+        // Use cached URL from openStarblaster() if available, fall back to config
+        String gitUrl = directiveGitUrls.getOrDefault(directiveId, resolveAuthenticatedGitUrl());
         Path tempDir = null;
         try {
             tempDir = Files.createTempDirectory("worldmind-diff-");

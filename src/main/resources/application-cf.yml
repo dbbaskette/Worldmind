@@ -31,6 +31,7 @@ worldmind:
     cf-username: ${CF_USERNAME:}
     cf-password: ${CF_PASSWORD:}
     git-token: ${GIT_TOKEN:}
+    git-remote-url: ${GIT_REMOTE_URL:}
     orchestrator-url: https://${vcap.application.uris[0]:localhost:8080}
     centurion-apps:
       forge: ${CENTURION_FORGE_APP:centurion-forge}
