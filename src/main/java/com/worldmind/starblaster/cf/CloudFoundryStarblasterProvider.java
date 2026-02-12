@@ -128,6 +128,28 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
                         + " echo '=== CONFIG ===' && cat $HOME/.config/goose/config.yaml 2>&1;"
                         + " echo '=== INSTRUCTION ===' && wc -c .worldmind/directives/" + directiveId + ".md 2>&1;"
                         + " echo '=== GOOSE VERSION ===' && goose --version 2>&1;"
+                        // Direct API tests to isolate streaming/tools issues
+                        + " echo '=== API TEST: no-stream, no-tools ===';"
+                        + " curl -sk -X POST \"${GOOSE_PROVIDER__HOST}/v1/chat/completions\""
+                        + " -H 'Content-Type: application/json'"
+                        + " -H \"Authorization: Bearer ${OPENAI_API_KEY}\""
+                        + " -d '{\"model\":\"'\"$GOOSE_MODEL\"'\",\"stream\":false,\"max_tokens\":20,\"messages\":[{\"role\":\"user\",\"content\":\"Say hello\"}]}'"
+                        + " 2>&1 | head -c 2000;"
+                        + " echo;"
+                        + " echo '=== API TEST: stream, no-tools ===';"
+                        + " curl -sk -X POST \"${GOOSE_PROVIDER__HOST}/v1/chat/completions\""
+                        + " -H 'Content-Type: application/json'"
+                        + " -H \"Authorization: Bearer ${OPENAI_API_KEY}\""
+                        + " -d '{\"model\":\"'\"$GOOSE_MODEL\"'\",\"stream\":true,\"max_tokens\":20,\"messages\":[{\"role\":\"user\",\"content\":\"Say hello\"}]}'"
+                        + " 2>&1 | head -c 2000;"
+                        + " echo;"
+                        + " echo '=== API TEST: stream, 1 tool ===';"
+                        + " curl -sk -X POST \"${GOOSE_PROVIDER__HOST}/v1/chat/completions\""
+                        + " -H 'Content-Type: application/json'"
+                        + " -H \"Authorization: Bearer ${OPENAI_API_KEY}\""
+                        + " -d '{\"model\":\"'\"$GOOSE_MODEL\"'\",\"stream\":true,\"max_tokens\":50,\"messages\":[{\"role\":\"user\",\"content\":\"Create a file called hello.txt with the word hello\"}],\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"shell\",\"description\":\"Run a shell command\",\"parameters\":{\"type\":\"object\",\"properties\":{\"command\":{\"type\":\"string\"}},\"required\":[\"command\"]}}}]}'"
+                        + " 2>&1 | head -c 2000;"
+                        + " echo;"
                         + " } > .worldmind/diagnostics.log 2>&1",
                 // Run Goose with developer builtin loaded explicitly via CLI.
                 // Config.yaml (map format) provides MCP extensions with auth headers.
