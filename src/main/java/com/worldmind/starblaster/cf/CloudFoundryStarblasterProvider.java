@@ -129,10 +129,14 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
                         + " echo '=== INSTRUCTION ===' && wc -c .worldmind/directives/" + directiveId + ".md 2>&1;"
                         + " echo '=== GOOSE VERSION ===' && goose --version 2>&1;"
                         + " } > .worldmind/diagnostics.log 2>&1",
-                // Run Goose with --debug for verbose output. Use a named session (not --no-session)
-                // so output isn't routed to /dev/null. Redirect all output to a log file.
+                // Run Goose with --debug. Capture stdout/stderr AND copy Goose's internal
+                // log files (llm_request.jsonl, server/cli logs) into .worldmind/ for diagnosis.
                 // Then always try to commit+push regardless of exit code.
-                "GOOSE_DEBUG=true goose run --debug -n " + directiveId + " -i .worldmind/directives/" + directiveId + ".md > .worldmind/goose-output.log 2>&1; GOOSE_RC=$?; echo \"GOOSE_EXIT_CODE=$GOOSE_RC\" >> .worldmind/diagnostics.log; git add -A && git commit -m '" + directiveId + "' && git push -uf origin " + branchName + "; exit $GOOSE_RC"
+                "GOOSE_DEBUG=true goose run --debug -n " + directiveId + " -i .worldmind/directives/" + directiveId + ".md > .worldmind/goose-output.log 2>&1"
+                        + "; GOOSE_RC=$?; echo \"GOOSE_EXIT_CODE=$GOOSE_RC\" >> .worldmind/diagnostics.log"
+                        + "; cp -r $HOME/.local/state/goose/logs/ .worldmind/goose-logs 2>/dev/null"
+                        + "; git add -A && git commit -m '" + directiveId + "' && git push -uf origin " + branchName
+                        + "; exit $GOOSE_RC"
         );
 
         log.info("Opening Starblaster {} for directive {} on app {}", taskName, directiveId, appName);
