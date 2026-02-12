@@ -2,6 +2,7 @@ package com.worldmind.dispatch.api;
 
 import com.worldmind.mcp.McpClientManager;
 import com.worldmind.mcp.McpProperties;
+import com.worldmind.starblaster.StarblasterProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -22,16 +23,21 @@ public class SettingsController {
 
     private final McpProperties mcpProperties;
     private final McpClientManager mcpClientManager;
+    private final StarblasterProperties starblasterProperties;
 
-    public SettingsController(McpProperties mcpProperties, McpClientManager mcpClientManager) {
+    public SettingsController(McpProperties mcpProperties, McpClientManager mcpClientManager,
+                              StarblasterProperties starblasterProperties) {
         this.mcpProperties = mcpProperties;
         this.mcpClientManager = mcpClientManager;
+        this.starblasterProperties = starblasterProperties;
     }
 
     @GetMapping("/mcp")
     public ResponseEntity<Map<String, Object>> getMcpSettings() {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("enabled", mcpProperties.isEnabled());
+        result.put("gooseProvider", starblasterProperties.getGooseProvider());
+        result.put("gooseModel", starblasterProperties.getGooseModel());
 
         List<Map<String, Object>> servers = new ArrayList<>();
 

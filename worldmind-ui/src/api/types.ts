@@ -91,6 +91,8 @@ export type InteractionMode =
 
 export interface McpSettingsResponse {
   enabled: boolean
+  gooseProvider: string
+  gooseModel: string
   servers: McpServerInfo[]
 }
 

@@ -78,17 +78,18 @@ cf_push() {
 
   VARS_FILE=$(mktemp /tmp/cf-vars-XXXXXX)
   MANIFEST_FILE="manifest.yml"
-  trap "rm -f $VARS_FILE $TMPDIR/cf-manifest-*.yml" EXIT
+  trap "rm -f $VARS_FILE .cf-manifest-*.yml" EXIT
 
   # If direct key provided, strip worldmind-model binding from centurion apps
   if [ -n "$DIRECT_KEY" ]; then
     echo "Direct API key detected for $GOOSE_PROVIDER — centurions will skip model binding"
-    MANIFEST_FILE=$(mktemp /tmp/cf-manifest-XXXXXX.yml)
-    # Remove "- worldmind-model" lines from centurion apps but keep it on the orchestrator.
+    MANIFEST_FILE=$(mktemp .cf-manifest-XXXXXX.yml)
+    # Remove worldmind-model binding from centurion apps but keep it on the orchestrator.
     # The orchestrator block ends before the first centurion block (line with "docker:").
-    # Strategy: remove worldmind-model lines that appear after the first "docker:" line.
+    # Centurion apps only bind worldmind-model, so remove both `services:` and the entry.
     awk '
       /docker:/ { seen_docker=1 }
+      seen_docker && /^[[:space:]]*services:[[:space:]]*$/ { next }
       seen_docker && /- worldmind-model/ { next }
       { print }
     ' manifest.yml > "$MANIFEST_FILE"
@@ -140,6 +141,19 @@ EOVARS
                  worldmind.starblaster.image-registry; do
     cf unset-env worldmind "$old_var" 2>/dev/null || true
   done
+
+  # Unbind worldmind-model from centurion apps when using a direct API key.
+  # CF preserves existing bindings even when removed from the manifest.
+  if [ -n "$DIRECT_KEY" ]; then
+    echo "Unbinding worldmind-model from centurion apps..."
+    for app in "${CENTURION_FORGE_APP:-centurion-forge}" \
+               "${CENTURION_GAUNTLET_APP:-centurion-gauntlet}" \
+               "${CENTURION_VIGIL_APP:-centurion-vigil}" \
+               "${CENTURION_PULSE_APP:-centurion-pulse}" \
+               "${CENTURION_PRISM_APP:-centurion-prism}"; do
+      cf unbind-service "$app" worldmind-model 2>/dev/null || true
+    done
+  fi
 
   echo "Pushing to Cloud Foundry..."
   CF_DOCKER_PASSWORD="$CF_DOCKER_PASSWORD" cf push -f "$MANIFEST_FILE" --vars-file "$VARS_FILE"

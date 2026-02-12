@@ -32,6 +32,21 @@ export function SettingsPanel() {
     <div className="h-full overflow-y-auto p-6">
       <h2 className="text-lg font-semibold text-wm_text-primary mb-6">Settings</h2>
 
+      {/* LLM Model Section */}
+      {settings?.gooseProvider && (
+        <div className="mb-6">
+          <h3 className="text-sm font-semibold text-wm_text-primary uppercase tracking-wider mb-3">LLM Model</h3>
+          <div className="bg-wm-card rounded-lg border border-wm-border p-4">
+            <div className="flex items-center gap-3">
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-centurion-forge/10 text-centurion-forge border border-centurion-forge/30">
+                {settings.gooseProvider}
+              </span>
+              <span className="text-sm font-mono text-wm_text-secondary">{settings.gooseModel}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MCP Servers Section */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-4">
