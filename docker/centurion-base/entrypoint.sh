@@ -144,7 +144,11 @@ MCP_EOF
     timeout: 300
 MCP_EOF
       fi
-      echo "[entrypoint] MCP extension '${NAME}' configured: ${URL}"
+      if [ -n "$TOKEN" ]; then
+        echo "[entrypoint] MCP extension '${NAME}' configured: ${URL} (token: set)"
+      else
+        echo "[entrypoint] MCP extension '${NAME}' configured: ${URL} (token: none)"
+      fi
     fi
   done
   IFS="$OLDIFS"
