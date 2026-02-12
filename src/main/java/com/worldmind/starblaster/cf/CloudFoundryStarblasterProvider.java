@@ -110,19 +110,29 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
                 // Export MCP server env vars (no-op if none configured)
                 mcpExports.isEmpty() ? "true" : mcpExports,
                 // Source entrypoint.sh to parse VCAP_SERVICES and set up Goose config.
-                // Bridge env vars for older entrypoint images that export GOOSE_PROVIDER__*
-                // instead of the standard OPENAI_API_KEY / OPENAI_HOST that Goose v1.x reads.
+                // Bridge env vars: ensure GOOSE_PROVIDER__HOST and GOOSE_PROVIDER__API_KEY
+                // are set (Goose's documented env var interface) alongside provider-native vars.
+                // Use { ... || true; } to prevent short-circuiting the && chain if a var is unset.
                 "sed '$d' /usr/local/bin/entrypoint.sh > /tmp/_entrypoint_setup.sh && . /tmp/_entrypoint_setup.sh"
-                        + " && [ -n \"$API_KEY\" ] && export OPENAI_API_KEY=\"${OPENAI_API_KEY:-$API_KEY}\""
-                        + " && [ -n \"$API_URL\" ] && export OPENAI_HOST=\"${OPENAI_HOST:-${API_URL%/}/}\"",
+                        + " && { [ -n \"$API_KEY\" ] && export GOOSE_PROVIDER__API_KEY=\"${GOOSE_PROVIDER__API_KEY:-$API_KEY}\""
+                        + " && export OPENAI_API_KEY=\"${OPENAI_API_KEY:-$API_KEY}\" || true; }"
+                        + " && { [ -n \"$API_URL\" ] && export GOOSE_PROVIDER__HOST=\"${GOOSE_PROVIDER__HOST:-$API_URL}\""
+                        + " && export OPENAI_HOST=\"${OPENAI_HOST:-${API_URL%/}/}\" || true; }",
                 "git clone %s /workspace && cd /workspace".formatted(gitRemoteUrl),
                 "git config user.name 'Worldmind Centurion' && git config user.email 'centurion@worldmind.local'",
                 "git checkout -B %s".formatted(branchName),
                 "mkdir -p .worldmind/directives && curl --retry 3 -fk '%s' > .worldmind/directives/%s.md".formatted(instructionUrl, directiveId),
+                // Dump diagnostics to a file that gets committed to git for debugging.
+                "mkdir -p .worldmind && {"
+                        + " echo '=== ENV ===' && env | grep -iE 'GOOSE|OPENAI|API_URL|API_KEY|PROVIDER|MODEL|SSL' | sed 's/\\(API_KEY\\|TOKEN\\)=.*/\\1=***/';"
+                        + " echo '=== CONFIG ===' && cat $HOME/.config/goose/config.yaml 2>&1;"
+                        + " echo '=== INSTRUCTION ===' && wc -c .worldmind/directives/%s.md 2>&1;"
+                        + " echo '=== GOOSE VERSION ===' && goose --version 2>&1;"
+                        + " } > .worldmind/diagnostics.log 2>&1".formatted(directiveId),
                 // Run Goose, then always try to commit+push regardless of exit code
                 // so partial work isn't lost when the container is destroyed.
                 // Capture Goose's exit code and return it as the task's final status.
-                "goose run --no-session -i .worldmind/directives/%s.md; GOOSE_RC=$?; git add -A && git commit -m '%s' && git push -uf origin %s; exit $GOOSE_RC".formatted(directiveId, directiveId, branchName)
+                "goose run --no-session -i .worldmind/directives/%s.md 2>&1 | tee .worldmind/goose-output.log; GOOSE_RC=$?; echo \"GOOSE_EXIT_CODE=$GOOSE_RC\" >> .worldmind/diagnostics.log; git add -A && git commit -m '%s' && git push -uf origin %s; exit $GOOSE_RC".formatted(directiveId, directiveId, branchName)
         );
 
         log.info("Opening Starblaster {} for directive {} on app {}", taskName, directiveId, appName);

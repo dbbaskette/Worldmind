@@ -66,6 +66,9 @@ class CloudFoundryStarblasterProviderTest {
         assertTrue(call.command.contains("curl"), "Should contain curl: " + call.command);
         assertTrue(call.command.contains("goose run --no-session -i"), "Should contain goose run: " + call.command);
         assertTrue(call.command.contains("git push"), "Should contain git push: " + call.command);
+        assertTrue(call.command.contains("GOOSE_PROVIDER__HOST"), "Should bridge GOOSE_PROVIDER__HOST: " + call.command);
+        assertTrue(call.command.contains("GOOSE_PROVIDER__API_KEY"), "Should bridge GOOSE_PROVIDER__API_KEY: " + call.command);
+        assertTrue(call.command.contains("diagnostics.log"), "Should write diagnostics: " + call.command);
     }
 
     @Test
@@ -276,6 +279,44 @@ class CloudFoundryStarblasterProviderTest {
     void getAppNameFromStarblasterIdThrowsOnMissingDirectiveId() {
         assertThrows(RuntimeException.class, () ->
                 provider.getAppNameFromStarblasterId("starblaster-"));
+    }
+
+    // --- detectChanges tests ---
+
+    @Test
+    void detectChangesReturnsEmptyListOnGitFailure() {
+        // With a real GitWorkspaceManager, clone will fail since the URL is fake.
+        // The method should catch the exception and return an empty list.
+        var changes = provider.detectChanges("DIR-001", Path.of("/tmp/project"));
+
+        assertNotNull(changes);
+        assertTrue(changes.isEmpty());
+    }
+
+    @Test
+    void resolveAuthenticatedGitUrlEmbedsToken() {
+        cfProperties.setGitToken("ghp_test123");
+        cfProperties.setGitRemoteUrl("https://github.com/example/project.git");
+
+        // Re-create provider with updated properties
+        var gitWorkspaceManager = new GitWorkspaceManager(cfProperties.getGitRemoteUrl());
+        provider = new CloudFoundryStarblasterProvider(cfProperties, gitWorkspaceManager, stubApiClient, new com.worldmind.starblaster.InstructionStore());
+
+        var url = provider.resolveAuthenticatedGitUrl();
+        assertTrue(url.startsWith("https://x-access-token:ghp_test123@"), "Should embed token: " + url);
+        assertTrue(url.contains("github.com/example/project.git"), "Should preserve rest of URL: " + url);
+    }
+
+    @Test
+    void resolveAuthenticatedGitUrlSkipsTokenWhenBlank() {
+        cfProperties.setGitToken("");
+        cfProperties.setGitRemoteUrl("https://github.com/example/project.git");
+
+        var gitWorkspaceManager = new GitWorkspaceManager(cfProperties.getGitRemoteUrl());
+        provider = new CloudFoundryStarblasterProvider(cfProperties, gitWorkspaceManager, stubApiClient, new com.worldmind.starblaster.InstructionStore());
+
+        var url = provider.resolveAuthenticatedGitUrl();
+        assertEquals("https://github.com/example/project.git", url);
     }
 
     // --- Helper methods ---

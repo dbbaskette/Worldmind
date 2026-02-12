@@ -73,14 +73,18 @@ export GOOSE_MODE=auto
 export GOOSE_CONTEXT_STRATEGY=summarize
 export GOOSE_MAX_TURNS=50
 
-# Set provider auth via Goose v1.x env vars
+# Set Goose provider auth via GOOSE_PROVIDER__* env vars (documented interface).
+# Also set provider-native vars (OPENAI_API_KEY etc.) as fallback.
+[ -n "$API_KEY" ] && export GOOSE_PROVIDER__API_KEY="$API_KEY"
+[ -n "$API_URL" ] && export GOOSE_PROVIDER__HOST="$API_URL"
+
 if [ "$PROVIDER" = "openai" ]; then
-    [ -n "$API_KEY" ] && export GOOSE_PROVIDER__API_KEY="$API_KEY"
-    [ -n "$API_URL" ] && export GOOSE_PROVIDER__HOST="${API_URL%/}/"
+    [ -n "$API_KEY" ] && export OPENAI_API_KEY="$API_KEY"
+    [ -n "$API_URL" ] && export OPENAI_HOST="${API_URL%/}/"
 elif [ "$PROVIDER" = "anthropic" ]; then
-    [ -n "$API_KEY" ] && export GOOSE_PROVIDER__API_KEY="$API_KEY"
+    [ -n "$API_KEY" ] && export ANTHROPIC_API_KEY="$API_KEY"
 elif [ "$PROVIDER" = "google" ]; then
-    [ -n "$API_KEY" ] && export GOOSE_PROVIDER__API_KEY="$API_KEY"
+    [ -n "$API_KEY" ] && export GOOGLE_API_KEY="$API_KEY"
 fi
 
 # Write config.yaml with developer extension

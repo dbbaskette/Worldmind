@@ -73,7 +73,11 @@ export GOOSE_MODE=auto
 export GOOSE_CONTEXT_STRATEGY=summarize
 export GOOSE_MAX_TURNS=50
 
-# Set provider auth via standard provider env vars (Goose v1.x reads these directly)
+# Set Goose provider auth via GOOSE_PROVIDER__* env vars (documented interface).
+# Also set provider-native vars (OPENAI_API_KEY etc.) as fallback.
+[ -n "$API_KEY" ] && export GOOSE_PROVIDER__API_KEY="$API_KEY"
+[ -n "$API_URL" ] && export GOOSE_PROVIDER__HOST="$API_URL"
+
 if [ "$PROVIDER" = "openai" ]; then
     [ -n "$API_KEY" ] && export OPENAI_API_KEY="$API_KEY"
     [ -n "$API_URL" ] && export OPENAI_HOST="${API_URL%/}/"
