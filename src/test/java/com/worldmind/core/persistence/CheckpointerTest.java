@@ -121,7 +121,7 @@ class CheckpointerTest {
                 new ClassifyRequestNode(mockLlm, null),
                 new UploadContextNode(mockScanner),
                 new GenerateSpecNode(mockLlm, null, null),
-                new PlanMissionNode(mockLlm, null),
+                new PlanMissionNode(mockLlm),
                 mockScheduleWave,
                 mockParallelDispatch,
                 mockEvaluateWave,

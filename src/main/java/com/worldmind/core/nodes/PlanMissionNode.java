@@ -10,8 +10,8 @@ import com.worldmind.core.model.MissionStatus;
 import com.worldmind.core.model.ProductSpec;
 import com.worldmind.core.model.ProjectContext;
 import com.worldmind.core.state.WorldmindState;
-import com.worldmind.mcp.McpToolProvider;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -29,6 +29,8 @@ import java.util.Optional;
  */
 @Component
 public class PlanMissionNode {
+
+    private static final Logger log = LoggerFactory.getLogger(PlanMissionNode.class);
 
     private static final String SYSTEM_PROMPT = """
             You are a mission planner for Worldmind, an agentic code assistant.
@@ -71,12 +73,9 @@ public class PlanMissionNode {
             """;
 
     private final LlmService llmService;
-    private final McpToolProvider mcpToolProvider;
 
-    public PlanMissionNode(LlmService llmService,
-                           @Autowired(required = false) McpToolProvider mcpToolProvider) {
+    public PlanMissionNode(LlmService llmService) {
         this.llmService = llmService;
-        this.mcpToolProvider = mcpToolProvider;
     }
 
     public Map<String, Object> apply(WorldmindState state) {
@@ -95,17 +94,75 @@ public class PlanMissionNode {
         Optional<ProductSpec> productSpec = state.productSpec();
 
         String userPrompt = buildUserPrompt(request, classification, projectContext, productSpec);
-        MissionPlan plan = (mcpToolProvider != null && mcpToolProvider.hasTools())
-                ? llmService.structuredCallWithTools(SYSTEM_PROMPT, userPrompt, MissionPlan.class, mcpToolProvider.getToolsFor("plan"))
-                : llmService.structuredCall(SYSTEM_PROMPT, userPrompt, MissionPlan.class);
+        // Plan generation uses structuredCall without MCP tools — the planner only
+        // needs to structure directives from the spec, not call external tools.
+        MissionPlan plan = llmService.structuredCall(SYSTEM_PROMPT, userPrompt, MissionPlan.class);
 
         List<Directive> directives = convertToDirectives(plan);
+        directives = ensureForgeDirective(directives, request);
+
+        log.info("Mission plan: {} directives — {}", directives.size(),
+                directives.stream().map(d -> d.id() + "[" + d.centurion() + "]").toList());
 
         return Map.of(
                 "directives", directives,
                 "executionStrategy", plan.executionStrategy().toUpperCase(),
                 "status", MissionStatus.AWAITING_APPROVAL.name()
         );
+    }
+
+    /**
+     * Guardrail: if the LLM generated a plan with no FORGE or PRISM directives,
+     * inject a default FORGE directive. This prevents missions that produce no code.
+     */
+    private List<Directive> ensureForgeDirective(List<Directive> directives, String request) {
+        boolean hasImplementation = directives.stream()
+                .anyMatch(d -> "FORGE".equalsIgnoreCase(d.centurion())
+                        || "PRISM".equalsIgnoreCase(d.centurion()));
+        if (hasImplementation) return directives;
+
+        log.warn("LLM plan contained no FORGE/PRISM directives — injecting default FORGE directive");
+
+        // Find the last non-VIGIL directive to use as a dependency
+        String lastNonVigilId = null;
+        for (var d : directives) {
+            if (!"VIGIL".equalsIgnoreCase(d.centurion())) {
+                lastNonVigilId = d.id();
+            }
+        }
+
+        String forgeId = String.format("DIR-%03d", directives.size() + 1);
+        List<String> deps = lastNonVigilId != null ? List.of(lastNonVigilId) : List.of();
+        var forgeDirective = new Directive(
+                forgeId, "FORGE",
+                "Implement the requested changes: " + request,
+                "Implement all goals from the product specification. Create or modify files as needed.",
+                "All specified changes are implemented and the code compiles",
+                deps,
+                DirectiveStatus.PENDING, 0, 3,
+                FailureStrategy.RETRY, List.of(), null
+        );
+
+        // Insert FORGE before any trailing VIGIL directive
+        var result = new ArrayList<Directive>();
+        boolean forgeInserted = false;
+        for (var d : directives) {
+            if ("VIGIL".equalsIgnoreCase(d.centurion()) && !forgeInserted) {
+                result.add(forgeDirective);
+                forgeInserted = true;
+                // Update VIGIL to depend on the new FORGE directive
+                d = new Directive(d.id(), d.centurion(), d.description(),
+                        d.inputContext(), d.successCriteria(),
+                        List.of(forgeId),
+                        d.status(), d.iteration(), d.maxIterations(),
+                        d.onFailure(), d.filesAffected(), d.elapsedMs());
+            }
+            result.add(d);
+        }
+        if (!forgeInserted) {
+            result.add(forgeDirective);
+        }
+        return result;
     }
 
     private String buildUserPrompt(String request, Classification classification,
