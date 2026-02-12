@@ -281,14 +281,16 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
         try {
             tempDir = Files.createTempDirectory("worldmind-diff-");
             gitWorkspaceManager.runGit(tempDir, "clone", "--depth", "1", "--branch", branchName, gitUrl, ".");
-            gitWorkspaceManager.runGit(tempDir, "fetch", "--depth", "1", "origin", "main");
+            // Fetch main into an explicit ref — plain "fetch origin main" only updates
+            // FETCH_HEAD, not origin/main, when the clone is single-branch.
+            gitWorkspaceManager.runGit(tempDir, "fetch", "--depth", "1", "origin", "main:refs/remotes/origin/main");
             String diffOutput = gitWorkspaceManager.runGitOutput(tempDir, "diff", "--stat", "origin/main..HEAD");
             // Filter out .worldmind/ internal files (diagnostics, logs) — only report project changes
             return gitWorkspaceManager.parseDiffStat(diffOutput).stream()
                     .filter(f -> !f.path().startsWith(".worldmind/") && !f.path().startsWith(".worldmind\\"))
                     .toList();
         } catch (Exception e) {
-            log.warn("Git-based change detection failed for {}: {}", directiveId, e.getMessage());
+            log.warn("Git-based change detection failed for {} (branch {}): {}", directiveId, branchName, e.getMessage());
             return List.of();
         } finally {
             if (tempDir != null) {
