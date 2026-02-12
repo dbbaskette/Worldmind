@@ -64,7 +64,7 @@ class CloudFoundryStarblasterProviderTest {
         assertTrue(call.command.contains("git clone"), "Should contain git clone: " + call.command);
         assertTrue(call.command.contains("worldmind/DIR-001"), "Should contain branch name: " + call.command);
         assertTrue(call.command.contains("curl"), "Should contain curl: " + call.command);
-        assertTrue(call.command.contains("goose run --no-session -i"), "Should contain goose run: " + call.command);
+        assertTrue(call.command.contains("goose run --debug -n"), "Should contain goose run: " + call.command);
         assertTrue(call.command.contains("git push"), "Should contain git push: " + call.command);
         assertTrue(call.command.contains("GOOSE_PROVIDER__HOST"), "Should bridge GOOSE_PROVIDER__HOST: " + call.command);
         assertTrue(call.command.contains("GOOSE_PROVIDER__API_KEY"), "Should bridge GOOSE_PROVIDER__API_KEY: " + call.command);

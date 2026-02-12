@@ -126,13 +126,13 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
                 "mkdir -p .worldmind && {"
                         + " echo '=== ENV ===' && env | grep -iE 'GOOSE|OPENAI|API_URL|API_KEY|PROVIDER|MODEL|SSL' | sed 's/\\(API_KEY\\|TOKEN\\)=.*/\\1=***/';"
                         + " echo '=== CONFIG ===' && cat $HOME/.config/goose/config.yaml 2>&1;"
-                        + " echo '=== INSTRUCTION ===' && wc -c .worldmind/directives/%s.md 2>&1;"
+                        + " echo '=== INSTRUCTION ===' && wc -c .worldmind/directives/" + directiveId + ".md 2>&1;"
                         + " echo '=== GOOSE VERSION ===' && goose --version 2>&1;"
-                        + " } > .worldmind/diagnostics.log 2>&1".formatted(directiveId),
-                // Run Goose, then always try to commit+push regardless of exit code
-                // so partial work isn't lost when the container is destroyed.
-                // Capture Goose's exit code and return it as the task's final status.
-                "goose run --no-session -i .worldmind/directives/%s.md 2>&1 | tee .worldmind/goose-output.log; GOOSE_RC=$?; echo \"GOOSE_EXIT_CODE=$GOOSE_RC\" >> .worldmind/diagnostics.log; git add -A && git commit -m '%s' && git push -uf origin %s; exit $GOOSE_RC".formatted(directiveId, directiveId, branchName)
+                        + " } > .worldmind/diagnostics.log 2>&1",
+                // Run Goose with --debug for verbose output. Use a named session (not --no-session)
+                // so output isn't routed to /dev/null. Redirect all output to a log file.
+                // Then always try to commit+push regardless of exit code.
+                "GOOSE_DEBUG=true goose run --debug -n " + directiveId + " -i .worldmind/directives/" + directiveId + ".md > .worldmind/goose-output.log 2>&1; GOOSE_RC=$?; echo \"GOOSE_EXIT_CODE=$GOOSE_RC\" >> .worldmind/diagnostics.log; git add -A && git commit -m '" + directiveId + "' && git push -uf origin " + branchName + "; exit $GOOSE_RC"
         );
 
         log.info("Opening Starblaster {} for directive {} on app {}", taskName, directiveId, appName);
