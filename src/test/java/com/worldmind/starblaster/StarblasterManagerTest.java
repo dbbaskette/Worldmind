@@ -12,9 +12,12 @@ import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import java.util.Map;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 class StarblasterManagerTest {
@@ -74,6 +77,45 @@ class StarblasterManagerTest {
         assertEquals(1, changes.size());
         assertEquals("hello.py", changes.get(0).path());
         assertEquals("created", changes.get(0).action());
+    }
+
+    @Test
+    void executeDirectiveUsesProviderDetectionWhenAvailable() {
+        var providerChanges = List.of(
+                new FileRecord("src/Foo.java", "modified", 10),
+                new FileRecord("src/Bar.java", "created", 25)
+        );
+        when(provider.openStarblaster(any())).thenReturn("container-3");
+        when(provider.waitForCompletion("container-3", 300)).thenReturn(0);
+        when(provider.captureOutput("container-3")).thenReturn("done");
+        when(provider.detectChanges(anyString(), any(Path.class))).thenReturn(providerChanges);
+
+        var result = manager.executeDirective(
+            "forge", "DIR-003", Path.of("/tmp/test"),
+            "Create file", Map.of(),
+            "", "base"
+        );
+
+        assertEquals(2, result.fileChanges().size());
+        assertEquals("src/Foo.java", result.fileChanges().get(0).path());
+        assertEquals("src/Bar.java", result.fileChanges().get(1).path());
+    }
+
+    @Test
+    void executeDirectiveFallsBackToFilesystemWhenProviderReturnsNull() {
+        when(provider.openStarblaster(any())).thenReturn("container-4");
+        when(provider.waitForCompletion("container-4", 300)).thenReturn(0);
+        when(provider.captureOutput("container-4")).thenReturn("done");
+        when(provider.detectChanges(anyString(), any(Path.class))).thenReturn(null);
+
+        var result = manager.executeDirective(
+            "forge", "DIR-004", Path.of("/tmp/test"),
+            "Create file", Map.of(),
+            "", "base"
+        );
+
+        // Provider returned null, so filesystem detection is used (no actual file changes in /tmp/test)
+        assertNotNull(result.fileChanges());
     }
 
     @Test

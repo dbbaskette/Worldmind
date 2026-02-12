@@ -12,59 +12,50 @@ CONFIG_FILE="$GOOSE_CONFIG_DIR/config.yaml"
 
 mkdir -p "$GOOSE_CONFIG_DIR"
 
-# --- CF environment detection ---
+# --- Credential resolution ---
+# Parse VCAP_SERVICES for any GenAI model binding (CredHub-managed credentials).
+# If no model is bound, the orchestrator's env vars provide credentials instead.
+# Other VCAP bindings (Postgres, etc.) are unaffected — only GenAI labels are parsed.
+
 if [ -n "$VCAP_SERVICES" ]; then
     echo "[entrypoint] Cloud Foundry environment detected, parsing VCAP_SERVICES..."
 
-    # Parse credentials from the bound worldmind-model service.
-    # Supports two formats:
-    #   1. GenAI tile: { "model_provider": "anthropic", "model_name": "...", "api_key": "..." }
-    #   2. OpenAI-compatible: { "uri": "https://...", "api_key": "...", "model": "..." }
+    # Parse credentials from bound GenAI service (if any).
+    # Sets VCAP_PROVIDER, VCAP_MODEL, VCAP_API_KEY, VCAP_API_URL only if a GenAI binding exists.
     eval "$(echo "$VCAP_SERVICES" | python3 -c "
 import sys, json, os
 vcap = json.load(sys.stdin)
 for label in vcap:
     for svc in vcap[label]:
         creds = svc.get('credentials', {})
-        # Detect provider
         if 'model_provider' in creds:
-            print('PROVIDER=' + creds['model_provider'])
+            print('VCAP_PROVIDER=' + creds['model_provider'])
         elif any(k in creds for k in ('uri', 'url', 'api_url', 'api_base')):
-            print('PROVIDER=openai')
+            print('VCAP_PROVIDER=openai')
         else:
             continue
-        # Model name
-        model = creds.get('model_name') or creds.get('model') or os.environ.get('GOOSE_MODEL', '')
+        model = creds.get('model_name') or creds.get('model') or ''
         if model:
-            print('MODEL=' + model)
-        # API key
+            print('VCAP_MODEL=' + model)
         api_key = creds.get('api_key') or creds.get('apiKey') or creds.get('key', '')
         if api_key:
-            print('API_KEY=' + api_key)
-        # API URL (OpenAI-compatible endpoint)
+            print('VCAP_API_KEY=' + api_key)
         api_url = creds.get('uri') or creds.get('url') or creds.get('api_url') or creds.get('api_base', '')
         if api_url:
-            print('API_URL=' + api_url)
+            print('VCAP_API_URL=' + api_url)
         sys.exit(0)
 " 2>/dev/null)"
 
-    PROVIDER="${PROVIDER:-openai}"
-    MODEL="${MODEL:-}"
-    API_KEY="${API_KEY:-}"
-    API_URL="${API_URL:-}"
-
-    echo "[entrypoint] CF config: provider=$PROVIDER, model=$MODEL, api_url=${API_URL:-N/A}"
-else
-    # --- Local/Docker environment ---
-    PROVIDER="${GOOSE_PROVIDER:-openai}"
-    MODEL="${GOOSE_MODEL:-qwen2.5-coder-32b}"
-    API_KEY="${GOOSE_PROVIDER__API_KEY:-}"
-    API_URL="${GOOSE_PROVIDER__HOST:-}"
+    if [ -n "$VCAP_PROVIDER" ]; then
+        echo "[entrypoint] Bound model: provider=$VCAP_PROVIDER, api_url=${VCAP_API_URL:-N/A}"
+    else
+        echo "[entrypoint] No GenAI model binding found in VCAP_SERVICES"
+    fi
 fi
 
-# Allow explicit env vars to override CF-detected values
-PROVIDER="${GOOSE_PROVIDER:-$PROVIDER}"
-MODEL="${GOOSE_MODEL:-$MODEL}"
+# Resolve provider: GOOSE_PROVIDER (from orchestrator) > VCAP binding > default
+PROVIDER="${GOOSE_PROVIDER:-${VCAP_PROVIDER:-openai}}"
+MODEL="${GOOSE_MODEL:-${VCAP_MODEL:-}}"
 
 # Export Goose v1.x environment variables
 export GOOSE_PROVIDER="$PROVIDER"
@@ -73,18 +64,24 @@ export GOOSE_MODE=auto
 export GOOSE_CONTEXT_STRATEGY=summarize
 export GOOSE_MAX_TURNS=50
 
-# Set Goose provider auth via GOOSE_PROVIDER__* env vars (documented interface).
-# Also set provider-native vars (OPENAI_API_KEY etc.) as fallback.
-[ -n "$API_KEY" ] && export GOOSE_PROVIDER__API_KEY="$API_KEY"
-[ -n "$API_URL" ] && export GOOSE_PROVIDER__HOST="$API_URL"
-
-if [ "$PROVIDER" = "openai" ]; then
-    [ -n "$API_KEY" ] && export OPENAI_API_KEY="$API_KEY"
-    [ -n "$API_URL" ] && export OPENAI_HOST="${API_URL%/}/"
-elif [ "$PROVIDER" = "anthropic" ]; then
-    [ -n "$API_KEY" ] && export ANTHROPIC_API_KEY="$API_KEY"
-elif [ "$PROVIDER" = "google" ]; then
-    [ -n "$API_KEY" ] && export GOOGLE_API_KEY="$API_KEY"
+# Resolve API key: direct key (GOOSE_PROVIDER__API_KEY) > VCAP binding key
+# When the orchestrator provides a direct key, the VCAP binding is skipped for auth.
+# This lets you use any provider by setting the key in .env without unbinding services.
+if [ -z "$GOOSE_PROVIDER__API_KEY" ] && [ -n "$VCAP_API_KEY" ]; then
+    export GOOSE_PROVIDER__API_KEY="$VCAP_API_KEY"
+    [ -n "$VCAP_API_URL" ] && export GOOSE_PROVIDER__HOST="$VCAP_API_URL"
+    # Set provider-native vars for compatibility
+    if [ "$PROVIDER" = "openai" ]; then
+        export OPENAI_API_KEY="$VCAP_API_KEY"
+        [ -n "$VCAP_API_URL" ] && export OPENAI_HOST="${VCAP_API_URL%/}/"
+    elif [ "$PROVIDER" = "anthropic" ]; then
+        export ANTHROPIC_API_KEY="$VCAP_API_KEY"
+    elif [ "$PROVIDER" = "google" ]; then
+        export GOOGLE_API_KEY="$VCAP_API_KEY"
+    fi
+    echo "[entrypoint] Using VCAP binding credentials"
+else
+    echo "[entrypoint] Using orchestrator-provided credentials"
 fi
 
 # Write config.yaml with developer extension using map format.

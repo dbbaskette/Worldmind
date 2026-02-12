@@ -100,56 +100,28 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
         // GOOSE_MODEL, config.yaml, SSL certs, etc. from VCAP_SERVICES.
         // Goose v1.x (Rust binary) handles SSL and auth natively.
 
-        // Export MCP env vars into the CF task shell so entrypoint.sh can generate Goose extensions
-        var mcpExports = request.envVars().entrySet().stream()
-                .filter(e -> e.getKey().startsWith("MCP_"))
+        // Export all env vars into the CF task shell so entrypoint.sh can read
+        // GOOSE_PROVIDER, GOOSE_MODEL, provider API keys, and MCP server configs.
+        var envExports = request.envVars().entrySet().stream()
                 .map(e -> "export %s='%s'".formatted(e.getKey(), e.getValue().replace("'", "\\'")))
                 .collect(Collectors.joining(" && "));
 
         var taskCommand = String.join(" && ",
-                // Export MCP server env vars (no-op if none configured)
-                mcpExports.isEmpty() ? "true" : mcpExports,
+                // Export env vars (provider config, API keys, MCP configs)
+                envExports.isEmpty() ? "true" : envExports,
                 // Source entrypoint.sh to parse VCAP_SERVICES and set up Goose config.
-                // Bridge env vars: ensure GOOSE_PROVIDER__HOST and GOOSE_PROVIDER__API_KEY
-                // are set (Goose's documented env var interface) alongside provider-native vars.
-                // Use { ... || true; } to prevent short-circuiting the && chain if a var is unset.
-                "sed '$d' /usr/local/bin/entrypoint.sh > /tmp/_entrypoint_setup.sh && . /tmp/_entrypoint_setup.sh"
-                        + " && { [ -n \"$API_KEY\" ] && export GOOSE_PROVIDER__API_KEY=\"${GOOSE_PROVIDER__API_KEY:-$API_KEY}\""
-                        + " && export OPENAI_API_KEY=\"${OPENAI_API_KEY:-$API_KEY}\" || true; }"
-                        + " && { [ -n \"$API_URL\" ] && export GOOSE_PROVIDER__HOST=\"${GOOSE_PROVIDER__HOST:-$API_URL}\""
-                        + " && export OPENAI_HOST=\"${OPENAI_HOST:-${API_URL%/}/}\" || true; }",
+                // Entrypoint uses conditional assignment (:-) so pre-exported vars take precedence.
+                "sed '$d' /usr/local/bin/entrypoint.sh > /tmp/_entrypoint_setup.sh && . /tmp/_entrypoint_setup.sh",
                 "git clone %s /workspace && cd /workspace".formatted(gitRemoteUrl),
                 "git config user.name 'Worldmind Centurion' && git config user.email 'centurion@worldmind.local'",
                 "git checkout -B %s".formatted(branchName),
                 "mkdir -p .worldmind/directives && curl --retry 3 -fk '%s' > .worldmind/directives/%s.md".formatted(instructionUrl, directiveId),
                 // Dump diagnostics to a file that gets committed to git for debugging.
                 "mkdir -p .worldmind && {"
-                        + " echo '=== ENV ===' && env | grep -iE 'GOOSE|OPENAI|API_URL|API_KEY|PROVIDER|MODEL|SSL' | sed 's/\\(API_KEY\\|TOKEN\\)=.*/\\1=***/';"
+                        + " echo '=== ENV ===' && env | grep -iE 'GOOSE|OPENAI|ANTHROPIC|GOOGLE|API_URL|API_KEY|PROVIDER|MODEL|SSL|MCP' | sed 's/\\(API_KEY\\|TOKEN\\)=.*/\\1=***/';"
                         + " echo '=== CONFIG ===' && cat $HOME/.config/goose/config.yaml 2>&1;"
                         + " echo '=== INSTRUCTION ===' && wc -c .worldmind/directives/" + directiveId + ".md 2>&1;"
                         + " echo '=== GOOSE VERSION ===' && goose --version 2>&1;"
-                        // Direct API tests to isolate streaming/tools issues
-                        + " echo '=== API TEST: no-stream, no-tools ===';"
-                        + " curl -sk -X POST \"${GOOSE_PROVIDER__HOST}/v1/chat/completions\""
-                        + " -H 'Content-Type: application/json'"
-                        + " -H \"Authorization: Bearer ${OPENAI_API_KEY}\""
-                        + " -d '{\"model\":\"'\"$GOOSE_MODEL\"'\",\"stream\":false,\"max_tokens\":20,\"messages\":[{\"role\":\"user\",\"content\":\"Say hello\"}]}'"
-                        + " 2>&1 | head -c 2000;"
-                        + " echo;"
-                        + " echo '=== API TEST: stream, no-tools ===';"
-                        + " curl -sk -X POST \"${GOOSE_PROVIDER__HOST}/v1/chat/completions\""
-                        + " -H 'Content-Type: application/json'"
-                        + " -H \"Authorization: Bearer ${OPENAI_API_KEY}\""
-                        + " -d '{\"model\":\"'\"$GOOSE_MODEL\"'\",\"stream\":true,\"max_tokens\":20,\"messages\":[{\"role\":\"user\",\"content\":\"Say hello\"}]}'"
-                        + " 2>&1 | head -c 2000;"
-                        + " echo;"
-                        + " echo '=== API TEST: stream, 1 tool ===';"
-                        + " curl -sk -X POST \"${GOOSE_PROVIDER__HOST}/v1/chat/completions\""
-                        + " -H 'Content-Type: application/json'"
-                        + " -H \"Authorization: Bearer ${OPENAI_API_KEY}\""
-                        + " -d '{\"model\":\"'\"$GOOSE_MODEL\"'\",\"stream\":true,\"max_tokens\":50,\"messages\":[{\"role\":\"user\",\"content\":\"Create a file called hello.txt with the word hello\"}],\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"shell\",\"description\":\"Run a shell command\",\"parameters\":{\"type\":\"object\",\"properties\":{\"command\":{\"type\":\"string\"}},\"required\":[\"command\"]}}}]}'"
-                        + " 2>&1 | head -c 2000;"
-                        + " echo;"
                         + " } > .worldmind/diagnostics.log 2>&1",
                 // Run Goose with developer builtin loaded explicitly via CLI.
                 // Config.yaml (map format) provides MCP extensions with auth headers.

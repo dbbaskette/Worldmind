@@ -316,6 +316,103 @@ public class GitWorkspaceManager {
         return results;
     }
 
+    /**
+     * Merges all passed directive branches into main and pushes.
+     *
+     * <p>Clones the repo into a temp directory, merges each branch with --no-ff,
+     * pushes to origin, then deletes the merged branches from the remote.
+     * If a merge conflicts, that branch is skipped (merge --abort) and others continue.
+     *
+     * @param directiveIds list of directive IDs whose branches should be merged
+     * @param gitToken     git token for push authentication
+     */
+    public void mergeDirectiveBranches(List<String> directiveIds, String gitToken) {
+        String gitUrl = authenticatedUrl(gitToken);
+        Path tempDir = null;
+        try {
+            tempDir = java.nio.file.Files.createTempDirectory("worldmind-merge-");
+            runGit(tempDir, "clone", gitUrl, ".");
+            runGit(tempDir, "config", "user.name", "Worldmind");
+            runGit(tempDir, "config", "user.email", "worldmind@worldmind.local");
+            runGit(tempDir, "checkout", "main");
+
+            for (String id : directiveIds) {
+                String branch = getBranchName(id);
+                int fetchExit = runGit(tempDir, "fetch", "origin", branch);
+                if (fetchExit != 0) {
+                    log.warn("Branch {} not found on remote, skipping", branch);
+                    continue;
+                }
+                int mergeExit = runGit(tempDir, "merge", "origin/" + branch,
+                        "--no-ff", "-m", "merge directive " + id);
+                if (mergeExit != 0) {
+                    log.error("Merge conflict on branch {}, aborting merge", branch);
+                    runGit(tempDir, "merge", "--abort");
+                }
+            }
+
+            runGit(tempDir, "push", "origin", "main");
+
+            // Cleanup merged branches from remote
+            for (String id : directiveIds) {
+                String branch = getBranchName(id);
+                runGit(tempDir, "push", "origin", "--delete", branch);
+            }
+        } catch (Exception e) {
+            log.error("Failed to merge directive branches: {}", e.getMessage(), e);
+        } finally {
+            if (tempDir != null) {
+                deleteDirectory(tempDir);
+            }
+        }
+    }
+
+    /**
+     * Deletes directive branches from the remote without merging.
+     * Used when a mission fails and branches should be cleaned up.
+     *
+     * @param directiveIds list of directive IDs whose branches should be deleted
+     * @param gitToken     git token for push authentication
+     */
+    public void cleanupDirectiveBranches(List<String> directiveIds, String gitToken) {
+        String gitUrl = authenticatedUrl(gitToken);
+        Path tempDir = null;
+        try {
+            tempDir = java.nio.file.Files.createTempDirectory("worldmind-cleanup-");
+            runGit(tempDir, "clone", "--depth", "1", gitUrl, ".");
+            for (String id : directiveIds) {
+                String branch = getBranchName(id);
+                int exit = runGit(tempDir, "push", "origin", "--delete", branch);
+                if (exit != 0) {
+                    log.debug("Could not delete branch {} (may already be deleted)", branch);
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to cleanup directive branches: {}", e.getMessage(), e);
+        } finally {
+            if (tempDir != null) {
+                deleteDirectory(tempDir);
+            }
+        }
+    }
+
+    private String authenticatedUrl(String gitToken) {
+        if (gitToken != null && !gitToken.isBlank() && gitRemoteUrl.startsWith("https://")) {
+            return gitRemoteUrl.replace("https://", "https://x-access-token:" + gitToken + "@");
+        }
+        return gitRemoteUrl;
+    }
+
+    private static void deleteDirectory(Path dir) {
+        try (var walk = java.nio.file.Files.walk(dir)) {
+            walk.sorted(java.util.Comparator.reverseOrder())
+                    .forEach(p -> {
+                        try { java.nio.file.Files.deleteIfExists(p); }
+                        catch (IOException ignored) {}
+                    });
+        } catch (IOException ignored) {}
+    }
+
     private List<String> buildCommand(String... args) {
         var command = new ArrayList<String>();
         command.add("git");

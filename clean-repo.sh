@@ -5,6 +5,12 @@
 
 set -e
 
+export GIT_TERMINAL_PROMPT=0
+export GIT_EDITOR=true
+export EDITOR=true
+export GH_PAGER=""
+export GIT_PAGER=""
+
 REPO="$1"
 
 if [ -z "$REPO" ]; then

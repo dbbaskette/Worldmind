@@ -53,6 +53,14 @@ class MissionControllerTest {
     @MockitoBean
     private com.worldmind.starblaster.InstructionStore instructionStore;
 
+    // Optional CF dependencies — provided as mocks so Spring can inject them.
+    // In production these are null when CF is not active.
+    @MockitoBean(enforceOverride = false)
+    private com.worldmind.starblaster.cf.GitWorkspaceManager gitWorkspaceManager;
+
+    @MockitoBean(enforceOverride = false)
+    private com.worldmind.starblaster.cf.CloudFoundryProperties cfProperties;
+
     // ── POST /api/v1/missions ────────────────────────────────────────
 
     @Test

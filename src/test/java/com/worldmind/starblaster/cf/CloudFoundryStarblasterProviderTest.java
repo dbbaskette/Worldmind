@@ -66,16 +66,18 @@ class CloudFoundryStarblasterProviderTest {
         assertTrue(call.command.contains("curl"), "Should contain curl: " + call.command);
         assertTrue(call.command.contains("goose run --debug --with-builtin developer"), "Should contain goose run with developer builtin: " + call.command);
         assertTrue(call.command.contains("git push"), "Should contain git push: " + call.command);
-        assertTrue(call.command.contains("GOOSE_PROVIDER__HOST"), "Should bridge GOOSE_PROVIDER__HOST: " + call.command);
-        assertTrue(call.command.contains("GOOSE_PROVIDER__API_KEY"), "Should bridge GOOSE_PROVIDER__API_KEY: " + call.command);
         assertTrue(call.command.contains("diagnostics.log"), "Should write diagnostics: " + call.command);
+        // Env vars from request are exported so entrypoint.sh can use them
+        assertTrue(call.command.contains("export GOOSE_PROVIDER="), "Should export GOOSE_PROVIDER: " + call.command);
     }
 
     @Test
-    void openStarblasterExportsMcpEnvVars() {
+    void openStarblasterExportsAllEnvVars() {
         var request = new StarblasterRequest(
                 "forge", "DIR-001", Path.of("/tmp/project"),
                 "Build something", Map.of(
+                        "GOOSE_PROVIDER", "anthropic",
+                        "ANTHROPIC_API_KEY", "sk-ant-test",
                         "MCP_SERVERS", "NEXUS",
                         "MCP_SERVER_NEXUS_URL", "https://nexus.example.com/mcp",
                         "MCP_SERVER_NEXUS_TOKEN", "test-token"
@@ -86,8 +88,11 @@ class CloudFoundryStarblasterProviderTest {
         provider.openStarblaster(request);
 
         var call = stubApiClient.createTaskCalls.get(0);
-        // MCP env vars are exported so entrypoint.sh can generate config.yaml
-        // with auth headers in map format (MCP extensions loaded from config, not CLI)
+        // All env vars are exported so entrypoint.sh can read provider config and MCP settings
+        assertTrue(call.command.contains("GOOSE_PROVIDER"),
+                "Should export GOOSE_PROVIDER: " + call.command);
+        assertTrue(call.command.contains("ANTHROPIC_API_KEY"),
+                "Should export ANTHROPIC_API_KEY: " + call.command);
         assertTrue(call.command.contains("MCP_SERVER_NEXUS_URL"),
                 "Should export MCP URL env var: " + call.command);
         assertTrue(call.command.contains("MCP_SERVER_NEXUS_TOKEN"),

@@ -88,25 +88,39 @@ public class StarblasterManager {
         var envVars = new HashMap<>(extraEnv);
         envVars.put("GOOSE_PROVIDER", properties.getGooseProvider());
         envVars.put("GOOSE_MODEL", properties.getGooseModel());
-        switch (properties.getGooseProvider()) {
-            case "openai" -> {
-                // Goose appends "v1" to OPENAI_HOST — ensure trailing slash so it forms ".../v1"
-                String lmUrl = properties.getLmStudioUrl();
+
+        // Forward provider API keys from the environment.
+        // When GOOSE_PROVIDER__API_KEY is set, entrypoint.sh skips VCAP_SERVICES
+        // entirely — direct keys take precedence over CF service bindings.
+        // When no direct key is provided, VCAP_SERVICES (CredHub) is used.
+        var providerKeyMap = Map.of(
+                "anthropic", "ANTHROPIC_API_KEY",
+                "openai", "OPENAI_API_KEY",
+                "google", "GOOGLE_API_KEY"
+        );
+        String activeKeyName = providerKeyMap.get(properties.getGooseProvider());
+        for (var entry : providerKeyMap.values()) {
+            String val = System.getenv(entry);
+            if (val != null && !val.isBlank()) {
+                envVars.put(entry, val);
+            }
+        }
+        // Set the generic Goose key for the active provider — signals entrypoint.sh to skip VCAP.
+        // Check provider-specific key first, then fall back to GOOSE_PROVIDER__API_KEY from env
+        // (for providers not in the map above).
+        String directKey = activeKeyName != null ? System.getenv(activeKeyName) : null;
+        if (directKey == null || directKey.isBlank()) {
+            directKey = System.getenv("GOOSE_PROVIDER__API_KEY");
+        }
+        if (directKey != null && !directKey.isBlank()) {
+            envVars.put("GOOSE_PROVIDER__API_KEY", directKey);
+        }
+        // For openai-compatible local endpoints (LM Studio, etc.), pass the host URL
+        if ("openai".equals(properties.getGooseProvider())) {
+            String lmUrl = properties.getLmStudioUrl();
+            if (lmUrl != null && !lmUrl.isBlank()) {
                 if (!lmUrl.endsWith("/")) lmUrl += "/";
                 envVars.put("OPENAI_HOST", lmUrl);
-                envVars.put("OPENAI_API_KEY", "not-needed-for-local");
-            }
-            case "anthropic" -> {
-                String apiKey = System.getenv("ANTHROPIC_API_KEY");
-                if (apiKey != null && !apiKey.isBlank()) {
-                    envVars.put("ANTHROPIC_API_KEY", apiKey);
-                }
-            }
-            case "google" -> {
-                String apiKey = System.getenv("GOOGLE_API_KEY");
-                if (apiKey != null && !apiKey.isBlank()) {
-                    envVars.put("GOOGLE_API_KEY", apiKey);
-                }
             }
         }
 
@@ -163,7 +177,12 @@ public class StarblasterManager {
             String output = provider.captureOutput(starblasterId);
             long elapsedMs = System.currentTimeMillis() - startMs;
 
-            List<FileRecord> changes = detectChanges(beforeSnapshot, effectivePath);
+            // Use provider-based change detection if available (e.g. git diff on CF),
+            // otherwise fall back to filesystem snapshot comparison.
+            List<FileRecord> providerChanges = provider.detectChanges(request.directiveId(), projectPath);
+            List<FileRecord> changes = providerChanges != null
+                    ? providerChanges
+                    : detectChanges(beforeSnapshot, effectivePath);
 
             log.info("Starblaster {} completed with exit code {} in {}ms — {} file changes",
                     starblasterId, exitCode, elapsedMs, changes.size());

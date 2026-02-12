@@ -10,6 +10,8 @@ import com.worldmind.core.model.ReviewFeedback;
 import com.worldmind.core.scheduler.OscillationDetector;
 import com.worldmind.core.state.WorldmindState;
 import com.worldmind.starblaster.InstructionStore;
+import com.worldmind.starblaster.cf.CloudFoundryProperties;
+import com.worldmind.starblaster.cf.GitWorkspaceManager;
 import org.bsc.langgraph4j.RunnableConfig;
 import org.bsc.langgraph4j.checkpoint.BaseCheckpointSaver;
 import org.bsc.langgraph4j.checkpoint.Checkpoint;
@@ -39,6 +41,8 @@ public class MissionController {
     private final OscillationDetector oscillationDetector;
     private final EventBus eventBus;
     private final InstructionStore instructionStore;
+    private final GitWorkspaceManager gitWorkspaceManager;
+    private final CloudFoundryProperties cfProperties;
 
     /** In-memory store of running/completed mission states, keyed by missionId. */
     private final ConcurrentHashMap<String, WorldmindState> missionStates = new ConcurrentHashMap<>();
@@ -51,13 +55,19 @@ public class MissionController {
                              SseStreamingService sseStreamingService,
                              OscillationDetector oscillationDetector,
                              EventBus eventBus,
-                             InstructionStore instructionStore) {
+                             InstructionStore instructionStore,
+                             @org.springframework.beans.factory.annotation.Autowired(required = false)
+                             GitWorkspaceManager gitWorkspaceManager,
+                             @org.springframework.beans.factory.annotation.Autowired(required = false)
+                             CloudFoundryProperties cfProperties) {
         this.missionEngine = missionEngine;
         this.checkpointSaver = checkpointSaver;
         this.sseStreamingService = sseStreamingService;
         this.oscillationDetector = oscillationDetector;
         this.eventBus = eventBus;
         this.instructionStore = instructionStore;
+        this.gitWorkspaceManager = gitWorkspaceManager;
+        this.cfProperties = cfProperties;
     }
 
     /**
@@ -459,6 +469,7 @@ public class MissionController {
 
     /**
      * Frees memory-heavy resources after a mission completes (success or failure).
+     * On CF, also merges passed directive branches into main and cleans up all branches.
      */
     private void cleanupMissionResources(String missionId) {
         try {
@@ -467,6 +478,35 @@ public class MissionController {
             // Release checkpoints — state is already in missionStates map
             RunnableConfig config = RunnableConfig.builder().threadId(missionId).build();
             checkpointSaver.release(config);
+
+            // CF git branch merge/cleanup
+            if (gitWorkspaceManager != null && cfProperties != null) {
+                WorldmindState state = missionStates.get(missionId);
+                if (state != null && !state.directives().isEmpty()) {
+                    List<String> allDirectiveIds = state.directives().stream()
+                            .map(Directive::id)
+                            .toList();
+                    List<String> passedIds = state.directives().stream()
+                            .filter(d -> d.status() == DirectiveStatus.PASSED)
+                            .map(Directive::id)
+                            .toList();
+
+                    if (state.status() == MissionStatus.COMPLETED && !passedIds.isEmpty()) {
+                        log.info("Merging {} passed directive branches for mission {}", passedIds.size(), missionId);
+                        gitWorkspaceManager.mergeDirectiveBranches(passedIds, cfProperties.getGitToken());
+                    }
+
+                    // Clean up any branches that weren't merged (failed directives, or all if mission failed)
+                    List<String> unmergedIds = allDirectiveIds.stream()
+                            .filter(id -> !passedIds.contains(id) || state.status() != MissionStatus.COMPLETED)
+                            .toList();
+                    if (!unmergedIds.isEmpty()) {
+                        log.info("Cleaning up {} unmerged directive branches for mission {}", unmergedIds.size(), missionId);
+                        gitWorkspaceManager.cleanupDirectiveBranches(unmergedIds, cfProperties.getGitToken());
+                    }
+                }
+            }
+
             log.debug("Cleaned up resources for mission {}", missionId);
         } catch (Exception e) {
             log.warn("Error cleaning up mission {}: {}", missionId, e.getMessage());

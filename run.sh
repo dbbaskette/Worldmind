@@ -51,8 +51,37 @@ cf_push() {
     exit 1
   fi
 
+  # Detect if a direct API key is available for the selected provider.
+  # If so, centurions don't need the worldmind-model service binding —
+  # the orchestrator will forward the key via env vars in the CF task command.
+  GOOSE_PROVIDER="${GOOSE_PROVIDER:-openai}"
+  GOOSE_MODEL="${GOOSE_MODEL:-}"
+  DIRECT_KEY=""
+  case "$GOOSE_PROVIDER" in
+    anthropic) DIRECT_KEY="${ANTHROPIC_API_KEY:-}" ;;
+    openai)    DIRECT_KEY="${OPENAI_API_KEY:-}" ;;
+    google)    DIRECT_KEY="${GOOGLE_API_KEY:-}" ;;
+    *)         DIRECT_KEY="${GOOSE_PROVIDER__API_KEY:-}" ;;
+  esac
+
   VARS_FILE=$(mktemp /tmp/cf-vars-XXXXXX)
-  trap "rm -f $VARS_FILE" EXIT
+  MANIFEST_FILE="manifest.yml"
+  trap "rm -f $VARS_FILE $TMPDIR/cf-manifest-*.yml" EXIT
+
+  # If direct key provided, strip worldmind-model binding from centurion apps
+  if [ -n "$DIRECT_KEY" ]; then
+    echo "Direct API key detected for $GOOSE_PROVIDER — centurions will skip model binding"
+    MANIFEST_FILE=$(mktemp /tmp/cf-manifest-XXXXXX.yml)
+    # Remove "- worldmind-model" lines from centurion apps but keep it on the orchestrator.
+    # The orchestrator block ends before the first centurion block (line with "docker:").
+    # Strategy: remove worldmind-model lines that appear after the first "docker:" line.
+    awk '
+      /docker:/ { seen_docker=1 }
+      seen_docker && /- worldmind-model/ { next }
+      { print }
+    ' manifest.yml > "$MANIFEST_FILE"
+  fi
+
   cat > "$VARS_FILE" <<EOVARS
 cf-api-url: ${CF_API_URL}
 cf-org: ${CF_ORG}
@@ -67,6 +96,11 @@ centurion-prism-app: ${CENTURION_PRISM_APP:-centurion-prism}
 cf-username: ${CF_USERNAME}
 cf-password: ${CF_PASSWORD}
 git-token: ${GIT_TOKEN:-${CF_DOCKER_PASSWORD:-}}
+goose-provider: ${GOOSE_PROVIDER}
+goose-model: ${GOOSE_MODEL}
+anthropic-api-key: "${ANTHROPIC_API_KEY:-}"
+openai-api-key: "${OPENAI_API_KEY:-}"
+google-api-key: "${GOOGLE_API_KEY:-}"
 mcp-enabled: ${MCP_ENABLED:-false}
 nexus-mcp-url: ${NEXUS_MCP_URL:-}
 nexus-mcp-token: ${NEXUS_MCP_TOKEN:-}
@@ -96,7 +130,7 @@ EOVARS
   done
 
   echo "Pushing to Cloud Foundry..."
-  CF_DOCKER_PASSWORD="$CF_DOCKER_PASSWORD" cf push --vars-file "$VARS_FILE"
+  CF_DOCKER_PASSWORD="$CF_DOCKER_PASSWORD" cf push -f "$MANIFEST_FILE" --vars-file "$VARS_FILE"
 }
 
 if [ $# -eq 0 ]; then
