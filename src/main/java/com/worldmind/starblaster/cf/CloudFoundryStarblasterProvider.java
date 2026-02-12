@@ -119,8 +119,10 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
                 "git config user.name 'Worldmind Centurion' && git config user.email 'centurion@worldmind.local'",
                 "git checkout -B %s".formatted(branchName),
                 "mkdir -p .worldmind/directives && curl --retry 3 -fk '%s' > .worldmind/directives/%s.md".formatted(instructionUrl, directiveId),
-                "goose run --no-session -i .worldmind/directives/%s.md".formatted(directiveId),
-                "git add -A && git commit -m '%s' && git push -uf origin %s".formatted(directiveId, branchName)
+                // Run Goose, then always try to commit+push regardless of exit code
+                // so partial work isn't lost when the container is destroyed.
+                // Capture Goose's exit code and return it as the task's final status.
+                "goose run --no-session -i .worldmind/directives/%s.md; GOOSE_RC=$?; git add -A && git commit -m '%s' && git push -uf origin %s; exit $GOOSE_RC".formatted(directiveId, directiveId, branchName)
         );
 
         log.info("Opening Starblaster {} for directive {} on app {}", taskName, directiveId, appName);
