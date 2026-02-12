@@ -120,8 +120,8 @@ public class EvaluateWaveNode {
                         Map.of("phase", "GAUNTLET"), Instant.now()));
                 TestResult testResult;
                 try {
-                    var gauntletDirective = createGauntletDirective(directive);
-                    log.info("Dispatching GAUNTLET for directive {}", id);
+                    var gauntletDirective = createGauntletDirective(directive, fileChanges);
+                    log.info("Dispatching GAUNTLET for directive {} ({} file changes)", id, fileChanges.size());
                     var gauntletResult = bridge.executeDirective(gauntletDirective, projectContext, Path.of(projectPath), state.gitRemoteUrl(), state.runtimeTag());
                     starblasterInfos.add(gauntletResult.starblasterInfo());
                     testResult = sealService.parseTestOutput(id, gauntletResult.output(),
@@ -138,8 +138,8 @@ public class EvaluateWaveNode {
                         Map.of("phase", "VIGIL"), Instant.now()));
                 ReviewFeedback reviewFeedback;
                 try {
-                    var vigilDirective = createVigilDirective(directive);
-                    log.info("Dispatching VIGIL for directive {}", id);
+                    var vigilDirective = createVigilDirective(directive, fileChanges);
+                    log.info("Dispatching VIGIL for directive {} ({} file changes)", id, fileChanges.size());
                     var vigilResult = bridge.executeDirective(vigilDirective, projectContext, Path.of(projectPath), state.gitRemoteUrl(), state.runtimeTag());
                     starblasterInfos.add(vigilResult.starblasterInfo());
                     reviewFeedback = sealService.parseReviewOutput(id, vigilResult.output());
@@ -287,23 +287,23 @@ public class EvaluateWaveNode {
         return sb.toString();
     }
 
-    private Directive createGauntletDirective(Directive forgeDirective) {
+    private Directive createGauntletDirective(Directive forgeDirective, List<FileRecord> fileChanges) {
         return new Directive(
                 forgeDirective.id() + "-GAUNTLET", "GAUNTLET",
                 "Run tests for directive " + forgeDirective.id(),
                 InstructionBuilder.buildGauntletInstruction(
-                        forgeDirective, null, forgeDirective.filesAffected()),
+                        forgeDirective, null, fileChanges),
                 "All tests pass", List.of(), DirectiveStatus.PENDING,
                 0, 1, FailureStrategy.SKIP, List.of(), null
         );
     }
 
-    private Directive createVigilDirective(Directive forgeDirective) {
+    private Directive createVigilDirective(Directive forgeDirective, List<FileRecord> fileChanges) {
         return new Directive(
                 forgeDirective.id() + "-VIGIL", "VIGIL",
                 "Review code for directive " + forgeDirective.id(),
                 InstructionBuilder.buildVigilInstruction(
-                        forgeDirective, null, forgeDirective.filesAffected(), null),
+                        forgeDirective, null, fileChanges, null),
                 "Code review complete with score >= 7", List.of(), DirectiveStatus.PENDING,
                 0, 1, FailureStrategy.SKIP, List.of(), null
         );

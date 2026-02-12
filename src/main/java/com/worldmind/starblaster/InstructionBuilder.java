@@ -58,7 +58,7 @@ public final class InstructionBuilder {
         sb.append("## Constraints\n\n");
         sb.append("- Only modify files related to this directive\n");
         sb.append("- Do not modify test files (Gauntlet handles tests)\n");
-        sb.append("- Commit nothing — file changes are detected externally\n");
+        sb.append("- When finished, stage and commit all changes: `git add -A && git commit -m 'done'`\n");
         sb.append("- If you encounter an error, attempt to fix it before reporting failure\n");
 
         return sb.toString();
@@ -224,7 +224,7 @@ public final class InstructionBuilder {
         sb.append("- Focus on internal code quality: extract methods, reduce duplication, improve naming\n");
         sb.append("- Run tests after each refactoring step to ensure nothing breaks\n");
         sb.append("- If any test fails after refactoring, revert that specific change\n");
-        sb.append("- Commit nothing — file changes are detected externally\n");
+        sb.append("- When finished, stage and commit all changes: `git add -A && git commit -m 'done'`\n");
         return sb.toString();
     }
 

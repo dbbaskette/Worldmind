@@ -106,6 +106,33 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
                 .map(e -> "export %s='%s'".formatted(e.getKey(), e.getValue().replace("'", "\\'")))
                 .collect(Collectors.joining(" && "));
 
+        // Determine branch setup and post-Goose git commands based on centurion type.
+        // FORGE/PRISM create their own branch and push changes.
+        // GAUNTLET/VIGIL checkout the parent FORGE branch to test/review its code.
+        // PULSE stays on the default branch (read-only research).
+        boolean isImplementation = "forge".equals(type) || "prism".equals(type);
+        String parentBranch = deriveParentBranch(type, directiveId);
+
+        String branchSetup;
+        String postGooseGit;
+        if (parentBranch != null) {
+            // GAUNTLET/VIGIL: fetch and checkout the parent FORGE/PRISM branch
+            branchSetup = "(git fetch origin " + parentBranch + " && git checkout " + parentBranch
+                    + ") || echo 'WARN: parent branch " + parentBranch + " not found, staying on default'";
+            postGooseGit = "";
+        } else if (isImplementation) {
+            // FORGE/PRISM: create branch — push runs after Goose commits
+            branchSetup = "git checkout -B " + branchName;
+            // Use semicolons (not &&) so push always runs.
+            // git diff --cached --quiet exits 1 if there ARE staged changes, so || triggers the commit.
+            postGooseGit = "; git add -A; git diff --cached --quiet || git commit -m '" + directiveId
+                    + "'; git push -uf origin " + branchName;
+        } else {
+            // PULSE and others: stay on default branch, no commit/push
+            branchSetup = "true";
+            postGooseGit = "";
+        }
+
         var taskCommand = String.join(" && ",
                 // Export env vars (provider config, API keys, MCP configs)
                 envExports.isEmpty() ? "true" : envExports,
@@ -114,7 +141,7 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
                 "sed '$d' /usr/local/bin/entrypoint.sh > /tmp/_entrypoint_setup.sh && . /tmp/_entrypoint_setup.sh",
                 "git clone %s /workspace && cd /workspace".formatted(gitRemoteUrl),
                 "git config user.name 'Worldmind Centurion' && git config user.email 'centurion@worldmind.local'",
-                "git checkout -B %s".formatted(branchName),
+                branchSetup,
                 "mkdir -p .worldmind/directives && curl --retry 3 -fk '%s' > .worldmind/directives/%s.md".formatted(instructionUrl, directiveId),
                 // Dump diagnostics to a file that gets committed to git for debugging.
                 "mkdir -p .worldmind && {"
@@ -131,7 +158,7 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
                         + " -i .worldmind/directives/" + directiveId + ".md > .worldmind/goose-output.log 2>&1"
                         + "; GOOSE_RC=$?; echo \"GOOSE_EXIT_CODE=$GOOSE_RC\" >> .worldmind/diagnostics.log"
                         + "; cp -r $HOME/.local/state/goose/logs/ .worldmind/goose-logs 2>/dev/null"
-                        + "; git add -A && git commit -m '" + directiveId + "' && git push -uf origin " + branchName
+                        + postGooseGit
                         + "; exit $GOOSE_RC"
         );
 
@@ -249,7 +276,10 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
             gitWorkspaceManager.runGit(tempDir, "clone", "--depth", "1", "--branch", branchName, gitUrl, ".");
             gitWorkspaceManager.runGit(tempDir, "fetch", "--depth", "1", "origin", "main");
             String diffOutput = gitWorkspaceManager.runGitOutput(tempDir, "diff", "--stat", "origin/main..HEAD");
-            return gitWorkspaceManager.parseDiffStat(diffOutput);
+            // Filter out .worldmind/ internal files (diagnostics, logs) — only report project changes
+            return gitWorkspaceManager.parseDiffStat(diffOutput).stream()
+                    .filter(f -> !f.path().startsWith(".worldmind/") && !f.path().startsWith(".worldmind\\"))
+                    .toList();
         } catch (Exception e) {
             log.warn("Git-based change detection failed for {}: {}", directiveId, e.getMessage());
             return List.of();
@@ -258,6 +288,24 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
                 deleteDirectory(tempDir);
             }
         }
+    }
+
+    /**
+     * Derives the parent FORGE/PRISM branch for quality-gate centurions.
+     * GAUNTLET and VIGIL directive IDs follow the pattern {@code DIR-NNN-GAUNTLET} or
+     * {@code DIR-NNN-VIGIL}. This strips the centurion suffix to find the parent branch.
+     *
+     * @return the parent branch name, or null if not a quality-gate centurion
+     */
+    String deriveParentBranch(String centurionType, String directiveId) {
+        if ("gauntlet".equalsIgnoreCase(centurionType) || "vigil".equalsIgnoreCase(centurionType)) {
+            String suffix = "-" + centurionType.toUpperCase();
+            if (directiveId.endsWith(suffix)) {
+                String parentId = directiveId.substring(0, directiveId.length() - suffix.length());
+                return gitWorkspaceManager.getBranchName(parentId);
+            }
+        }
+        return null;
     }
 
     /**

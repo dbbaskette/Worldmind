@@ -309,6 +309,94 @@ class CloudFoundryStarblasterProviderTest {
                 provider.getAppNameFromStarblasterId("starblaster-"));
     }
 
+    // --- deriveParentBranch tests ---
+
+    @Test
+    void deriveParentBranchReturnsForgebranchForGauntlet() {
+        var branch = provider.deriveParentBranch("gauntlet", "DIR-001-GAUNTLET");
+        assertEquals("worldmind/DIR-001", branch);
+    }
+
+    @Test
+    void deriveParentBranchReturnsForgebranchForVigil() {
+        var branch = provider.deriveParentBranch("vigil", "DIR-001-VIGIL");
+        assertEquals("worldmind/DIR-001", branch);
+    }
+
+    @Test
+    void deriveParentBranchReturnsNullForForge() {
+        var branch = provider.deriveParentBranch("forge", "DIR-001");
+        assertNull(branch);
+    }
+
+    @Test
+    void deriveParentBranchReturnsNullForPulse() {
+        var branch = provider.deriveParentBranch("pulse", "DIR-001");
+        assertNull(branch);
+    }
+
+    @Test
+    void deriveParentBranchHandlesCaseInsensitive() {
+        var branch = provider.deriveParentBranch("GAUNTLET", "DIR-001-GAUNTLET");
+        assertEquals("worldmind/DIR-001", branch);
+    }
+
+    // --- centurion-type-aware task commands ---
+
+    @Test
+    void gauntletTaskFetchesParentBranchNotCreatesNew() {
+        var request = makeRequest("gauntlet", "DIR-001-GAUNTLET");
+
+        provider.openStarblaster(request);
+
+        var call = stubApiClient.createTaskCalls.get(0);
+        assertTrue(call.command.contains("git fetch origin worldmind/DIR-001"),
+                "GAUNTLET should fetch parent FORGE branch: " + call.command);
+        assertFalse(call.command.contains("git checkout -B"),
+                "GAUNTLET should NOT create a new branch: " + call.command);
+        assertFalse(call.command.contains("git push"),
+                "GAUNTLET should NOT push: " + call.command);
+    }
+
+    @Test
+    void vigilTaskFetchesParentBranchNotCreatesNew() {
+        var request = makeRequest("vigil", "DIR-001-VIGIL");
+
+        provider.openStarblaster(request);
+
+        var call = stubApiClient.createTaskCalls.get(0);
+        assertTrue(call.command.contains("git fetch origin worldmind/DIR-001"),
+                "VIGIL should fetch parent FORGE branch: " + call.command);
+        assertFalse(call.command.contains("git push"),
+                "VIGIL should NOT push: " + call.command);
+    }
+
+    @Test
+    void pulseTaskStaysOnDefaultBranch() {
+        var request = makeRequest("pulse", "DIR-001");
+
+        provider.openStarblaster(request);
+
+        var call = stubApiClient.createTaskCalls.get(0);
+        assertFalse(call.command.contains("git checkout -B"),
+                "PULSE should NOT create a branch: " + call.command);
+        assertFalse(call.command.contains("git push"),
+                "PULSE should NOT push: " + call.command);
+    }
+
+    @Test
+    void forgeTaskCreatesAndPushesBranch() {
+        var request = makeRequest("forge", "DIR-001");
+
+        provider.openStarblaster(request);
+
+        var call = stubApiClient.createTaskCalls.get(0);
+        assertTrue(call.command.contains("git checkout -B worldmind/DIR-001"),
+                "FORGE should create branch: " + call.command);
+        assertTrue(call.command.contains("git push -uf origin worldmind/DIR-001"),
+                "FORGE should push branch: " + call.command);
+    }
+
     // --- detectChanges tests ---
 
     @Test
