@@ -15,6 +15,22 @@ services:
       timeout: 5s
       retries: 5
 
+  nexus:
+    image: ${NEXUS_IMAGE:-ghcr.io/dbbaskette/nexus:latest}
+    ports:
+      - "8090:8090"
+    volumes:
+      - nexus-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    # Only started when Nexus is needed
+    profiles:
+      - nexus
+      - full
+
   worldmind:
     build: .
     ports:
@@ -34,6 +50,21 @@ services:
       GOOSE_PROVIDER: ${GOOSE_PROVIDER:-openai}
       GOOSE_MODEL: ${GOOSE_MODEL:-qwen2.5-coder-32b}
       WORKSPACE_VOLUME: worldmind-workspace
+      # Nexus MCP Gateway
+      NEXUS_ENABLED: ${NEXUS_ENABLED:-false}
+      NEXUS_URL: ${NEXUS_URL:-http://nexus:8090/mcp}
+      NEXUS_CORE_CLASSIFY_TOKEN: ${NEXUS_CORE_CLASSIFY_TOKEN:-}
+      NEXUS_CORE_UPLOAD_TOKEN: ${NEXUS_CORE_UPLOAD_TOKEN:-}
+      NEXUS_CORE_PLAN_TOKEN: ${NEXUS_CORE_PLAN_TOKEN:-}
+      NEXUS_CORE_SCHEDULE_TOKEN: ${NEXUS_CORE_SCHEDULE_TOKEN:-}
+      NEXUS_CORE_CONVERGE_TOKEN: ${NEXUS_CORE_CONVERGE_TOKEN:-}
+      NEXUS_CORE_SEAL_TOKEN: ${NEXUS_CORE_SEAL_TOKEN:-}
+      NEXUS_CORE_POSTMISSION_TOKEN: ${NEXUS_CORE_POSTMISSION_TOKEN:-}
+      NEXUS_CENTURION_FORGE_TOKEN: ${NEXUS_CENTURION_FORGE_TOKEN:-}
+      NEXUS_CENTURION_GAUNTLET_TOKEN: ${NEXUS_CENTURION_GAUNTLET_TOKEN:-}
+      NEXUS_CENTURION_PRISM_TOKEN: ${NEXUS_CENTURION_PRISM_TOKEN:-}
+      NEXUS_CENTURION_VIGIL_TOKEN: ${NEXUS_CENTURION_VIGIL_TOKEN:-}
+      NEXUS_CENTURION_PULSE_TOKEN: ${NEXUS_CENTURION_PULSE_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -44,5 +75,6 @@ services:
 
 volumes:
   pgdata:
+  nexus-data:
   workspace:
     name: worldmind-workspace

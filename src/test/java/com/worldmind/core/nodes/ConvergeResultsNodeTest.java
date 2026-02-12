@@ -25,7 +25,7 @@ class ConvergeResultsNodeTest {
 
     @BeforeEach
     void setUp() {
-        node = new ConvergeResultsNode(new EventBus());
+        node = new ConvergeResultsNode(new EventBus(), null);
     }
 
     @Test

@@ -173,3 +173,32 @@ worldmind:
           prism: ${NEXUS_MCP_TOKEN_PRISM:}
   health:
     timeout-seconds: 5
+  nexus:
+    enabled: ${NEXUS_ENABLED:false}
+    url: ${NEXUS_URL:}
+    core:
+      classify:
+        token: ${NEXUS_CORE_CLASSIFY_TOKEN:}
+      upload:
+        token: ${NEXUS_CORE_UPLOAD_TOKEN:}
+      plan:
+        token: ${NEXUS_CORE_PLAN_TOKEN:}
+      schedule:
+        token: ${NEXUS_CORE_SCHEDULE_TOKEN:}
+      converge:
+        token: ${NEXUS_CORE_CONVERGE_TOKEN:}
+      seal:
+        token: ${NEXUS_CORE_SEAL_TOKEN:}
+      postmission:
+        token: ${NEXUS_CORE_POSTMISSION_TOKEN:}
+    centurions:
+      forge:
+        token: ${NEXUS_CENTURION_FORGE_TOKEN:}
+      gauntlet:
+        token: ${NEXUS_CENTURION_GAUNTLET_TOKEN:}
+      prism:
+        token: ${NEXUS_CENTURION_PRISM_TOKEN:}
+      vigil:
+        token: ${NEXUS_CENTURION_VIGIL_TOKEN:}
+      pulse:
+        token: ${NEXUS_CENTURION_PULSE_TOKEN:}

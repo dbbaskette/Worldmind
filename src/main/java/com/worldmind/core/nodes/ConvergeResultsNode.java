@@ -5,9 +5,11 @@ import com.worldmind.core.events.WorldmindEvent;
 import com.worldmind.core.model.DirectiveStatus;
 import com.worldmind.core.model.MissionMetrics;
 import com.worldmind.core.model.MissionStatus;
+import com.worldmind.core.novaforce.NovaForceToolProvider;
 import com.worldmind.core.state.WorldmindState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -20,6 +22,10 @@ import java.util.Map;
  * <p>Reads {@code directives}, {@code testResults}, and {@code starblasters} from the
  * graph state, computes aggregate counts and durations, and returns state updates
  * including a {@link MissionMetrics} instance and the final {@link MissionStatus}.
+ *
+ * <p>When Nexus is enabled, has access to Datacore (read) tools for verifying
+ * mission checkpoint state and centurion output alignment. Tool-based verification
+ * is available for future LLM-assisted convergence analysis.
  */
 @Component
 public class ConvergeResultsNode {
@@ -27,14 +33,25 @@ public class ConvergeResultsNode {
     private static final Logger log = LoggerFactory.getLogger(ConvergeResultsNode.class);
 
     private final EventBus eventBus;
+    private final NovaForceToolProvider novaForceToolProvider;
 
-    public ConvergeResultsNode(EventBus eventBus) {
+    public ConvergeResultsNode(EventBus eventBus,
+                               @Autowired(required = false) NovaForceToolProvider novaForceToolProvider) {
         this.eventBus = eventBus;
+        this.novaForceToolProvider = novaForceToolProvider;
     }
 
     public Map<String, Object> apply(WorldmindState state) {
         var directives = state.directives();
         var testResults = state.testResults();
+
+        // Log available Nexus tools for this node
+        if (novaForceToolProvider != null && novaForceToolProvider.isEnabled()) {
+            var tools = novaForceToolProvider.getToolsForNode("converge");
+            if (tools.length > 0) {
+                log.info("Converge node has {} Nexus tool(s) available (Datacore read)", tools.length);
+            }
+        }
 
         // Count directives by status
         int completed = 0;

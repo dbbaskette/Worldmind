@@ -9,8 +9,8 @@ import com.worldmind.core.model.MissionPlan;
 import com.worldmind.core.model.MissionStatus;
 import com.worldmind.core.model.ProductSpec;
 import com.worldmind.core.model.ProjectContext;
+import com.worldmind.core.novaforce.NovaForceToolProvider;
 import com.worldmind.core.state.WorldmindState;
-import com.worldmind.mcp.McpToolProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -26,6 +26,9 @@ import java.util.Optional;
  * Uses {@link LlmService#structuredCall} to obtain a {@link MissionPlan}
  * (structured output) and converts the plan's {@link MissionPlan.DirectivePlan}
  * entries into concrete {@link Directive} records with sequential IDs.
+ * <p>
+ * When Nexus is enabled, injects Archive (read) and Brave Search tools so the
+ * LLM can check mission history patterns and research unfamiliar frameworks.
  */
 @Component
 public class PlanMissionNode {
@@ -59,13 +62,20 @@ public class PlanMissionNode {
             Respond with valid JSON matching the schema provided.
             """;
 
+    private static final String TOOL_GUIDANCE = """
+
+            You have access to mission history (Archive) and web search (Brave Search). \
+            Before decomposing, check Archive for patterns from similar past missions. \
+            If the mission involves unfamiliar libraries or frameworks, search for them \
+            to understand constraints and best practices before generating directives.""";
+
     private final LlmService llmService;
-    private final McpToolProvider mcpToolProvider;
+    private final NovaForceToolProvider novaForceToolProvider;
 
     public PlanMissionNode(LlmService llmService,
-                           @Autowired(required = false) McpToolProvider mcpToolProvider) {
+                           @Autowired(required = false) NovaForceToolProvider novaForceToolProvider) {
         this.llmService = llmService;
-        this.mcpToolProvider = mcpToolProvider;
+        this.novaForceToolProvider = novaForceToolProvider;
     }
 
     public Map<String, Object> apply(WorldmindState state) {
@@ -84,8 +94,13 @@ public class PlanMissionNode {
         Optional<ProductSpec> productSpec = state.productSpec();
 
         String userPrompt = buildUserPrompt(request, classification, projectContext, productSpec);
-        MissionPlan plan = (mcpToolProvider != null && mcpToolProvider.hasTools())
-                ? llmService.structuredCallWithTools(SYSTEM_PROMPT, userPrompt, MissionPlan.class, mcpToolProvider.getToolsFor("plan"))
+        var tools = novaForceToolProvider != null ? novaForceToolProvider.getToolsForNode("plan") : null;
+        boolean hasTools = tools != null && tools.length > 0;
+
+        String systemPrompt = hasTools ? SYSTEM_PROMPT + TOOL_GUIDANCE : SYSTEM_PROMPT;
+
+        MissionPlan plan = hasTools
+                ? llmService.structuredCallWithTools(systemPrompt, userPrompt, MissionPlan.class, tools)
                 : llmService.structuredCall(SYSTEM_PROMPT, userPrompt, MissionPlan.class);
 
         List<Directive> directives = convertToDirectives(plan);

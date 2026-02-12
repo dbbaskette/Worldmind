@@ -1,12 +1,14 @@
 package com.worldmind.core.nodes;
 
 import com.worldmind.core.model.*;
+import com.worldmind.core.novaforce.NovaForceToolProvider;
 import com.worldmind.core.seal.SealEvaluationService;
 import com.worldmind.core.state.WorldmindState;
 import com.worldmind.starblaster.InstructionBuilder;
 import com.worldmind.starblaster.StarblasterBridge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
@@ -26,6 +28,10 @@ import java.util.*;
  *   <li>{@link FailureStrategy#ESCALATE} — fail the mission</li>
  *   <li>{@link FailureStrategy#REPLAN} — fail the mission (replanning not yet implemented)</li>
  * </ul>
+ *
+ * <p>When Nexus is enabled, has access to Archive (read/write) tools. After evaluating
+ * results: if APPROVED, patterns that worked are recorded. If REJECTED, failures and
+ * reasons are recorded so the Worldmind learns from every mission.
  */
 @Component
 public class EvaluateSealNode {
@@ -34,10 +40,13 @@ public class EvaluateSealNode {
 
     private final StarblasterBridge bridge;
     private final SealEvaluationService sealService;
+    private final NovaForceToolProvider novaForceToolProvider;
 
-    public EvaluateSealNode(StarblasterBridge bridge, SealEvaluationService sealService) {
+    public EvaluateSealNode(StarblasterBridge bridge, SealEvaluationService sealService,
+                            @Autowired(required = false) NovaForceToolProvider novaForceToolProvider) {
         this.bridge = bridge;
         this.sealService = sealService;
+        this.novaForceToolProvider = novaForceToolProvider;
     }
 
     public Map<String, Object> apply(WorldmindState state) {
@@ -117,6 +126,15 @@ public class EvaluateSealNode {
 
         log.info("Seal evaluation for {}: {} — {}", directive.id(),
                 sealDecision.sealGranted() ? "GRANTED" : "DENIED", sealDecision.reason());
+
+        // Log available Archive tools for seal learning (write patterns on approval, failures on rejection)
+        if (novaForceToolProvider != null && novaForceToolProvider.isEnabled()) {
+            var tools = novaForceToolProvider.getToolsForNode("seal");
+            if (tools.length > 0) {
+                log.info("Seal node has {} Nexus tool(s) available (Archive read/write) for directive {}",
+                        tools.length, directive.id());
+            }
+        }
 
         updates.put("testResults", List.of(testResult));
         updates.put("reviewFeedback", List.of(reviewFeedback));

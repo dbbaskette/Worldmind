@@ -34,7 +34,7 @@ class ForgeIntegrationTest {
 
         var provider = new DockerStarblasterProvider(dockerClient, "ghcr.io/dbbaskette", "starblaster");
         var properties = new StarblasterProperties();
-        var manager = new StarblasterManager(provider, properties, null);
+        var manager = new StarblasterManager(provider, properties, null, null, null);
 
         // Execute a simple file creation task
         var result = manager.executeDirective(

@@ -59,4 +59,30 @@ public class WorldmindMetrics {
                 .register(registry)
                 .increment();
     }
+
+    // ── Nexus MCP Gateway Metrics ──────────────────────────────────
+
+    public void recordNexusRequest(String user, String status) {
+        Counter.builder("worldmind.nexus.requests.total")
+                .tag("user", user)
+                .tag("status", status)
+                .register(registry)
+                .increment();
+    }
+
+    public void recordNexusRequestDuration(String user, String tool, long ms) {
+        Timer.builder("worldmind.nexus.request.duration")
+                .tag("user", user)
+                .tag("tool", tool)
+                .register(registry)
+                .record(Duration.ofMillis(ms));
+    }
+
+    public void recordNexusError(String user, String errorType) {
+        Counter.builder("worldmind.nexus.errors.total")
+                .tag("user", user)
+                .tag("error_type", errorType)
+                .register(registry)
+                .increment();
+    }
 }

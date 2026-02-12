@@ -27,7 +27,7 @@ class StarblasterManagerTest {
     void setUp() {
         provider = mock(StarblasterProvider.class);
         properties = new StarblasterProperties();
-        manager = new StarblasterManager(provider, properties, null);
+        manager = new StarblasterManager(provider, properties, null, null, null);
     }
 
     @Test

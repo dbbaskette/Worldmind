@@ -1,6 +1,8 @@
 package com.worldmind.starblaster;
 
 import com.worldmind.core.model.FileRecord;
+import com.worldmind.core.novaforce.NexusClientFactory;
+import com.worldmind.core.novaforce.NexusProperties;
 import com.worldmind.mcp.McpProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,12 +35,18 @@ public class StarblasterManager {
     private final StarblasterProvider provider;
     private final StarblasterProperties properties;
     private final McpProperties mcpProperties;
+    private final NexusProperties nexusProperties;
+    private final NexusClientFactory nexusClientFactory;
 
     public StarblasterManager(StarblasterProvider provider, StarblasterProperties properties,
-                              @Autowired(required = false) McpProperties mcpProperties) {
+                              @Autowired(required = false) McpProperties mcpProperties,
+                              @Autowired(required = false) NexusProperties nexusProperties,
+                              @Autowired(required = false) NexusClientFactory nexusClientFactory) {
         this.provider = provider;
         this.properties = properties;
         this.mcpProperties = mcpProperties;
+        this.nexusProperties = nexusProperties;
+        this.nexusClientFactory = nexusClientFactory;
     }
 
     /**
@@ -110,8 +118,21 @@ public class StarblasterManager {
             }
         }
 
-        // Inject MCP server configs for centurion's Goose MCP extensions
-        if (mcpProperties != null && mcpProperties.isConfigured()) {
+        // Inject Nexus MCP Gateway config (Nova Force) — single gateway, per-centurion token
+        if (nexusProperties != null && nexusProperties.isEnabled() && nexusClientFactory != null) {
+            String nexusUrl = nexusProperties.getUrl();
+            String nexusToken = nexusClientFactory.getCenturionToken(centurionType);
+            if (nexusUrl != null && !nexusUrl.isBlank()) {
+                envVars.put("MCP_SERVERS", "NEXUS");
+                envVars.put("MCP_SERVER_NEXUS_URL", nexusUrl);
+                if (nexusToken != null && !nexusToken.isBlank()) {
+                    envVars.put("MCP_SERVER_NEXUS_TOKEN", nexusToken);
+                }
+                log.debug("Nexus env injected for centurion '{}': url={}", centurionType, nexusUrl);
+            }
+        }
+        // Legacy: inject MCP server configs from worldmind.mcp.* (fallback when Nexus is not enabled)
+        else if (mcpProperties != null && mcpProperties.isConfigured()) {
             var serverNames = new ArrayList<String>();
             for (var entry : mcpProperties.getServers().entrySet()) {
                 String name = entry.getKey();

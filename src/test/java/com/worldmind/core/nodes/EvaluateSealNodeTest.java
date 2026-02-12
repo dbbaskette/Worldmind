@@ -32,7 +32,7 @@ class EvaluateSealNodeTest {
     void setUp() {
         bridge = mock(StarblasterBridge.class);
         sealService = mock(SealEvaluationService.class);
-        node = new EvaluateSealNode(bridge, sealService);
+        node = new EvaluateSealNode(bridge, sealService, null);
     }
 
     // ── Helper methods ──────────────────────────────────────────────

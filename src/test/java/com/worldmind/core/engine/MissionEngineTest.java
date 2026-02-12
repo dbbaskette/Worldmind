@@ -108,6 +108,9 @@ class MissionEngineTest {
                 "status", MissionStatus.COMPLETED.name()
         ));
 
+        PostMissionNode mockPostMissionNode = mock(PostMissionNode.class);
+        when(mockPostMissionNode.apply(any(WorldmindState.class))).thenReturn(Map.of());
+
         WorldmindGraph graph = new WorldmindGraph(
                 new ClassifyRequestNode(mockLlm, null),
                 new UploadContextNode(mockScanner),
@@ -117,6 +120,7 @@ class MissionEngineTest {
                 mockParallelDispatch,
                 mockEvaluateWave,
                 mockConvergeNode,
+                mockPostMissionNode,
                 null
         );
 

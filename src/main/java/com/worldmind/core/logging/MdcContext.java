@@ -24,10 +24,17 @@ public final class MdcContext {
         MDC.put("waveNumber", String.valueOf(waveNumber));
     }
 
+    public static void setNexusTool(String nexusUser, String tool) {
+        MDC.put("nexusUser", nexusUser);
+        MDC.put("tool", tool);
+    }
+
     public static void clear() {
         MDC.remove("missionId");
         MDC.remove("directiveId");
         MDC.remove("centurionType");
         MDC.remove("waveNumber");
+        MDC.remove("nexusUser");
+        MDC.remove("tool");
     }
 }

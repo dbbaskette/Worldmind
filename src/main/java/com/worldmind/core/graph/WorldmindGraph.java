@@ -32,8 +32,8 @@ import static org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
  *            -> schedule_wave -> [routeAfterSchedule]
  *               -> parallel_dispatch -> evaluate_wave -> [routeAfterWaveEval]
  *                  -> schedule_wave (loop back for next wave)
- *                  -> converge_results -> END
- *               -> converge_results -> END  (empty wave = all done)
+ *                  -> converge_results -> post_mission -> END
+ *               -> converge_results -> post_mission -> END  (empty wave = all done)
  * </pre>
  */
 @Component
@@ -52,6 +52,7 @@ public class WorldmindGraph {
             ParallelDispatchNode parallelDispatchNode,
             EvaluateWaveNode evaluateWaveNode,
             ConvergeResultsNode convergeNode,
+            PostMissionNode postMissionNode,
             @Autowired(required = false) BaseCheckpointSaver checkpointSaver) throws Exception {
 
         var graph = new StateGraph<>(WorldmindState.SCHEMA, WorldmindState::new)
@@ -65,6 +66,7 @@ public class WorldmindGraph {
                 .addNode("parallel_dispatch", node_async(parallelDispatchNode::apply))
                 .addNode("evaluate_wave", node_async(evaluateWaveNode::apply))
                 .addNode("converge_results", node_async(convergeNode::apply))
+                .addNode("post_mission", node_async(postMissionNode::apply))
                 .addEdge(START, "classify_request")
                 .addEdge("classify_request", "upload_context")
                 .addEdge("upload_context", "generate_spec")
@@ -83,7 +85,8 @@ public class WorldmindGraph {
                         edge_async(this::routeAfterWaveEval),
                         Map.of("schedule_wave", "schedule_wave",
                                 "converge_results", "converge_results"))
-                .addEdge("converge_results", END);
+                .addEdge("converge_results", "post_mission")
+                .addEdge("post_mission", END);
 
         var configBuilder = CompileConfig.builder()
                 .recursionLimit(100);

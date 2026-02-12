@@ -3,8 +3,8 @@ package com.worldmind.core.nodes;
 import com.worldmind.core.llm.LlmService;
 import com.worldmind.core.model.Classification;
 import com.worldmind.core.model.MissionStatus;
+import com.worldmind.core.novaforce.NovaForceToolProvider;
 import com.worldmind.core.state.WorldmindState;
-import com.worldmind.mcp.McpToolProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -16,6 +16,9 @@ import java.util.Map;
  * <p>
  * Delegates to {@link LlmService} for structured output so the LLM returns
  * a valid {@link Classification} record.
+ * <p>
+ * When Nexus is enabled, injects Archive (read) and Brave Search tools so the
+ * LLM can check mission history and search for unfamiliar technology.
  */
 @Component
 public class ClassifyRequestNode {
@@ -35,13 +38,20 @@ public class ClassifyRequestNode {
             Respond with valid JSON matching the schema provided.
             """;
 
+    private static final String TOOL_GUIDANCE = """
+
+            You have access to mission history (Archive) and web search (Brave Search). \
+            Check Archive for similar past missions before classifying. \
+            If the mission references unfamiliar technology, search for it to understand \
+            the domain before routing.""";
+
     private final LlmService llmService;
-    private final McpToolProvider mcpToolProvider;
+    private final NovaForceToolProvider novaForceToolProvider;
 
     public ClassifyRequestNode(LlmService llmService,
-                               @Autowired(required = false) McpToolProvider mcpToolProvider) {
+                               @Autowired(required = false) NovaForceToolProvider novaForceToolProvider) {
         this.llmService = llmService;
-        this.mcpToolProvider = mcpToolProvider;
+        this.novaForceToolProvider = novaForceToolProvider;
     }
 
     public Map<String, Object> apply(WorldmindState state) {
@@ -51,9 +61,14 @@ public class ClassifyRequestNode {
         }
 
         String request = state.request();
-        Classification classification = (mcpToolProvider != null && mcpToolProvider.hasTools())
-                ? llmService.structuredCallWithTools(SYSTEM_PROMPT, request, Classification.class, mcpToolProvider.getToolsFor("classify"))
-                : llmService.structuredCall(SYSTEM_PROMPT, request, Classification.class);
+        var tools = novaForceToolProvider != null ? novaForceToolProvider.getToolsForNode("classify") : null;
+        boolean hasTools = tools != null && tools.length > 0;
+
+        String systemPrompt = hasTools ? SYSTEM_PROMPT + TOOL_GUIDANCE : SYSTEM_PROMPT;
+
+        Classification classification = hasTools
+                ? llmService.structuredCallWithTools(systemPrompt, request, Classification.class, tools)
+                : llmService.structuredCall(systemPrompt, request, Classification.class);
         return Map.of(
                 "classification", classification,
                 "status", MissionStatus.UPLOADING.name()

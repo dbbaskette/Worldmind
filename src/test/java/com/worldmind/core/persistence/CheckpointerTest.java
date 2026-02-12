@@ -117,6 +117,9 @@ class CheckpointerTest {
     }
 
     private WorldmindGraph buildGraph(BaseCheckpointSaver saver) throws Exception {
+        PostMissionNode mockPostMissionNode = mock(PostMissionNode.class);
+        when(mockPostMissionNode.apply(any(WorldmindState.class))).thenReturn(Map.of());
+
         return new WorldmindGraph(
                 new ClassifyRequestNode(mockLlm, null),
                 new UploadContextNode(mockScanner),
@@ -126,6 +129,7 @@ class CheckpointerTest {
                 mockParallelDispatch,
                 mockEvaluateWave,
                 mockConvergeNode,
+                mockPostMissionNode,
                 saver
         );
     }
