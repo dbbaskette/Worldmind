@@ -64,11 +64,34 @@ class CloudFoundryStarblasterProviderTest {
         assertTrue(call.command.contains("git clone"), "Should contain git clone: " + call.command);
         assertTrue(call.command.contains("worldmind/DIR-001"), "Should contain branch name: " + call.command);
         assertTrue(call.command.contains("curl"), "Should contain curl: " + call.command);
-        assertTrue(call.command.contains("goose run --debug -n"), "Should contain goose run: " + call.command);
+        assertTrue(call.command.contains("goose run --debug --with-builtin developer"), "Should contain goose run with developer builtin: " + call.command);
         assertTrue(call.command.contains("git push"), "Should contain git push: " + call.command);
         assertTrue(call.command.contains("GOOSE_PROVIDER__HOST"), "Should bridge GOOSE_PROVIDER__HOST: " + call.command);
         assertTrue(call.command.contains("GOOSE_PROVIDER__API_KEY"), "Should bridge GOOSE_PROVIDER__API_KEY: " + call.command);
         assertTrue(call.command.contains("diagnostics.log"), "Should write diagnostics: " + call.command);
+    }
+
+    @Test
+    void openStarblasterExportsMcpEnvVars() {
+        var request = new StarblasterRequest(
+                "forge", "DIR-001", Path.of("/tmp/project"),
+                "Build something", Map.of(
+                        "MCP_SERVERS", "NEXUS",
+                        "MCP_SERVER_NEXUS_URL", "https://nexus.example.com/mcp",
+                        "MCP_SERVER_NEXUS_TOKEN", "test-token"
+                ),
+                4096, 2, "", "base"
+        );
+
+        provider.openStarblaster(request);
+
+        var call = stubApiClient.createTaskCalls.get(0);
+        // MCP env vars are exported so entrypoint.sh can generate config.yaml
+        // with auth headers in map format (MCP extensions loaded from config, not CLI)
+        assertTrue(call.command.contains("MCP_SERVER_NEXUS_URL"),
+                "Should export MCP URL env var: " + call.command);
+        assertTrue(call.command.contains("MCP_SERVER_NEXUS_TOKEN"),
+                "Should export MCP token env var: " + call.command);
     }
 
     @Test

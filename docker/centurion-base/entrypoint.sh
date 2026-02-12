@@ -87,11 +87,16 @@ elif [ "$PROVIDER" = "google" ]; then
     [ -n "$API_KEY" ] && export GOOGLE_API_KEY="$API_KEY"
 fi
 
-# Write config.yaml with developer extension
+# Write config.yaml with developer extension using map format.
+# Goose v1.23.x expects extensions as a map (key: config) not a list (- type: ...).
 cat > "$CONFIG_FILE" <<CFGEOF
 extensions:
-  - type: builtin
+  developer:
+    bundled: true
+    enabled: true
     name: developer
+    type: builtin
+    timeout: 300
 CFGEOF
 
 # Add MCP server extensions (injected by Worldmind orchestrator)
@@ -109,19 +114,25 @@ if [ -n "$MCP_SERVERS" ]; then
       if [ -n "$TOKEN" ]; then
         export "${TOKEN_VAR}"
         cat >> "$CONFIG_FILE" <<MCP_EOF
-  - type: streamable_http
+  ${NAME}:
+    enabled: true
+    type: streamable_http
     name: ${NAME}
     uri: ${URL}
     headers:
       Authorization: "Bearer \${${TOKEN_VAR}}"
     env_keys:
       - ${TOKEN_VAR}
+    timeout: 300
 MCP_EOF
       else
         cat >> "$CONFIG_FILE" <<MCP_EOF
-  - type: streamable_http
+  ${NAME}:
+    enabled: true
+    type: streamable_http
     name: ${NAME}
     uri: ${URL}
+    timeout: 300
 MCP_EOF
       fi
       echo "[entrypoint] MCP extension '${NAME}' configured: ${URL}"
@@ -147,4 +158,6 @@ if [ -n "$CF_SYSTEM_CERT_PATH" ]; then
     echo "[entrypoint] Appended CF CA certs to $COMBINED_CERTS"
 fi
 
-exec goose run "$@"
+# Pass --with-builtin developer as belt-and-suspenders alongside config.yaml.
+# Config.yaml (map format) should load extensions, but CLI flag ensures developer loads.
+exec goose run --with-builtin developer "$@"

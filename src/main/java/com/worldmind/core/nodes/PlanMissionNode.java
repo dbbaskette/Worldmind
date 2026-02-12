@@ -43,13 +43,18 @@ public class PlanMissionNode {
 
             Rules:
             1. Each directive should be a single, focused task
-            2. Order directives logically (implementation before testing before review)
-            3. Use dependencies to express ordering constraints
-            4. Choose execution strategy based on complexity:
+            2. Start with a PULSE research directive to analyze the codebase and gather
+               context before implementation. PULSE examines existing code patterns,
+               dependencies, and architecture so that subsequent directives are well-informed.
+               Skip PULSE only for trivial changes (typo fixes, config tweaks).
+            3. Order remaining directives logically (implementation before testing before review)
+            4. Use dependencies to express ordering constraints — FORGE/PRISM directives
+               should depend on the PULSE directive so they benefit from its findings
+            5. Choose execution strategy based on complexity:
                - "sequential" for simple, dependent tasks
                - "parallel" for independent subtasks
                - "adaptive" for complex tasks needing dynamic planning
-            5. Every mission should end with a VIGIL review directive
+            6. Every mission should end with a VIGIL review directive
 
             Respond with valid JSON matching the schema provided.
             """;
