@@ -118,6 +118,7 @@ if [ -n "$MCP_SERVERS" ]; then
     enabled: true
     type: streamable_http
     name: ${NAME}
+    description: "${NAME} MCP server"
     uri: ${URL}
     headers:
       Authorization: "Bearer \${${TOKEN_VAR}}"
@@ -131,6 +132,7 @@ MCP_EOF
     enabled: true
     type: streamable_http
     name: ${NAME}
+    description: "${NAME} MCP server"
     uri: ${URL}
     timeout: 300
 MCP_EOF
