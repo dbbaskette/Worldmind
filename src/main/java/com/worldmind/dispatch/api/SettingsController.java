@@ -133,7 +133,8 @@ public class SettingsController {
 
     /**
      * Parses VCAP_SERVICES to extract model provider and name from the bound genai service.
-     * Mirrors the resolution logic in centurion entrypoint.sh.
+     * Checks credentials first (CredHub-resolved at runtime), then falls back to the
+     * service plan name which contains the model identifier.
      */
     private Map<String, String> resolveModelFromVcap(String serviceName) {
         String vcapServices = System.getenv("VCAP_SERVICES");
@@ -150,18 +151,38 @@ public class SettingsController {
                     if (serviceName != null && !serviceName.isBlank() && !name.equals(serviceName)) {
                         continue;
                     }
-                    JsonNode creds = svc.get("credentials");
-                    if (creds == null) continue;
 
                     Map<String, String> resolved = new LinkedHashMap<>();
-                    if (creds.has("model_provider")) {
-                        resolved.put("provider", creds.get("model_provider").asText());
+
+                    // Try credentials first (resolved from CredHub at runtime)
+                    JsonNode creds = svc.get("credentials");
+                    if (creds != null) {
+                        if (creds.has("model_provider")) {
+                            resolved.put("provider", creds.get("model_provider").asText());
+                        }
+                        String modelName = creds.has("model_name") ? creds.get("model_name").asText()
+                                : creds.has("model") ? creds.get("model").asText() : null;
+                        if (modelName != null) {
+                            resolved.put("model", modelName);
+                        }
                     }
-                    String modelName = creds.has("model_name") ? creds.get("model_name").asText()
-                            : creds.has("model") ? creds.get("model").asText() : null;
-                    if (modelName != null) {
-                        resolved.put("model", modelName);
+
+                    // Fall back to the service plan name (e.g. "tanzu-Qwen3-Coder-30B-A3B-vllm-v1")
+                    if (!resolved.containsKey("model") && svc.has("plan")) {
+                        String plan = svc.get("plan").asText();
+                        if (plan != null && !plan.isBlank()) {
+                            resolved.put("model", plan);
+                        }
                     }
+
+                    // Use the service label as provider fallback (e.g. "genai")
+                    if (!resolved.containsKey("provider")) {
+                        String svcLabel = label.getKey();
+                        if (svcLabel != null && !svcLabel.isBlank()) {
+                            resolved.put("provider", svcLabel);
+                        }
+                    }
+
                     if (!resolved.isEmpty()) {
                         return resolved;
                     }
