@@ -45,6 +45,7 @@ public class StarblasterProperties {
         return "openai";
     }
     public String getGooseModel() { return goose.model; }
+    public String getGooseServiceName() { return goose.serviceName; }
     public String getLmStudioUrl() { return goose.lmStudioUrl; }
 
     public Starblaster getStarblaster() { return starblaster; }
@@ -86,12 +87,15 @@ public class StarblasterProperties {
     public static class Goose {
         private String provider = "";
         private String model = "qwen2.5-coder-32b";
+        private String serviceName = "";
         private String lmStudioUrl = "http://host.docker.internal:1234/v1";
 
         public String getProvider() { return provider; }
         public void setProvider(String provider) { this.provider = provider; }
         public String getModel() { return model; }
         public void setModel(String model) { this.model = model; }
+        public String getServiceName() { return serviceName; }
+        public void setServiceName(String serviceName) { this.serviceName = serviceName; }
         public String getLmStudioUrl() { return lmStudioUrl; }
         public void setLmStudioUrl(String lmStudioUrl) { this.lmStudioUrl = lmStudioUrl; }
     }

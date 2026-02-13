@@ -61,6 +61,7 @@ worldmind:
   goose:
     provider: ${GOOSE_PROVIDER:}
     model: ${GOOSE_MODEL:qwen2.5-coder-32b}
+    service-name: ${GENAI_SERVICE_NAME:}
     lm-studio-url: ${LM_STUDIO_URL:http://host.docker.internal:1234/v1}
   starblaster:
     provider: ${STARBLASTER_PROVIDER:docker}

@@ -128,7 +128,15 @@ public class StarblasterManager {
             log.info("Goose provider explicitly configured: provider={}, model={}",
                     properties.getGooseProvider(), properties.getGooseModel());
         } else {
-            log.info("No Goose provider configured — centurion will resolve from VCAP_SERVICES");
+            // Forward GENAI_SERVICE_NAME so entrypoint.sh picks the right VCAP binding
+            // when multiple genai services are bound (e.g. worldmind-model vs worldmind-model-2).
+            String serviceName = properties.getGooseServiceName();
+            if (serviceName != null && !serviceName.isBlank()) {
+                envVars.put("GENAI_SERVICE_NAME", serviceName);
+                log.info("No Goose provider configured — centurion will resolve from VCAP_SERVICES (service: {})", serviceName);
+            } else {
+                log.info("No Goose provider configured — centurion will resolve from VCAP_SERVICES");
+            }
         }
 
         // Inject MCP server configs for centurion's Goose MCP extensions

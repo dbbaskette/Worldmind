@@ -21,12 +21,16 @@ if [ -n "$VCAP_SERVICES" ]; then
     echo "[entrypoint] Cloud Foundry environment detected, parsing VCAP_SERVICES..."
 
     # Parse credentials from bound GenAI service (if any).
-    # Sets PROVIDER, MODEL, API_KEY, API_URL only if a GenAI binding exists.
+    # When GENAI_SERVICE_NAME is set, only that service instance is used.
+    # Otherwise, picks the first genai binding found.
     eval "$(echo "$VCAP_SERVICES" | python3 -c "
 import sys, json, os
 vcap = json.load(sys.stdin)
+target = os.environ.get('GENAI_SERVICE_NAME', '')
 for label in vcap:
     for svc in vcap[label]:
+        if target and svc.get('name', '') != target:
+            continue
         creds = svc.get('credentials', {})
         if 'model_provider' in creds:
             print('VCAP_PROVIDER=' + creds['model_provider'])
@@ -96,6 +100,8 @@ fi
 
 # Write config.yaml with developer extension using map format.
 # Goose v1.23.x expects extensions as a map (key: config) not a list (- type: ...).
+# Explicitly disable built-in extensions that waste tokens (todo, apps, skills, etc.)
+# — centurions only need the developer extension for file editing and shell access.
 cat > "$CONFIG_FILE" <<CFGEOF
 extensions:
   developer:
@@ -104,6 +110,22 @@ extensions:
     name: developer
     type: builtin
     timeout: 300
+  todo:
+    bundled: true
+    enabled: false
+    type: builtin
+  apps:
+    bundled: true
+    enabled: false
+    type: builtin
+  skills:
+    bundled: true
+    enabled: false
+    type: builtin
+  extensionmanager:
+    bundled: true
+    enabled: false
+    type: builtin
 CFGEOF
 
 # Add MCP server extensions (injected by Worldmind orchestrator)
