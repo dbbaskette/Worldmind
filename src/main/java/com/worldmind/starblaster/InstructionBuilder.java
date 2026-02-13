@@ -243,6 +243,24 @@ public final class InstructionBuilder {
                 """ + instruction;
     }
 
+    /**
+     * Appends a brief note reminding the centurion that MCP extension tools
+     * are available and should be used when relevant.
+     *
+     * @param instruction    the base instruction text
+     * @param centurionType  the centurion type (unused for now, kept for future scoping)
+     * @param serverNames    names of configured MCP servers (e.g. ["nexus"])
+     * @return instruction with MCP tools note appended
+     */
+    public static String withMcpTools(String instruction, String centurionType, List<String> serverNames) {
+        if (serverNames == null || serverNames.isEmpty()) return instruction;
+        return instruction
+                + "\n\n## Tools\n\n"
+                + "You have MCP extension tools available for GitHub operations, code search, "
+                + "and other services. Use them whenever they can help — especially for git "
+                + "operations, reading repository files, or searching code.\n";
+    }
+
     private static String formatFileChanges(List<FileRecord> fileChanges) {
         if (fileChanges == null || fileChanges.isEmpty()) {
             return "- No file changes recorded\n";

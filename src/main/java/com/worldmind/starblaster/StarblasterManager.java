@@ -144,6 +144,15 @@ public class StarblasterManager {
             }
         }
 
+        // Append MCP tool instructions if MCP servers are configured for this centurion
+        if (mcpProperties != null && mcpProperties.isConfigured()) {
+            var mcpServerNames = mcpProperties.getServers().entrySet().stream()
+                    .filter(e -> e.getValue().getUrl() != null && !e.getValue().getUrl().isBlank())
+                    .map(Map.Entry::getKey)
+                    .toList();
+            instructionText = InstructionBuilder.withMcpTools(instructionText, centurionType, mcpServerNames);
+        }
+
         var request = new StarblasterRequest(
             centurionType, directiveId, projectPath,
             instructionText, envVars,

@@ -325,9 +325,10 @@ public class GitWorkspaceManager {
      *
      * @param directiveIds list of directive IDs whose branches should be merged
      * @param gitToken     git token for push authentication
+     * @param overrideGitUrl optional git URL override (e.g. from mission request); uses config URL if null/blank
      */
-    public void mergeDirectiveBranches(List<String> directiveIds, String gitToken) {
-        String gitUrl = authenticatedUrl(gitToken);
+    public void mergeDirectiveBranches(List<String> directiveIds, String gitToken, String overrideGitUrl) {
+        String gitUrl = authenticatedUrl(gitToken, overrideGitUrl);
         Path tempDir = null;
         try {
             tempDir = java.nio.file.Files.createTempDirectory("worldmind-merge-");
@@ -373,9 +374,10 @@ public class GitWorkspaceManager {
      *
      * @param directiveIds list of directive IDs whose branches should be deleted
      * @param gitToken     git token for push authentication
+     * @param overrideGitUrl optional git URL override (e.g. from mission request); uses config URL if null/blank
      */
-    public void cleanupDirectiveBranches(List<String> directiveIds, String gitToken) {
-        String gitUrl = authenticatedUrl(gitToken);
+    public void cleanupDirectiveBranches(List<String> directiveIds, String gitToken, String overrideGitUrl) {
+        String gitUrl = authenticatedUrl(gitToken, overrideGitUrl);
         Path tempDir = null;
         try {
             tempDir = java.nio.file.Files.createTempDirectory("worldmind-cleanup-");
@@ -396,11 +398,23 @@ public class GitWorkspaceManager {
         }
     }
 
-    private String authenticatedUrl(String gitToken) {
-        if (gitToken != null && !gitToken.isBlank() && gitRemoteUrl.startsWith("https://")) {
-            return gitRemoteUrl.replace("https://", "https://x-access-token:" + gitToken + "@");
+    /**
+     * Strips GitHub browser-URL suffixes (e.g. /tree/main, /blob/...) so the URL
+     * is a valid git remote for cloning.
+     */
+    static String sanitizeGitUrl(String url) {
+        if (url == null) return "";
+        return url.replaceFirst("/(tree|blob|commit|pulls?|issues?|actions|releases)/.*$", "")
+                  .replaceFirst("/+$", "");
+    }
+
+    private String authenticatedUrl(String gitToken, String overrideGitUrl) {
+        String baseUrl = (overrideGitUrl != null && !overrideGitUrl.isBlank()) ? sanitizeGitUrl(overrideGitUrl) : gitRemoteUrl;
+        log.info("Resolved git URL for merge/cleanup: {}", baseUrl.replaceAll("://[^@]+@", "://***@"));
+        if (gitToken != null && !gitToken.isBlank() && baseUrl.startsWith("https://")) {
+            return baseUrl.replace("https://", "https://x-access-token:" + gitToken + "@");
         }
-        return gitRemoteUrl;
+        return baseUrl;
     }
 
     private static void deleteDirectory(Path dir) {

@@ -407,10 +407,12 @@ public class MissionController {
             return ResponseEntity.notFound().build();
         }
 
+        var activeWaveIds = new HashSet<>(state.waveDirectiveIds());
+        var completedIds = new HashSet<>(state.completedDirectiveIds());
         return state.directives().stream()
                 .filter(d -> d.id().equals(did))
                 .findFirst()
-                .map(d -> ResponseEntity.ok(toDirectiveResponse(d, state)))
+                .map(d -> ResponseEntity.ok(toDirectiveResponse(d, state, activeWaveIds, completedIds)))
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -491,9 +493,12 @@ public class MissionController {
                             .map(Directive::id)
                             .toList();
 
+                    // Use the mission's git URL (what centurions actually pushed to)
+                    String missionGitUrl = state.gitRemoteUrl();
+
                     if (state.status() == MissionStatus.COMPLETED && !passedIds.isEmpty()) {
                         log.info("Merging {} passed directive branches for mission {}", passedIds.size(), missionId);
-                        gitWorkspaceManager.mergeDirectiveBranches(passedIds, cfProperties.getGitToken());
+                        gitWorkspaceManager.mergeDirectiveBranches(passedIds, cfProperties.getGitToken(), missionGitUrl);
                     }
 
                     // Clean up any branches that weren't merged (failed directives, or all if mission failed)
@@ -502,7 +507,7 @@ public class MissionController {
                             .toList();
                     if (!unmergedIds.isEmpty()) {
                         log.info("Cleaning up {} unmerged directive branches for mission {}", unmergedIds.size(), missionId);
-                        gitWorkspaceManager.cleanupDirectiveBranches(unmergedIds, cfProperties.getGitToken());
+                        gitWorkspaceManager.cleanupDirectiveBranches(unmergedIds, cfProperties.getGitToken(), missionGitUrl);
                     }
                 }
             }
@@ -514,8 +519,12 @@ public class MissionController {
     }
 
     private MissionResponse toResponse(WorldmindState state) {
+        // Build a set of currently-dispatched directive IDs so we can show them as EXECUTING
+        var activeWaveIds = new HashSet<>(state.waveDirectiveIds());
+        var completedIds = new HashSet<>(state.completedDirectiveIds());
+
         List<MissionResponse.DirectiveResponse> directives = state.directives().stream()
-                .map(d -> toDirectiveResponse(d, state))
+                .map(d -> toDirectiveResponse(d, state, activeWaveIds, completedIds))
                 .toList();
 
         int waveCount = state.metrics()
@@ -537,7 +546,9 @@ public class MissionController {
         );
     }
 
-    private MissionResponse.DirectiveResponse toDirectiveResponse(Directive d, WorldmindState state) {
+    private MissionResponse.DirectiveResponse toDirectiveResponse(Directive d, WorldmindState state,
+                                                                    Set<String> activeWaveIds,
+                                                                    Set<String> completedIds) {
         // Find review feedback for this directive
         Integer reviewScore = null;
         String reviewSummary = null;
@@ -549,11 +560,24 @@ public class MissionController {
             }
         }
 
+        // Synthesize EXECUTING status for directives in the current wave that haven't
+        // been completed yet. The directives channel isn't updated until EvaluateWaveNode
+        // runs, so during dispatch they still show PENDING in the checkpoint.
+        String uiStatus;
+        if (d.status() == DirectiveStatus.PENDING
+                && activeWaveIds.contains(d.id())
+                && !completedIds.contains(d.id())
+                && state.status() == MissionStatus.EXECUTING) {
+            uiStatus = "EXECUTING";
+        } else {
+            uiStatus = mapDirectiveStatus(d.status());
+        }
+
         return new MissionResponse.DirectiveResponse(
                 d.id(),
                 d.centurion(),
                 d.description(),
-                mapDirectiveStatus(d.status()),
+                uiStatus,
                 d.iteration(),
                 d.maxIterations(),
                 d.elapsedMs(),

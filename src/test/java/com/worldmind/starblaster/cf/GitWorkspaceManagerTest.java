@@ -191,7 +191,7 @@ class GitWorkspaceManagerTest {
     @Test
     void mergeDirectiveBranchesClonesAndMergesEachBranch() {
         manager.setExitCode(0);
-        manager.mergeDirectiveBranches(List.of("DIR-001", "DIR-002"), "ghp_token");
+        manager.mergeDirectiveBranches(List.of("DIR-001", "DIR-002"), "ghp_token", null);
 
         var commands = manager.getExecutedCommands();
         // Should clone, config user, config email, checkout main,
@@ -221,7 +221,7 @@ class GitWorkspaceManagerTest {
                 0,  // delete DIR-001
                 0   // delete DIR-002
         ));
-        manager.mergeDirectiveBranches(List.of("DIR-001", "DIR-002"), "ghp_token");
+        manager.mergeDirectiveBranches(List.of("DIR-001", "DIR-002"), "ghp_token", null);
 
         var commands = manager.getExecutedCommands();
         // Should NOT have a merge for DIR-001 since fetch failed
@@ -235,7 +235,7 @@ class GitWorkspaceManagerTest {
     @Test
     void cleanupDirectiveBranchesDeletesWithoutMerging() {
         manager.setExitCode(0);
-        manager.cleanupDirectiveBranches(List.of("DIR-001", "DIR-002"), "ghp_token");
+        manager.cleanupDirectiveBranches(List.of("DIR-001", "DIR-002"), "ghp_token", null);
 
         var commands = manager.getExecutedCommands();
         assertTrue(commands.stream().anyMatch(c -> c.contains("clone")), "Should clone: " + commands);
@@ -261,7 +261,7 @@ class GitWorkspaceManagerTest {
                 0,  // delete DIR-001
                 0   // delete DIR-002
         ));
-        manager.mergeDirectiveBranches(List.of("DIR-001", "DIR-002"), "ghp_token");
+        manager.mergeDirectiveBranches(List.of("DIR-001", "DIR-002"), "ghp_token", null);
 
         var commands = manager.getExecutedCommands();
         assertTrue(commands.stream().anyMatch(c -> c.contains("merge") && c.contains("--abort")),
