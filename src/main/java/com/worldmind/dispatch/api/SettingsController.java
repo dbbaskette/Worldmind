@@ -42,9 +42,9 @@ public class SettingsController {
         String provider = starblasterProperties.getGooseProvider();
         String model = starblasterProperties.getGooseModel();
 
-        // When provider isn't explicitly configured, resolve from VCAP_SERVICES
-        // so the UI shows the actual model bound via CF service binding.
-        if (!starblasterProperties.isGooseProviderConfigured()) {
+        // When model is empty, resolve from VCAP_SERVICES so the UI shows the
+        // actual model bound via CF service binding.
+        if (model == null || model.isBlank()) {
             var vcapResolved = resolveModelFromVcap(starblasterProperties.getGooseServiceName());
             if (vcapResolved != null) {
                 provider = vcapResolved.getOrDefault("provider", provider);
