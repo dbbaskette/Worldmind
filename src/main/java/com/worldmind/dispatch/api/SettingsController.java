@@ -1,5 +1,7 @@
 package com.worldmind.dispatch.api;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.worldmind.mcp.McpClientManager;
 import com.worldmind.mcp.McpProperties;
 import com.worldmind.starblaster.StarblasterProperties;
@@ -36,8 +38,22 @@ public class SettingsController {
     public ResponseEntity<Map<String, Object>> getMcpSettings() {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("enabled", mcpProperties.isEnabled());
-        result.put("gooseProvider", starblasterProperties.getGooseProvider());
-        result.put("gooseModel", starblasterProperties.getGooseModel());
+
+        String provider = starblasterProperties.getGooseProvider();
+        String model = starblasterProperties.getGooseModel();
+
+        // When provider isn't explicitly configured, resolve from VCAP_SERVICES
+        // so the UI shows the actual model bound via CF service binding.
+        if (!starblasterProperties.isGooseProviderConfigured()) {
+            var vcapResolved = resolveModelFromVcap(starblasterProperties.getGooseServiceName());
+            if (vcapResolved != null) {
+                provider = vcapResolved.getOrDefault("provider", provider);
+                model = vcapResolved.getOrDefault("model", model);
+            }
+        }
+
+        result.put("gooseProvider", provider);
+        result.put("gooseModel", model);
 
         List<Map<String, Object>> servers = new ArrayList<>();
 
@@ -113,5 +129,47 @@ public class SettingsController {
 
         result.put("servers", servers);
         return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Parses VCAP_SERVICES to extract model provider and name from the bound genai service.
+     * Mirrors the resolution logic in centurion entrypoint.sh.
+     */
+    private Map<String, String> resolveModelFromVcap(String serviceName) {
+        String vcapServices = System.getenv("VCAP_SERVICES");
+        if (vcapServices == null || vcapServices.isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode root = new ObjectMapper().readTree(vcapServices);
+            var labels = root.fields();
+            while (labels.hasNext()) {
+                var label = labels.next();
+                for (JsonNode svc : label.getValue()) {
+                    String name = svc.has("name") ? svc.get("name").asText() : "";
+                    if (serviceName != null && !serviceName.isBlank() && !name.equals(serviceName)) {
+                        continue;
+                    }
+                    JsonNode creds = svc.get("credentials");
+                    if (creds == null) continue;
+
+                    Map<String, String> resolved = new LinkedHashMap<>();
+                    if (creds.has("model_provider")) {
+                        resolved.put("provider", creds.get("model_provider").asText());
+                    }
+                    String modelName = creds.has("model_name") ? creds.get("model_name").asText()
+                            : creds.has("model") ? creds.get("model").asText() : null;
+                    if (modelName != null) {
+                        resolved.put("model", modelName);
+                    }
+                    if (!resolved.isEmpty()) {
+                        return resolved;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Failed to resolve model from VCAP_SERVICES: {}", e.getMessage());
+        }
+        return null;
     }
 }
