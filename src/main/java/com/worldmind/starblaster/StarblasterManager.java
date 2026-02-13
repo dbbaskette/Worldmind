@@ -191,7 +191,14 @@ public class StarblasterManager {
             throw new RuntimeException("Failed to write instruction file for " + directiveId, e);
         }
 
-        Map<String, Long> beforeSnapshot = snapshotFiles(effectivePath);
+        // Snapshot project files before execution.
+        // Provider-based snapshot (Docker helper container) takes priority over local snapshot
+        // because in Docker-in-Docker mode, the local filesystem is the instruction volume,
+        // not the host project directory where centurions write code.
+        Map<String, Long> providerSnapshot = provider.snapshotProjectFiles(projectPath);
+        Map<String, Long> beforeSnapshot = providerSnapshot != null
+                ? providerSnapshot
+                : snapshotFiles(effectivePath);
 
         long startMs = System.currentTimeMillis();
         String starblasterId = provider.openStarblaster(request);
@@ -201,9 +208,14 @@ public class StarblasterManager {
             String output = provider.captureOutput(starblasterId);
             long elapsedMs = System.currentTimeMillis() - startMs;
 
-            // Use provider-based change detection if available (e.g. git diff on CF),
-            // otherwise fall back to filesystem snapshot comparison.
+            // Detect file changes using the best available method:
+            // 1. Provider-specific detection (CF git diff)
+            // 2. Provider-based snapshot comparison (Docker helper containers)
+            // 3. Local filesystem snapshot comparison (direct host access)
             List<FileRecord> providerChanges = provider.detectChanges(request.directiveId(), projectPath);
+            if (providerChanges == null && providerSnapshot != null) {
+                providerChanges = provider.detectChangesBySnapshot(beforeSnapshot, projectPath);
+            }
             List<FileRecord> changes = providerChanges != null
                     ? providerChanges
                     : detectChanges(beforeSnapshot, effectivePath);

@@ -47,6 +47,10 @@ class EvaluateWaveNodeTest {
                 List.of(new FileRecord("test.java", "created", 10)), "Success", 500L);
     }
 
+    private WaveDispatchResult passedResultNoFiles(String id) {
+        return new WaveDispatchResult(id, DirectiveStatus.PASSED, List.of(), "Success", 500L);
+    }
+
     private WaveDispatchResult failedResult(String id) {
         return new WaveDispatchResult(id, DirectiveStatus.FAILED, List.of(), "Failed output", 300L);
     }
@@ -256,6 +260,26 @@ class EvaluateWaveNodeTest {
 
         // Should still produce a result (not crash)
         assertNotNull(result.get("completedDirectiveIds"));
+    }
+
+    @Test
+    @DisplayName("FORGE with no file changes -> immediately ESCALATES to FAILED (no retry)")
+    void forgeNoFileChangesEscalatesImmediately() {
+        // Even on first iteration with RETRY strategy, empty FORGE should escalate
+        var d = forgeDirective("DIR-001", 0, 3, FailureStrategy.RETRY);
+
+        var state = new WorldmindState(Map.of(
+                "waveDirectiveIds", List.of("DIR-001"),
+                "directives", List.of(d),
+                "waveDispatchResults", List.of(passedResultNoFiles("DIR-001"))
+        ));
+
+        var result = node.apply(state);
+
+        // Should immediately FAIL the mission — no point retrying when centurion wrote nothing
+        assertEquals(MissionStatus.FAILED.name(), result.get("status"));
+        // Should NOT run GAUNTLET/VIGIL on empty output
+        verify(mockBridge, never()).executeDirective(any(), any(), any(), any(), any());
     }
 
     @Test

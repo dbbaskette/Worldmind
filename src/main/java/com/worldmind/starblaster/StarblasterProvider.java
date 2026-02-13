@@ -4,6 +4,7 @@ import com.worldmind.core.model.FileRecord;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Abstraction for container orchestration.
@@ -45,6 +46,35 @@ public interface StarblasterProvider {
      * @return list of file changes, or {@code null} to fall back to filesystem detection
      */
     default List<FileRecord> detectChanges(String directiveId, Path projectPath) {
+        return null;
+    }
+
+    /**
+     * Snapshots the project directory before centurion execution.
+     * Used by Docker provider where the worldmind container cannot directly
+     * see the host filesystem that centurions bind-mount.
+     *
+     * <p>Returns {@code null} to indicate "use default local filesystem snapshot".
+     *
+     * @param projectPath host path to the project directory
+     * @return file snapshot map (path -> lastModified), or null for default behavior
+     */
+    default Map<String, Long> snapshotProjectFiles(Path projectPath) {
+        return null;
+    }
+
+    /**
+     * Detects file changes by comparing before/after snapshots via the provider.
+     * Called after centurion execution with the before-snapshot from
+     * {@link #snapshotProjectFiles}.
+     *
+     * <p>Returns {@code null} to indicate "use default filesystem detection".
+     *
+     * @param beforeSnapshot snapshot from before execution
+     * @param projectPath host path to the project directory
+     * @return list of file changes, or null for default behavior
+     */
+    default List<FileRecord> detectChangesBySnapshot(Map<String, Long> beforeSnapshot, Path projectPath) {
         return null;
     }
 }

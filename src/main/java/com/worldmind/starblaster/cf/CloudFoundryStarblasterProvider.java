@@ -2,6 +2,7 @@ package com.worldmind.starblaster.cf;
 
 import com.worldmind.core.model.FileRecord;
 import com.worldmind.starblaster.InstructionStore;
+import com.worldmind.starblaster.OutputStore;
 import com.worldmind.starblaster.StarblasterProvider;
 import com.worldmind.starblaster.StarblasterRequest;
 import org.slf4j.Logger;
@@ -43,6 +44,7 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
     private final GitWorkspaceManager gitWorkspaceManager;
     private final CfApiClient cfApiClient;
     private final InstructionStore instructionStore;
+    private final OutputStore outputStore;
 
     /**
      * Tracks starblasterId to app name mapping so waitForCompletion/captureOutput/teardown
@@ -59,11 +61,13 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
     public CloudFoundryStarblasterProvider(CloudFoundryProperties cfProperties,
                                            GitWorkspaceManager gitWorkspaceManager,
                                            CfApiClient cfApiClient,
-                                           InstructionStore instructionStore) {
+                                           InstructionStore instructionStore,
+                                           OutputStore outputStore) {
         this.cfProperties = cfProperties;
         this.gitWorkspaceManager = gitWorkspaceManager;
         this.cfApiClient = cfApiClient;
         this.instructionStore = instructionStore;
+        this.outputStore = outputStore;
     }
 
     @Override
@@ -77,6 +81,7 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
         var gitRemoteUrl = request.gitRemoteUrl() != null && !request.gitRemoteUrl().isBlank()
                 ? request.gitRemoteUrl()
                 : cfProperties.getGitRemoteUrl();
+        gitRemoteUrl = sanitizeGitUrl(gitRemoteUrl);
 
         // Embed git token into HTTPS URLs for push authentication
         var gitToken = cfProperties.getGitToken();
@@ -99,6 +104,7 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
 
         var orchestratorUrl = cfProperties.getOrchestratorUrl();
         var instructionUrl = orchestratorUrl + "/api/internal/instructions/" + instructionKey;
+        var outputUrl = orchestratorUrl + "/api/internal/output/" + taskName;
 
         // Build the task command that runs inside the CF app container.
         // CF tasks bypass Docker ENTRYPOINT, so we source entrypoint.sh
@@ -151,19 +157,29 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
                 "mkdir -p .worldmind/directives && curl --retry 3 -fk '%s' > .worldmind/directives/%s.md".formatted(instructionUrl, directiveId),
                 // Dump diagnostics to a file that gets committed to git for debugging.
                 "mkdir -p .worldmind && {"
-                        + " echo '=== ENV ===' && env | grep -iE 'GOOSE|OPENAI|ANTHROPIC|GOOGLE|API_URL|API_KEY|PROVIDER|MODEL|SSL|MCP' | sed 's/\\(API_KEY\\|TOKEN\\)=.*/\\1=***/';"
+                        + " echo '=== ENV ===' && env | grep -iE 'GOOSE|OPENAI|ANTHROPIC|GOOGLE|API_URL|API_KEY|PROVIDER|MODEL|SSL|MCP|HOME' | sed 's/\\(API_KEY\\|TOKEN\\)=.*/\\1=***/';"
                         + " echo '=== CONFIG ===' && cat $HOME/.config/goose/config.yaml 2>&1;"
                         + " echo '=== INSTRUCTION ===' && wc -c .worldmind/directives/" + directiveId + ".md 2>&1;"
+                        + " echo '=== INSTRUCTION PREVIEW ===' && head -5 .worldmind/directives/" + directiveId + ".md 2>&1;"
                         + " echo '=== GOOSE VERSION ===' && goose --version 2>&1;"
+                        + " echo '=== GOOSE RUN HELP ===' && goose run --help 2>&1;"
+                        + " echo '=== WORKSPACE ===' && ls -la /workspace 2>&1;"
                         + " } > .worldmind/diagnostics.log 2>&1",
-                // Run Goose with developer builtin loaded explicitly via CLI.
-                // Config.yaml (map format) provides MCP extensions with auth headers.
-                // --with-builtin developer is belt-and-suspenders alongside config.yaml.
-                "GOOSE_DEBUG=true goose run --debug --with-builtin developer"
-                        + " -n " + directiveId
+                // Run Goose headlessly with the instruction file.
+                // -i/--instructions loads the file and executes its commands.
+                // --no-session avoids persisting session state in CF ephemeral containers.
+                // --with-builtin developer loads file-writing tools alongside config.yaml.
+                // Verify instruction file is non-empty before running — curl may have failed silently.
+                "INSTRUCTION_FILE=.worldmind/directives/" + directiveId + ".md"
+                        + " && if [ ! -s \"$INSTRUCTION_FILE\" ]; then"
+                        + " echo 'FATAL: instruction file is empty or missing' >> .worldmind/diagnostics.log;"
+                        + " echo 'FATAL: instruction file is empty or missing'; exit 1; fi"
+                        + " && GOOSE_DEBUG=true goose run --debug --no-session --with-builtin developer"
                         + " -i .worldmind/directives/" + directiveId + ".md > .worldmind/goose-output.log 2>&1"
                         + "; GOOSE_RC=$?; echo \"GOOSE_EXIT_CODE=$GOOSE_RC\" >> .worldmind/diagnostics.log"
                         + "; cp -r $HOME/.local/state/goose/logs/ .worldmind/goose-logs 2>/dev/null"
+                        // POST Goose output back to orchestrator (CF API doesn't expose task stdout)
+                        + "; curl -fk -X PUT -H 'Content-Type: text/plain' --data-binary @.worldmind/goose-output.log '%s' 2>/dev/null || true".formatted(outputUrl)
                         + postGooseGit
                         + "; exit $GOOSE_RC"
         );
@@ -219,16 +235,23 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
     }
 
     /**
-     * Returns diagnostic output for a task.
+     * Returns Goose output for a task.
      *
-     * <p>The CF API v3 does not expose application logs directly (that requires
-     * the Log Cache API). For failed tasks, this returns the failure reason
-     * from the task resource. For other states, it returns a pointer to
-     * {@code cf logs}.
+     * <p>The CF API v3 does not expose task stdout/stderr. Centurion tasks
+     * POST their Goose output back to the orchestrator via the OutputStore.
+     * For failed tasks, this also checks the CF failure reason.
      */
     @Override
     public String captureOutput(String starblasterId) {
         try {
+            // Check OutputStore first — centurions POST their output here
+            String output = outputStore.remove(starblasterId);
+            if (output != null && !output.isBlank()) {
+                log.info("Retrieved output for {} from OutputStore ({} chars)", starblasterId, output.length());
+                return output;
+            }
+
+            // Fall back to CF failure reason for tasks that failed before posting output
             var appName = getAppNameFromStarblasterId(starblasterId);
             var taskGuid = starblasterTaskGuids.get(starblasterId);
             var failureReason = taskGuid != null
@@ -237,7 +260,8 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
             if (!failureReason.isEmpty()) {
                 return "Task failed: " + failureReason;
             }
-            return "Task output available via: cf logs " + appName + " --recent";
+            log.warn("No output captured for task {} — centurion may not have posted output", starblasterId);
+            return "";
         } catch (Exception e) {
             log.warn("Failed to capture output for task {}: {}", starblasterId, e.getMessage());
             return "";
@@ -274,7 +298,16 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
      */
     @Override
     public List<FileRecord> detectChanges(String directiveId, Path projectPath) {
-        String branchName = gitWorkspaceManager.getBranchName(directiveId);
+        // For quality-gate centurions (GAUNTLET/VIGIL), use the parent FORGE branch.
+        // Their directive IDs end with -GAUNTLET or -VIGIL but they don't push their own branches.
+        String effectiveId = directiveId;
+        for (var suffix : List.of("-GAUNTLET", "-VIGIL")) {
+            if (directiveId.endsWith(suffix)) {
+                effectiveId = directiveId.substring(0, directiveId.length() - suffix.length());
+                break;
+            }
+        }
+        String branchName = gitWorkspaceManager.getBranchName(effectiveId);
         // Use cached URL from openStarblaster() if available, fall back to config
         String gitUrl = directiveGitUrls.getOrDefault(directiveId, resolveAuthenticatedGitUrl());
         Path tempDir = null;
@@ -328,6 +361,17 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
             gitUrl = gitUrl.replace("https://", "https://x-access-token:" + gitToken + "@");
         }
         return gitUrl;
+    }
+
+    /**
+     * Strips GitHub browser-URL suffixes (e.g. /tree/main, /blob/...) so the URL
+     * is a valid git remote for cloning.
+     */
+    static String sanitizeGitUrl(String url) {
+        if (url == null) return "";
+        // Strip /tree/..., /blob/..., /commit/... suffixes (GitHub browser URLs)
+        return url.replaceFirst("/(tree|blob|commit|pulls?|issues?|actions|releases)/.*$", "")
+                  .replaceFirst("/+$", "");
     }
 
     private static void deleteDirectory(Path dir) {

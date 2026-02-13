@@ -1,6 +1,7 @@
 package com.worldmind.starblaster.cf;
 
 import com.worldmind.starblaster.InstructionStore;
+import com.worldmind.starblaster.OutputStore;
 import com.worldmind.starblaster.StarblasterRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,7 +45,8 @@ class CloudFoundryStarblasterProviderTest {
         var gitWorkspaceManager = new GitWorkspaceManager(cfProperties.getGitRemoteUrl());
         stubApiClient = new StubCfApiClient(cfProperties);
         var instructionStore = new InstructionStore();
-        provider = new CloudFoundryStarblasterProvider(cfProperties, gitWorkspaceManager, stubApiClient, instructionStore);
+        var outputStore = new OutputStore();
+        provider = new CloudFoundryStarblasterProvider(cfProperties, gitWorkspaceManager, stubApiClient, instructionStore, outputStore);
     }
 
     // --- openStarblaster tests ---
@@ -64,7 +66,11 @@ class CloudFoundryStarblasterProviderTest {
         assertTrue(call.command.contains("git clone"), "Should contain git clone: " + call.command);
         assertTrue(call.command.contains("worldmind/DIR-001"), "Should contain branch name: " + call.command);
         assertTrue(call.command.contains("curl"), "Should contain curl: " + call.command);
-        assertTrue(call.command.contains("goose run --debug --with-builtin developer"), "Should contain goose run with developer builtin: " + call.command);
+        assertTrue(call.command.contains("goose run --debug --no-session --with-builtin developer"), "Should contain goose run with developer builtin: " + call.command);
+        // Instruction file must be passed via -i/--instructions flag
+        assertTrue(call.command.contains("-i .worldmind/directives/DIR-001.md"), "Should pass instruction via -i flag: " + call.command);
+        // Verify instruction file is non-empty before running Goose
+        assertTrue(call.command.contains("! -s"), "Should check instruction file is non-empty: " + call.command);
         assertTrue(call.command.contains("git push"), "Should contain git push: " + call.command);
         assertTrue(call.command.contains("diagnostics.log"), "Should write diagnostics: " + call.command);
         // Env vars from request are exported so entrypoint.sh can use them
@@ -229,12 +235,12 @@ class CloudFoundryStarblasterProviderTest {
     }
 
     @Test
-    void captureOutputReturnsFallbackWhenNoFailure() {
+    void captureOutputReturnsEmptyWhenNoOutputAndNoFailure() {
         stubApiClient.failureReason = "";
 
         var output = provider.captureOutput("starblaster-forge-DIR-001");
 
-        assertTrue(output.contains("cf logs"), "Should reference cf logs: " + output);
+        assertEquals("", output, "Should return empty when no output posted and no failure");
     }
 
     @Test
@@ -416,7 +422,7 @@ class CloudFoundryStarblasterProviderTest {
 
         // Re-create provider with updated properties
         var gitWorkspaceManager = new GitWorkspaceManager(cfProperties.getGitRemoteUrl());
-        provider = new CloudFoundryStarblasterProvider(cfProperties, gitWorkspaceManager, stubApiClient, new com.worldmind.starblaster.InstructionStore());
+        provider = new CloudFoundryStarblasterProvider(cfProperties, gitWorkspaceManager, stubApiClient, new com.worldmind.starblaster.InstructionStore(), new com.worldmind.starblaster.OutputStore());
 
         var url = provider.resolveAuthenticatedGitUrl();
         assertTrue(url.startsWith("https://x-access-token:ghp_test123@"), "Should embed token: " + url);
@@ -429,7 +435,7 @@ class CloudFoundryStarblasterProviderTest {
         cfProperties.setGitRemoteUrl("https://github.com/example/project.git");
 
         var gitWorkspaceManager = new GitWorkspaceManager(cfProperties.getGitRemoteUrl());
-        provider = new CloudFoundryStarblasterProvider(cfProperties, gitWorkspaceManager, stubApiClient, new com.worldmind.starblaster.InstructionStore());
+        provider = new CloudFoundryStarblasterProvider(cfProperties, gitWorkspaceManager, stubApiClient, new com.worldmind.starblaster.InstructionStore(), new com.worldmind.starblaster.OutputStore());
 
         var url = provider.resolveAuthenticatedGitUrl();
         assertEquals("https://github.com/example/project.git", url);

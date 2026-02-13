@@ -173,4 +173,5 @@ fi
 
 # Pass --with-builtin developer as belt-and-suspenders alongside config.yaml.
 # Config.yaml (map format) should load extensions, but CLI flag ensures developer loads.
-exec goose run --with-builtin developer "$@"
+# The instruction file is passed as $1 — use -i/--instructions flag (not positional arg).
+exec goose run --no-session --with-builtin developer -i "$@"

@@ -113,9 +113,9 @@ class SealEvaluationServiceTest {
         }
 
         @Test
-        @DisplayName("fallback to failed when output contains FAILED keyword")
-        void fallbackToFailedWhenErrorInOutput() {
-            String output = "Something FAILED during execution";
+        @DisplayName("fallback to failed when output contains BUILD FAILURE")
+        void fallbackToFailedWhenBuildFailure() {
+            String output = "BUILD FAILURE — compilation errors in module";
             TestResult result = service.parseTestOutput("DIR-007", output, 1500);
 
             assertFalse(result.passed());
@@ -124,12 +124,12 @@ class SealEvaluationServiceTest {
         }
 
         @Test
-        @DisplayName("fallback to failed when output contains Error keyword")
-        void fallbackToFailedWhenErrorKeyword() {
+        @DisplayName("generic FAILED/Error keywords treated as passed (not build failures)")
+        void genericErrorKeywordsTreatedAsPassed() {
             String output = "An Error occurred while running tests";
             TestResult result = service.parseTestOutput("DIR-008", output, 1500);
 
-            assertFalse(result.passed());
+            assertTrue(result.passed());
         }
 
         @Test

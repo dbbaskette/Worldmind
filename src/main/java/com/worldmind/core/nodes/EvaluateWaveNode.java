@@ -114,6 +114,34 @@ public class EvaluateWaveNode {
                 // FORGE directive that passed dispatch — run GAUNTLET + VIGIL
                 var fileChanges = dispatchResult.filesAffected() != null ? dispatchResult.filesAffected() : List.<FileRecord>of();
 
+                // FORGE must produce code — if no files were affected, escalate immediately.
+                // Retrying is pointless when the centurion wrote nothing — it's a systemic issue
+                // (wrong model, bad config, broken instruction) that won't resolve on retry.
+                if (fileChanges.isEmpty()) {
+                    String outputSnippet = summarizeCenturionOutput(dispatchResult.output());
+                    log.warn("FORGE directive {} produced no file changes — escalating immediately. Centurion output: {}",
+                            id, outputSnippet);
+
+                    eventBus.publish(new WorldmindEvent("directive.failed",
+                            state.missionId(), id,
+                            Map.of("reason", "FORGE produced no code changes",
+                                   "centurionOutput", outputSnippet),
+                            Instant.now()));
+
+                    String failureReason = "FORGE directive produced no code changes. Centurion output:\n" + outputSnippet;
+                    var outcome = applyFailureStrategy(id, directive, FailureStrategy.ESCALATE, failureReason);
+                    completedIds.addAll(outcome.completedIds);
+                    if (!outcome.completedIds.isEmpty()) {
+                        updatedDirectives.add(withResult(directive, dispatchResult, DirectiveStatus.SKIPPED));
+                    } else if (outcome.missionFailed) {
+                        updatedDirectives.add(withResult(directive, dispatchResult, DirectiveStatus.FAILED));
+                    }
+                    if (outcome.retryContext != null) retryContext = outcome.retryContext;
+                    if (outcome.missionFailed) missionStatus = MissionStatus.FAILED;
+                    errors.addAll(outcome.errors);
+                    continue;
+                }
+
                 // Step 1: GAUNTLET
                 eventBus.publish(new WorldmindEvent("directive.phase",
                         state.missionId(), id,
@@ -124,6 +152,10 @@ public class EvaluateWaveNode {
                     log.info("Dispatching GAUNTLET for directive {} ({} file changes)", id, fileChanges.size());
                     var gauntletResult = bridge.executeDirective(gauntletDirective, projectContext, Path.of(projectPath), state.gitRemoteUrl(), state.runtimeTag());
                     starblasterInfos.add(gauntletResult.starblasterInfo());
+                    if (gauntletResult.directive().status() == DirectiveStatus.FAILED) {
+                        log.warn("GAUNTLET for {} failed ({}ms): {}", id,
+                                gauntletResult.directive().elapsedMs(), gauntletResult.output());
+                    }
                     testResult = sealService.parseTestOutput(id, gauntletResult.output(),
                             gauntletResult.directive().elapsedMs() != null ? gauntletResult.directive().elapsedMs() : 0L);
                 } catch (Exception e) {
@@ -142,6 +174,10 @@ public class EvaluateWaveNode {
                     log.info("Dispatching VIGIL for directive {} ({} file changes)", id, fileChanges.size());
                     var vigilResult = bridge.executeDirective(vigilDirective, projectContext, Path.of(projectPath), state.gitRemoteUrl(), state.runtimeTag());
                     starblasterInfos.add(vigilResult.starblasterInfo());
+                    if (vigilResult.directive().status() == DirectiveStatus.FAILED) {
+                        log.warn("VIGIL for {} failed ({}ms): {}", id,
+                                vigilResult.directive().elapsedMs(), vigilResult.output());
+                    }
                     reviewFeedback = sealService.parseReviewOutput(id, vigilResult.output());
                 } catch (Exception e) {
                     log.error("VIGIL dispatch failed for {}: {}", id, e.getMessage());
@@ -307,6 +343,23 @@ public class EvaluateWaveNode {
                 "Code review complete with score >= 7", List.of(), DirectiveStatus.PENDING,
                 0, 1, FailureStrategy.SKIP, List.of(), null
         );
+    }
+
+    /**
+     * Extracts the last meaningful portion of centurion output for diagnostics.
+     * Keeps the tail of the output where the centurion typically explains what it did (or didn't do).
+     */
+    private static String summarizeCenturionOutput(String output) {
+        if (output == null || output.isBlank()) {
+            return "(no output from centurion)";
+        }
+        // Keep last 2000 chars — the end of the session is where the centurion
+        // typically summarizes its work or explains why it couldn't proceed
+        int maxLen = 2000;
+        String trimmed = output.length() > maxLen
+                ? "...\n" + output.substring(output.length() - maxLen)
+                : output;
+        return trimmed;
     }
 
     private static class FailureOutcome {

@@ -122,6 +122,36 @@ function PhasePipeline({ directive, events }: { directive: DirectiveResponse; ev
   )
 }
 
+function FailureReason({ events }: { events: WorldmindEvent[] }) {
+  const failedEvent = events.find(e => e.eventType === 'directive.failed' && e.payload?.reason)
+  if (!failedEvent) return null
+
+  const reason = failedEvent.payload?.reason as string
+  const centurionOutput = failedEvent.payload?.centurionOutput as string | undefined
+  const [showOutput, setShowOutput] = useState(false)
+
+  return (
+    <div className="mt-2 bg-red-500/5 border border-red-500/20 rounded px-2.5 py-2">
+      <p className="text-[11px] text-red-400 font-medium">{reason}</p>
+      {centurionOutput && (
+        <>
+          <button
+            onClick={() => setShowOutput(!showOutput)}
+            className="mt-1 text-[10px] font-mono text-red-400/70 hover:text-red-400 transition-colors"
+          >
+            {showOutput ? '\u25BE' : '\u25B8'} centurion output
+          </button>
+          {showOutput && (
+            <pre className="mt-1.5 text-[10px] font-mono text-wm_text-secondary bg-wm-bg rounded p-2 max-h-60 overflow-auto whitespace-pre-wrap break-words">
+              {centurionOutput}
+            </pre>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 function QualityScore({ score, summary }: { score: number | null; summary: string | null }) {
   if (score == null) return null
 
@@ -180,6 +210,7 @@ export function DirectiveCard({ directive, events, onRetry }: DirectiveCardProps
         <p className="text-xs text-wm_text-secondary leading-relaxed mb-2">{directive.description}</p>
 
         <PhasePipeline directive={directive} events={events} />
+        <FailureReason events={events} />
 
         <div className="flex items-center gap-3 text-[10px] text-wm_text-muted flex-wrap">
           <span className="font-mono">iter {directive.iteration}/{directive.max_iterations}</span>

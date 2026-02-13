@@ -42,16 +42,24 @@ public class SealEvaluationService {
     private static final Pattern PYTEST_PASSED_PATTERN = Pattern.compile("(\\d+)\\s+passed");
     private static final Pattern PYTEST_FAILED_PATTERN = Pattern.compile("(\\d+)\\s+failed");
 
-    /** Fallback failure indicators (case-insensitive). */
-    private static final Pattern FAILURE_INDICATOR =
-            Pattern.compile("(?i)(FAILED|Error)");
+    /** Specific test failure patterns (not generic "Error" which matches Goose session noise). */
+    private static final Pattern BUILD_FAILURE_PATTERN =
+            Pattern.compile("(?i)(BUILD FAILURE|BUILD FAILED|COMPILATION ERROR|test.*failed|npm ERR!)");
+
+    /** Extract "Score: X/10" from raw Goose output before LLM parsing. */
+    private static final Pattern SCORE_PATTERN =
+            Pattern.compile("(?i)Score:\\s*(\\d{1,2})\\s*/\\s*10");
 
     private static final String REVIEW_PARSE_SYSTEM_PROMPT =
-            "You are a code review parser. Extract structured feedback from the following code review output. " +
-            "Extract the reviewer's approval decision and score exactly as stated in the output. " +
-            "If the review contains an explicit score (e.g. 'Score: 8/10'), use that exact number. " +
-            "Do NOT re-evaluate or override the reviewer's score — extract it faithfully. " +
-            "Also extract the summary, list of issues, and list of suggestions from the review.";
+            "You are a code review parser. The input is the raw session log from an AI coding agent (Goose) " +
+            "that was asked to perform a code review. The log contains tool calls, file reads, and the agent's " +
+            "review commentary. Extract the agent's review findings:\n\n" +
+            "1. Find the review SCORE — look for 'Score: X/10' or similar scoring. If the agent gave a score, use it exactly.\n" +
+            "2. If no explicit score is found, assess the agent's review commentary: " +
+            "if the review found no significant issues, score 8/10. If it found minor issues, score 6/10. " +
+            "If it found major issues, score 3/10.\n" +
+            "3. Extract: approved (true if score >= 7), summary, issues list, suggestions list.\n" +
+            "4. The 'score' field MUST be an integer 0-10. Never return 0 unless the review found catastrophic problems.";
 
     private final LlmService llmService;
     private final McpToolProvider mcpToolProvider;
@@ -104,14 +112,15 @@ public class SealEvaluationService {
             return new TestResult(directiveId, passed, totalTests, failedCount, gauntletOutput, durationMs);
         }
 
-        // Fallback: check for failure/error keywords
-        boolean containsFailure = FAILURE_INDICATOR.matcher(gauntletOutput).find();
-        if (containsFailure) {
-            log.info("Fallback: failure indicator found in output for {}", directiveId);
+        // Fallback: check for specific build/test failure patterns (not generic "Error"
+        // which false-positives on Goose session logs containing error handling code)
+        boolean containsBuildFailure = BUILD_FAILURE_PATTERN.matcher(gauntletOutput).find();
+        if (containsBuildFailure) {
+            log.info("Fallback: build/test failure pattern found in output for {}", directiveId);
             return new TestResult(directiveId, false, 0, 0, gauntletOutput, durationMs);
         }
 
-        log.info("Fallback: no failure indicators found in output for {}, treating as passed", directiveId);
+        log.info("No test framework output found for {}, treating as passed", directiveId);
         return new TestResult(directiveId, true, 0, 0, gauntletOutput, durationMs);
     }
 
@@ -132,15 +141,31 @@ public class SealEvaluationService {
                     List.of("No output from reviewer"), List.of(), 0);
         }
 
-        log.info("Parsing review output for directive {} via LLM", directiveId);
+        log.info("Parsing review output for directive {} via LLM ({} chars)", directiveId, vigilOutput.length());
+
+        // Try regex extraction first — if Goose included "Score: X/10" in its output,
+        // we can use it directly without relying on the LLM parser
+        Matcher scoreMatcher = SCORE_PATTERN.matcher(vigilOutput);
+        int regexScore = scoreMatcher.find() ? Integer.parseInt(scoreMatcher.group(1)) : -1;
+        if (regexScore >= 0) {
+            log.info("Extracted review score {} via regex for directive {}", regexScore, directiveId);
+        }
+
         String userPrompt = "Directive: " + directiveId + "\n\nReview Output:\n" + vigilOutput;
         var parsed = (mcpToolProvider != null && mcpToolProvider.hasTools())
                 ? llmService.structuredCallWithTools(REVIEW_PARSE_SYSTEM_PROMPT, userPrompt, ReviewFeedback.class, mcpToolProvider.getToolsFor("seal"))
                 : llmService.structuredCall(REVIEW_PARSE_SYSTEM_PROMPT, userPrompt, ReviewFeedback.class);
 
-        // Reconstruct with the correct directiveId since the LLM may not preserve it
-        return new ReviewFeedback(directiveId, parsed.approved(), parsed.summary(),
-                parsed.issues(), parsed.suggestions(), parsed.score());
+        // Use regex-extracted score if LLM returned 0 (likely parsing failure)
+        int finalScore = parsed.score();
+        if (finalScore == 0 && regexScore > 0) {
+            log.info("LLM returned score 0 but regex found {}, using regex score for {}", regexScore, directiveId);
+            finalScore = regexScore;
+        }
+        boolean approved = finalScore >= REVIEW_SCORE_THRESHOLD;
+
+        return new ReviewFeedback(directiveId, approved, parsed.summary(),
+                parsed.issues(), parsed.suggestions(), finalScore);
     }
 
     /**

@@ -5,10 +5,12 @@ import com.github.dockerjava.api.command.WaitContainerResultCallback;
 import com.github.dockerjava.api.exception.NotFoundException;
 import com.github.dockerjava.api.model.*;
 import com.github.dockerjava.core.command.LogContainerResultCallback;
+import com.worldmind.core.model.FileRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
+import java.nio.file.Path;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -23,10 +25,18 @@ import java.util.concurrent.TimeUnit;
  *   <li>Extra host entry for host.docker.internal (for LM Studio access)</li>
  *   <li>Command: goose run /workspace/.worldmind/directives/{directiveId}.md</li>
  * </ul>
+ *
+ * <p>When the worldmind server itself runs inside Docker (WORKSPACE_VOLUME set),
+ * it cannot directly see the host filesystem where centurions write code.
+ * In this mode, file change detection uses lightweight helper containers that
+ * bind-mount the same host project path to capture before/after file listings.
  */
 public class DockerStarblasterProvider implements StarblasterProvider {
 
     private static final Logger log = LoggerFactory.getLogger(DockerStarblasterProvider.class);
+
+    /** Alpine image used for lightweight file-listing helper containers. */
+    private static final String HELPER_IMAGE = "alpine:3.19";
 
     private final DockerClient dockerClient;
     private final String imageRegistry;
@@ -155,5 +165,129 @@ public class DockerStarblasterProvider implements StarblasterProvider {
         } catch (Exception e) {
             log.warn("Failed to remove container {}", starblasterId, e);
         }
+    }
+
+    /**
+     * When the worldmind server runs inside Docker, it cannot see the host filesystem.
+     * This method runs a lightweight helper container that bind-mounts the same host
+     * project path and captures a file listing with timestamps.
+     */
+    @Override
+    public Map<String, Long> snapshotProjectFiles(Path projectPath) {
+        if (System.getenv("WORKSPACE_VOLUME") == null) {
+            return null; // Not in Docker-in-Docker mode, use default local snapshot
+        }
+        return runFileListingHelper(projectPath, "snapshot-before");
+    }
+
+    /**
+     * Compares a before-snapshot against the current state of the host project
+     * directory using a helper container.
+     */
+    @Override
+    public List<FileRecord> detectChangesBySnapshot(Map<String, Long> beforeSnapshot, Path projectPath) {
+        if (System.getenv("WORKSPACE_VOLUME") == null || beforeSnapshot == null) {
+            return null; // Use default local detection
+        }
+
+        Map<String, Long> afterSnapshot = runFileListingHelper(projectPath, "snapshot-after");
+        if (afterSnapshot == null) {
+            log.warn("Failed to capture after-snapshot, falling back to empty changes");
+            return List.of();
+        }
+
+        var changes = new ArrayList<FileRecord>();
+        for (var entry : afterSnapshot.entrySet()) {
+            String path = entry.getKey();
+            Long afterTime = entry.getValue();
+            Long beforeTime = beforeSnapshot.get(path);
+
+            if (beforeTime == null) {
+                changes.add(new FileRecord(path, "created", 0));
+            } else if (!afterTime.equals(beforeTime)) {
+                changes.add(new FileRecord(path, "modified", 0));
+            }
+        }
+
+        log.info("Docker helper detected {} file changes", changes.size());
+        return changes;
+    }
+
+    /**
+     * Runs a lightweight Alpine container that bind-mounts the host project path
+     * and outputs a file listing with modification timestamps.
+     *
+     * <p>Output format: one line per file, "mtime_seconds path"
+     */
+    private Map<String, Long> runFileListingHelper(Path hostProjectPath, String suffix) {
+        String containerName = "wm-" + suffix + "-" + System.currentTimeMillis();
+        try {
+            var hostConfig = HostConfig.newHostConfig()
+                    .withBinds(new Bind(hostProjectPath.toString(), new Volume("/scan"), AccessMode.ro));
+
+            var response = dockerClient.createContainerCmd(HELPER_IMAGE)
+                    .withName(containerName)
+                    .withHostConfig(hostConfig)
+                    .withCmd("sh", "-c",
+                            "find /scan -type f " +
+                            "-not -path '*/.git/*' " +
+                            "-not -path '*/.worldmind/*' " +
+                            "-not -path '*/node_modules/*' " +
+                            "-exec stat -c '%Y %n' {} +")
+                    .exec();
+
+            String containerId = response.getId();
+            dockerClient.startContainerCmd(containerId).exec();
+
+            var callback = dockerClient.waitContainerCmd(containerId)
+                    .exec(new WaitContainerResultCallback());
+            callback.awaitStatusCode(30, TimeUnit.SECONDS);
+
+            var sb = new StringBuilder();
+            dockerClient.logContainerCmd(containerId)
+                    .withStdOut(true)
+                    .withFollowStream(false)
+                    .exec(new LogContainerResultCallback() {
+                        @Override
+                        public void onNext(Frame frame) {
+                            sb.append(new String(frame.getPayload()));
+                        }
+                    }).awaitCompletion(10, TimeUnit.SECONDS);
+
+            dockerClient.removeContainerCmd(containerId).withForce(true).exec();
+
+            return parseFileListing(sb.toString());
+        } catch (Exception e) {
+            log.warn("Helper container {} failed: {}", containerName, e.getMessage());
+            // Clean up on failure
+            try { dockerClient.removeContainerCmd(containerName).withForce(true).exec(); }
+            catch (Exception ignored) {}
+            return null;
+        }
+    }
+
+    /**
+     * Parses "mtime_seconds path" output into a map of relative path -> mtime.
+     */
+    private static Map<String, Long> parseFileListing(String output) {
+        var result = new HashMap<String, Long>();
+        for (String line : output.split("\n")) {
+            line = line.trim();
+            if (line.isEmpty()) continue;
+            int spaceIdx = line.indexOf(' ');
+            if (spaceIdx <= 0) continue;
+            try {
+                long mtime = Long.parseLong(line.substring(0, spaceIdx));
+                String fullPath = line.substring(spaceIdx + 1);
+                // Strip "/scan/" prefix to get relative path
+                String relativePath = fullPath.startsWith("/scan/")
+                        ? fullPath.substring(6)
+                        : fullPath;
+                result.put(relativePath, mtime);
+            } catch (NumberFormatException e) {
+                // Skip malformed lines
+            }
+        }
+        return result;
     }
 }

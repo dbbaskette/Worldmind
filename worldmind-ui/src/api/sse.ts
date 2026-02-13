@@ -45,10 +45,15 @@ export class SseConnection {
     eventTypes.forEach(eventType => {
       this.eventSource?.addEventListener(eventType, (e: MessageEvent) => {
         try {
-          const data: WorldmindEvent = JSON.parse(e.data)
+          const data = JSON.parse(e.data)
+          // The backend sends a flat object: { missionId, directiveId, ...payload, timestamp }
+          // Reconstruct the structured WorldmindEvent that components expect:
+          // { eventType, missionId, directiveId, payload: {...}, timestamp }
+          const { missionId, directiveId, timestamp, ...payload } = data
+          const event: WorldmindEvent = { eventType, missionId, directiveId, payload, timestamp }
           const handler = this.handlers[eventType]
           if (handler) {
-            handler(data)
+            handler(event)
           }
         } catch (error) {
           console.error(`Failed to parse SSE event ${eventType}:`, error)

@@ -40,34 +40,30 @@ public class PlanMissionNode {
 
             Available Centurions (worker types):
             - FORGE: Code generation and implementation — creates and modifies source files
-            - GAUNTLET: Test writing and execution — writes tests and runs them
-            - VIGIL: Code review and quality assessment
             - PULSE: Research and context gathering (analysis only, produces NO code)
             - PRISM: Code refactoring — restructures existing code
+
+            DO NOT include GAUNTLET or VIGIL directives — testing and code review
+            are run automatically after each FORGE/PRISM directive completes.
 
             CRITICAL RULES:
             1. Every mission for a feature, bugfix, or refactor MUST include at least one
                FORGE or PRISM directive. These are the ONLY centurions that write code.
-               A plan with only PULSE and VIGIL is INVALID — it produces no output.
+               A plan with only PULSE is INVALID — it produces no output.
             2. Start with a single PULSE directive to gather context, then follow with
                FORGE/PRISM directives that do the actual implementation work.
                Skip PULSE only for trivial changes (typo fixes, config tweaks).
             3. Each directive should be a single, focused task with a clear deliverable.
-            4. Order directives logically: PULSE (research) -> FORGE/PRISM (implement)
-               -> GAUNTLET (test) -> VIGIL (review).
-            5. Use dependencies to express ordering — FORGE/PRISM depend on PULSE,
-               GAUNTLET depends on FORGE/PRISM, VIGIL depends on GAUNTLET.
+            4. Order directives logically: PULSE (research) -> FORGE/PRISM (implement).
+            5. Leave the dependencies list empty — the system assigns them automatically.
             6. Choose execution strategy based on complexity:
                - "sequential" for simple, dependent tasks
                - "parallel" for independent subtasks
                - "adaptive" for complex tasks needing dynamic planning
-            7. Every mission should end with a VIGIL review directive.
 
             Example plan for "Add a /health endpoint":
             - PULSE: Analyze existing controller patterns and endpoint conventions
             - FORGE: Create HealthController with GET /health returning status JSON
-            - GAUNTLET: Write integration test for /health endpoint
-            - VIGIL: Review the new endpoint code and test coverage
 
             Respond with valid JSON matching the schema provided.
             """;
@@ -100,9 +96,10 @@ public class PlanMissionNode {
 
         List<Directive> directives = convertToDirectives(plan);
         directives = ensureForgeDirective(directives, request);
+        directives = assignTypeDependencies(directives);
 
         log.info("Mission plan: {} directives — {}", directives.size(),
-                directives.stream().map(d -> d.id() + "[" + d.centurion() + "]").toList());
+                directives.stream().map(d -> d.id() + "[" + d.centurion() + "](deps:" + d.dependencies() + ")").toList());
 
         return Map.of(
                 "directives", directives,
@@ -123,22 +120,13 @@ public class PlanMissionNode {
 
         log.warn("LLM plan contained no FORGE/PRISM directives — injecting default FORGE directive");
 
-        // Find the last non-VIGIL directive to use as a dependency
-        String lastNonVigilId = null;
-        for (var d : directives) {
-            if (!"VIGIL".equalsIgnoreCase(d.centurion())) {
-                lastNonVigilId = d.id();
-            }
-        }
-
         String forgeId = String.format("DIR-%03d", directives.size() + 1);
-        List<String> deps = lastNonVigilId != null ? List.of(lastNonVigilId) : List.of();
         var forgeDirective = new Directive(
                 forgeId, "FORGE",
                 "Implement the requested changes: " + request,
                 "Implement all goals from the product specification. Create or modify files as needed.",
                 "All specified changes are implemented and the code compiles",
-                deps,
+                List.of(),
                 DirectiveStatus.PENDING, 0, 3,
                 FailureStrategy.RETRY, List.of(), null
         );
@@ -150,12 +138,6 @@ public class PlanMissionNode {
             if ("VIGIL".equalsIgnoreCase(d.centurion()) && !forgeInserted) {
                 result.add(forgeDirective);
                 forgeInserted = true;
-                // Update VIGIL to depend on the new FORGE directive
-                d = new Directive(d.id(), d.centurion(), d.description(),
-                        d.inputContext(), d.successCriteria(),
-                        List.of(forgeId),
-                        d.status(), d.iteration(), d.maxIterations(),
-                        d.onFailure(), d.filesAffected(), d.elapsedMs());
             }
             result.add(d);
         }
@@ -250,24 +232,14 @@ public class PlanMissionNode {
     }
 
     private List<Directive> convertToDirectives(MissionPlan plan) {
-        int total = plan.directives().size();
         var directives = new ArrayList<Directive>();
-        for (int i = 0; i < total; i++) {
+        for (int i = 0; i < plan.directives().size(); i++) {
             var dp = plan.directives().get(i);
             String id = String.format("DIR-%03d", i + 1);
-            // Convert dependencies: LLMs may return numeric indices (0-based or 1-based),
-            // compound strings ("0-forge-generate-html"), or already-formatted IDs.
-            // Normalize all forms to DIR-xxx and remove self-references and forward-references.
-            List<String> deps = dp.dependencies() != null
-                    ? dp.dependencies().stream()
-                        .map(dep -> normalizeDepId(dep, total))
-                        .filter(dep -> dep != null && !dep.equals(id))
-                        .toList()
-                    : List.of();
             directives.add(new Directive(
                     id, dp.centurion(), dp.description(),
                     dp.inputContext(), dp.successCriteria(),
-                    deps,
+                    List.of(),
                     DirectiveStatus.PENDING, 0, 3,
                     FailureStrategy.RETRY, List.of(), null
             ));
@@ -276,37 +248,39 @@ public class PlanMissionNode {
     }
 
     /**
-     * Normalizes a dependency reference to a directive ID.
-     * Handles 0-based indices (0 -> DIR-001), 1-based indices (1 -> DIR-001),
-     * compound strings ("0-forge-generate-html" -> DIR-001),
-     * and already-formatted IDs (DIR-001 -> DIR-001).
-     *
-     * When the index is ambiguous (could be 0-based or 1-based), we use
-     * the total directive count to detect 1-based: if the extracted number
-     * equals totalDirectives, it must be 1-based (0-based max is total-1).
+     * Builds deterministic dependencies for all directives based on centurion type ordering.
+     * LLM-generated dependencies are unreliable (arbitrary string formats), so we
+     * enforce: FORGE/PRISM depend on all preceding PULSE;
+     * GAUNTLET/VIGIL depend on all preceding FORGE/PRISM.
      */
-    private static String normalizeDepId(String dep, int totalDirectives) {
-        if (dep == null || dep.isBlank()) return null;
-        String trimmed = dep.trim();
-        // Already a directive ID
-        if (trimmed.toUpperCase().startsWith("DIR-")) return trimmed.toUpperCase();
-        // Extract leading numeric index from strings like "0", "1", "0-forge-generate-html", etc.
-        String numPart = trimmed.split("[^0-9]", 2)[0];
-        if (!numPart.isEmpty()) {
-            try {
-                int num = Integer.parseInt(numPart);
-                // Determine if 0-based or 1-based:
-                // If num == 0, it's definitely 0-based
-                // If num >= totalDirectives, it's 1-based (0-based can't exceed total-1)
-                // Otherwise assume 0-based (more common in LLM output)
-                if (num == 0 || num < totalDirectives) {
-                    return String.format("DIR-%03d", num + 1); // 0-based
-                } else {
-                    return String.format("DIR-%03d", num);     // 1-based
+    private static List<Directive> assignTypeDependencies(List<Directive> directives) {
+        var result = new ArrayList<Directive>();
+        for (var d : directives) {
+            String type = d.centurion() != null ? d.centurion().toUpperCase() : "";
+            var prerequisiteTypes = switch (type) {
+                case "FORGE", "PRISM" -> java.util.Set.of("PULSE");
+                case "GAUNTLET" -> java.util.Set.of("FORGE", "PRISM");
+                case "VIGIL" -> java.util.Set.of("FORGE", "PRISM");
+                default -> java.util.Set.<String>of();
+            };
+
+            if (prerequisiteTypes.isEmpty()) {
+                result.add(d);
+                continue;
+            }
+
+            var deps = new ArrayList<String>();
+            for (var prev : directives) {
+                if (prev.id().equals(d.id())) break;
+                if (prev.centurion() != null && prerequisiteTypes.contains(prev.centurion().toUpperCase())) {
+                    deps.add(prev.id());
                 }
-            } catch (NumberFormatException ignored) { }
+            }
+            result.add(new Directive(d.id(), d.centurion(), d.description(),
+                    d.inputContext(), d.successCriteria(), deps,
+                    d.status(), d.iteration(), d.maxIterations(),
+                    d.onFailure(), d.filesAffected(), d.elapsedMs()));
         }
-        // Not a number — return as-is (might be a centurion type name)
-        return trimmed;
+        return result;
     }
 }

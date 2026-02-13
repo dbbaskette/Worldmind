@@ -2,6 +2,8 @@ package com.worldmind.core.scheduler;
 
 import com.worldmind.core.model.Directive;
 import com.worldmind.core.model.ExecutionStrategy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -14,6 +16,8 @@ import java.util.Set;
  */
 @Service
 public class DirectiveScheduler {
+
+    private static final Logger log = LoggerFactory.getLogger(DirectiveScheduler.class);
 
     /**
      * Compute the next wave of directive IDs eligible for dispatch.
@@ -28,6 +32,9 @@ public class DirectiveScheduler {
                                          ExecutionStrategy strategy, int maxParallel) {
         int limit = strategy == ExecutionStrategy.SEQUENTIAL ? 1 : maxParallel;
 
+        log.debug("computeNextWave: {} directives, {} completed {}, strategy={}, limit={}",
+                directives.size(), completedIds.size(), completedIds, strategy, limit);
+
         // Build a lookup: centurion type → completed directive IDs of that type.
         // This lets us resolve dependencies expressed as centurion names (e.g. "PULSE")
         // in addition to concrete directive IDs (e.g. "DIR-001").
@@ -41,8 +48,15 @@ public class DirectiveScheduler {
         var wave = new ArrayList<String>();
         for (var directive : directives) {
             if (wave.size() >= limit) break;
-            if (completedIds.contains(directive.id())) continue;
-            if (!allDependenciesSatisfied(directive, completedIds, completedTypes)) continue;
+            if (completedIds.contains(directive.id())) {
+                log.debug("  {} [{}] — already completed", directive.id(), directive.centurion());
+                continue;
+            }
+            if (!allDependenciesSatisfied(directive, completedIds, completedTypes)) {
+                log.debug("  {} [{}] — deps unsatisfied: {}", directive.id(), directive.centurion(), directive.dependencies());
+                continue;
+            }
+            log.debug("  {} [{}] — eligible (deps: {})", directive.id(), directive.centurion(), directive.dependencies());
             wave.add(directive.id());
         }
 

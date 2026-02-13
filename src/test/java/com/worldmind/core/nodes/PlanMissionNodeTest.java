@@ -35,10 +35,9 @@ class PlanMissionNodeTest {
                 "Add user endpoint",
                 "sequential",
                 List.of(
+                        new MissionPlan.DirectivePlan("PULSE", "Research API", "", "Done", List.of()),
                         new MissionPlan.DirectivePlan("FORGE", "Create model", "", "Model exists", List.of()),
-                        new MissionPlan.DirectivePlan("FORGE", "Create controller", "", "Controller works", List.of("DIR-001")),
-                        new MissionPlan.DirectivePlan("GAUNTLET", "Write tests", "", "Tests pass", List.of("DIR-001", "DIR-002")),
-                        new MissionPlan.DirectivePlan("VIGIL", "Review code", "", "Code quality ok", List.of("DIR-003"))
+                        new MissionPlan.DirectivePlan("FORGE", "Create controller", "", "Controller works", List.of())
                 )
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
@@ -54,15 +53,17 @@ class PlanMissionNodeTest {
 
         @SuppressWarnings("unchecked")
         var directives = (List<Directive>) result.get("directives");
-        assertEquals(4, directives.size());
+        assertEquals(3, directives.size());
         assertEquals("DIR-001", directives.get(0).id());
-        assertEquals("FORGE", directives.get(0).centurion());
-        assertEquals("Create model", directives.get(0).description());
-        assertEquals(DirectiveStatus.PENDING, directives.get(0).status());
+        assertEquals("PULSE", directives.get(0).centurion());
+        assertEquals(List.of(), directives.get(0).dependencies());
         assertEquals("DIR-002", directives.get(1).id());
+        assertEquals("FORGE", directives.get(1).centurion());
+        // FORGE depends on preceding PULSE
+        assertEquals(List.of("DIR-001"), directives.get(1).dependencies());
         assertEquals("DIR-003", directives.get(2).id());
-        assertEquals("DIR-004", directives.get(3).id());
-        assertEquals("VIGIL", directives.get(3).centurion());
+        assertEquals("FORGE", directives.get(2).centurion());
+        assertEquals(List.of("DIR-001"), directives.get(2).dependencies());
         assertEquals("SEQUENTIAL", result.get("executionStrategy"));
         assertEquals("AWAITING_APPROVAL", result.get("status"));
     }
@@ -127,17 +128,18 @@ class PlanMissionNodeTest {
     }
 
     @Test
-    @DisplayName("preserves dependencies from plan")
-    void preservesDependencies() {
+    @DisplayName("assigns deterministic type-based dependencies regardless of LLM output")
+    void assignsTypeDependencies() {
         var mockLlm = mock(LlmService.class);
         var plan = new MissionPlan(
                 "Full feature",
                 "adaptive",
                 List.of(
+                        // LLM dependencies are ignored — system builds them from centurion types
                         new MissionPlan.DirectivePlan("PULSE", "Research API", "", "Research done", List.of()),
-                        new MissionPlan.DirectivePlan("FORGE", "Implement feature", "", "Feature works", List.of("DIR-001")),
-                        new MissionPlan.DirectivePlan("GAUNTLET", "Write tests", "", "Tests pass", List.of("DIR-001", "DIR-002")),
-                        new MissionPlan.DirectivePlan("VIGIL", "Final review", "", "Approved", List.of("DIR-002", "DIR-003"))
+                        new MissionPlan.DirectivePlan("FORGE", "Implement feature", "", "Feature works", List.of("garbage_dep")),
+                        new MissionPlan.DirectivePlan("GAUNTLET", "Write tests", "", "Tests pass", List.of("also_garbage")),
+                        new MissionPlan.DirectivePlan("VIGIL", "Final review", "", "Approved", List.of("invalid_ref"))
                 )
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
@@ -153,10 +155,14 @@ class PlanMissionNodeTest {
 
         @SuppressWarnings("unchecked")
         var directives = (List<Directive>) result.get("directives");
+        // PULSE: no deps
         assertEquals(List.of(), directives.get(0).dependencies());
+        // FORGE: depends on preceding PULSE (DIR-001)
         assertEquals(List.of("DIR-001"), directives.get(1).dependencies());
-        assertEquals(List.of("DIR-001", "DIR-002"), directives.get(2).dependencies());
-        assertEquals(List.of("DIR-002", "DIR-003"), directives.get(3).dependencies());
+        // GAUNTLET: depends on preceding FORGE (DIR-002)
+        assertEquals(List.of("DIR-002"), directives.get(2).dependencies());
+        // VIGIL: depends on preceding FORGE (DIR-002)
+        assertEquals(List.of("DIR-002"), directives.get(3).dependencies());
     }
 
     @Test
@@ -311,7 +317,7 @@ class PlanMissionNodeTest {
                 "sequential",
                 List.of(
                         new MissionPlan.DirectivePlan("PULSE", "Research codebase", "", "Research done", List.of()),
-                        new MissionPlan.DirectivePlan("VIGIL", "Review code", "", "Review done", List.of("DIR-001"))
+                        new MissionPlan.DirectivePlan("VIGIL", "Review code", "", "Review done", List.of())
                 )
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
@@ -331,9 +337,11 @@ class PlanMissionNodeTest {
         assertEquals("PULSE", directives.get(0).centurion());
         assertEquals("FORGE", directives.get(1).centurion());
         assertEquals("VIGIL", directives.get(2).centurion());
-        // FORGE should depend on PULSE
-        assertTrue(directives.get(1).dependencies().contains("DIR-001"));
-        // VIGIL should depend on the injected FORGE
-        assertTrue(directives.get(2).dependencies().contains("DIR-003"));
+        // PULSE: no deps
+        assertEquals(List.of(), directives.get(0).dependencies());
+        // FORGE: depends on preceding PULSE
+        assertEquals(List.of("DIR-001"), directives.get(1).dependencies());
+        // VIGIL: depends on preceding FORGE (DIR-003 is the injected FORGE)
+        assertEquals(List.of("DIR-003"), directives.get(2).dependencies());
     }
 }

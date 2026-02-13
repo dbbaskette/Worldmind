@@ -3,6 +3,7 @@ package com.worldmind.starblaster.cf;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.worldmind.starblaster.InstructionStore;
+import com.worldmind.starblaster.OutputStore;
 import com.worldmind.starblaster.StarblasterProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,10 +37,11 @@ public class CfStarblasterConfig {
     public StarblasterProvider cloudFoundryStarblasterProvider(CloudFoundryProperties cfProperties,
                                                          GitWorkspaceManager gitWorkspaceManager,
                                                          CfApiClient cfApiClient,
-                                                         InstructionStore instructionStore) {
+                                                         InstructionStore instructionStore,
+                                                         OutputStore outputStore) {
         resolveOrchestratorUrl(cfProperties);
         log.info("CF Starblaster provider — orchestrator URL: {}", cfProperties.getOrchestratorUrl());
-        return new CloudFoundryStarblasterProvider(cfProperties, gitWorkspaceManager, cfApiClient, instructionStore);
+        return new CloudFoundryStarblasterProvider(cfProperties, gitWorkspaceManager, cfApiClient, instructionStore, outputStore);
     }
 
     /**

@@ -27,10 +27,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - uses: docker/setup-buildx-action@v3
+
       - name: Build and push centurion-base
         uses: docker/build-push-action@v6
         with:
           context: docker/centurion-base
+          platforms: linux/amd64
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/centurion-base:latest
 
@@ -38,6 +41,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: docker/centurion-forge
+          platforms: linux/amd64
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/centurion-forge:latest
 
@@ -45,6 +49,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: docker/centurion-gauntlet
+          platforms: linux/amd64
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/centurion-gauntlet:latest
 
@@ -52,6 +57,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: docker/centurion-vigil
+          platforms: linux/amd64
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/centurion-vigil:latest
 
@@ -59,6 +65,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: docker/centurion-pulse
+          platforms: linux/amd64
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/centurion-pulse:latest
 
@@ -66,6 +73,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: docker/centurion-prism
+          platforms: linux/amd64
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/centurion-prism:latest
 
@@ -76,6 +84,7 @@ jobs:
         with:
           context: docker/starblasters
           file: docker/starblasters/Dockerfile.base
+          platforms: linux/amd64
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/starblaster:base
 
@@ -84,6 +93,7 @@ jobs:
         with:
           context: docker/starblasters
           file: docker/starblasters/Dockerfile.java
+          platforms: linux/amd64
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/starblaster:java
 
@@ -92,5 +102,6 @@ jobs:
         with:
           context: docker/starblasters
           file: docker/starblasters/Dockerfile.python
+          platforms: linux/amd64
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/starblaster:python
