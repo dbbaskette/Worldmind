@@ -195,12 +195,15 @@ class GitWorkspaceManagerTest {
 
         var commands = manager.getExecutedCommands();
         // Should clone, config user, config email, checkout main,
-        // then for each: fetch + merge, then push main, then 2x push --delete
+        // then for each: fetch (explicit refspec) + merge, then push main, then 2x push --delete
         assertTrue(commands.stream().anyMatch(c -> c.contains("clone")), "Should clone: " + commands);
         assertTrue(commands.stream().anyMatch(c -> c.contains("checkout") && c.contains("main")), "Should checkout main: " + commands);
-        assertTrue(commands.stream().anyMatch(c -> c.contains("fetch") && c.contains("worldmind/DIR-001")), "Should fetch DIR-001: " + commands);
+        // Verify explicit refspec is used for fetch (not bare branch name)
+        assertTrue(commands.stream().anyMatch(c -> c.contains("fetch") && c.contains("refs/heads/worldmind/DIR-001:refs/remotes/origin/worldmind/DIR-001")),
+                "Should fetch DIR-001 with explicit refspec: " + commands);
         assertTrue(commands.stream().anyMatch(c -> c.contains("merge") && c.contains("worldmind/DIR-001")), "Should merge DIR-001: " + commands);
-        assertTrue(commands.stream().anyMatch(c -> c.contains("fetch") && c.contains("worldmind/DIR-002")), "Should fetch DIR-002: " + commands);
+        assertTrue(commands.stream().anyMatch(c -> c.contains("fetch") && c.contains("refs/heads/worldmind/DIR-002:refs/remotes/origin/worldmind/DIR-002")),
+                "Should fetch DIR-002 with explicit refspec: " + commands);
         assertTrue(commands.stream().anyMatch(c -> c.contains("push") && c.contains("main")), "Should push main: " + commands);
         assertTrue(commands.stream().anyMatch(c -> c.contains("--delete") && c.contains("worldmind/DIR-001")), "Should delete DIR-001 branch: " + commands);
         assertTrue(commands.stream().anyMatch(c -> c.contains("--delete") && c.contains("worldmind/DIR-002")), "Should delete DIR-002 branch: " + commands);
@@ -214,6 +217,7 @@ class GitWorkspaceManagerTest {
                 0,  // config user.name
                 0,  // config user.email
                 0,  // checkout main
+                // branch -r (diagnostic listing, uses runGitOutput — not in exit code sequence)
                 1,  // fetch DIR-001 (branch not found)
                 0,  // fetch DIR-002
                 0,  // merge DIR-002
@@ -252,6 +256,7 @@ class GitWorkspaceManagerTest {
                 0,  // config user.name
                 0,  // config user.email
                 0,  // checkout main
+                // branch -r (diagnostic listing, uses runGitOutput — not in exit code sequence)
                 0,  // fetch DIR-001
                 0,  // merge DIR-001
                 0,  // fetch DIR-002

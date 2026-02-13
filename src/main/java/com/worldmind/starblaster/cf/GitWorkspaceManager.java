@@ -337,9 +337,17 @@ public class GitWorkspaceManager {
             runGit(tempDir, "config", "user.email", "worldmind@worldmind.local");
             runGit(tempDir, "checkout", "main");
 
+            // Log available remote branches for diagnostics
+            String remoteBranches = runGitOutput(tempDir, "branch", "-r");
+            log.info("Remote branches after clone: {}", remoteBranches);
+
             for (String id : directiveIds) {
                 String branch = getBranchName(id);
-                int fetchExit = runGit(tempDir, "fetch", "origin", branch);
+                // Use explicit refspec so the remote tracking ref is created.
+                // Plain "git fetch origin worldmind/DIR-001" only updates FETCH_HEAD,
+                // not origin/worldmind/DIR-001, so the subsequent merge would fail.
+                int fetchExit = runGit(tempDir, "fetch", "origin",
+                        "refs/heads/" + branch + ":refs/remotes/origin/" + branch);
                 if (fetchExit != 0) {
                     log.warn("Branch {} not found on remote, skipping", branch);
                     continue;
