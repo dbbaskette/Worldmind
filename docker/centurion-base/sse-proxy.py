@@ -168,8 +168,11 @@ def main():
     # Bind to any available port on localhost
     server = ThreadedHTTPServer(("127.0.0.1", 0), ProxyHandler)
     port = server.server_address[1]
-    # Print port for entrypoint to capture — MUST be first line of stdout
-    print(port, flush=True)
+    # Write port to file for entrypoint to read after backgrounding
+    port_file = "/tmp/sse-proxy-port"
+    with open(port_file, "w") as f:
+        f.write(str(port))
+    print(f"[sse-proxy] listening on 127.0.0.1:{port}", flush=True)
     server.serve_forever()
 
 

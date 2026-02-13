@@ -197,12 +197,17 @@ fi
 # Fixes Tanzu GenAI SSE incompatibilities: missing "data: " space, missing
 # tool_calls index, and hardcoded gpt-4o-mini fast model name.
 if [ -n "$GOOSE_PROVIDER__HOST" ] && echo "$GOOSE_PROVIDER__HOST" | grep -q "^https"; then
-    SSE_PROXY_PORT=$(python3 /usr/local/bin/sse-proxy.py \
-        "$GOOSE_PROVIDER__HOST" "$GOOSE_PROVIDER__API_KEY" "$GOOSE_MODEL" &)
-    sleep 0.5
-    export GOOSE_PROVIDER__HOST="http://127.0.0.1:${SSE_PROXY_PORT}"
-    export OPENAI_HOST="http://127.0.0.1:${SSE_PROXY_PORT}/"
-    echo "[entrypoint] SSE proxy started on port $SSE_PROXY_PORT"
+    python3 /usr/local/bin/sse-proxy.py \
+        "$GOOSE_PROVIDER__HOST" "$GOOSE_PROVIDER__API_KEY" "$GOOSE_MODEL" &
+    sleep 1
+    SSE_PROXY_PORT=$(cat /tmp/sse-proxy-port 2>/dev/null)
+    if [ -n "$SSE_PROXY_PORT" ]; then
+        export GOOSE_PROVIDER__HOST="http://127.0.0.1:${SSE_PROXY_PORT}"
+        export OPENAI_HOST="http://127.0.0.1:${SSE_PROXY_PORT}/"
+        echo "[entrypoint] SSE proxy started on port $SSE_PROXY_PORT"
+    else
+        echo "[entrypoint] WARNING: SSE proxy failed to start, using direct connection"
+    fi
 fi
 
 # Pass --with-builtin developer as belt-and-suspenders alongside config.yaml.
