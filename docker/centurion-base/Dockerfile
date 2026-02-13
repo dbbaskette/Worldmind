@@ -11,6 +11,9 @@ RUN ARCH=$(uname -m) && \
     chmod +x /usr/local/bin/goose && \
     goose --version
 
+# Copy SSE normalizing proxy (fixes Tanzu GenAI streaming for Goose)
+COPY sse-proxy.py /usr/local/bin/sse-proxy.py
+
 # Copy entrypoint script (generates config.yaml from env vars, then runs goose)
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh

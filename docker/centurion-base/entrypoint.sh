@@ -193,6 +193,19 @@ if [ -n "$CF_SYSTEM_CERT_PATH" ]; then
     echo "[entrypoint] Appended CF CA certs to $COMBINED_CERTS"
 fi
 
+# Start SSE normalizing proxy if we have a remote HTTPS endpoint.
+# Fixes Tanzu GenAI SSE incompatibilities: missing "data: " space, missing
+# tool_calls index, and hardcoded gpt-4o-mini fast model name.
+if [ -n "$GOOSE_PROVIDER__HOST" ] && echo "$GOOSE_PROVIDER__HOST" | grep -q "^https"; then
+    SSE_PROXY_PORT=$(python3 /usr/local/bin/sse-proxy.py \
+        "$GOOSE_PROVIDER__HOST" "$GOOSE_PROVIDER__API_KEY" "$GOOSE_MODEL" &)
+    sleep 0.5
+    export GOOSE_PROVIDER__HOST="http://127.0.0.1:${SSE_PROXY_PORT}"
+    export OPENAI_HOST="http://127.0.0.1:${SSE_PROXY_PORT}/"
+    echo "[entrypoint] SSE proxy started on port $SSE_PROXY_PORT"
+fi
+
 # Pass --with-builtin developer as belt-and-suspenders alongside config.yaml.
 # Config.yaml (map format) should load extensions, but CLI flag ensures developer loads.
-exec goose run --with-builtin developer "$@"
+# The instruction file is passed as $1 — use -i/--instructions flag (not positional arg).
+exec goose run --no-session --with-builtin developer -i "$@"
