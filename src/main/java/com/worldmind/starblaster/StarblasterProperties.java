@@ -22,6 +22,17 @@ public class StarblasterProperties {
     public String getImagePrefix() { return starblaster.imagePrefix; }
 
     // -- Goose accessors (delegate to nested) --
+
+    /**
+     * Returns true when the Goose provider was explicitly configured via
+     * {@code GOOSE_PROVIDER} env var or application property.
+     * When false, centurions should resolve provider/model from VCAP_SERVICES
+     * (CF service bindings) instead of receiving overrides from the orchestrator.
+     */
+    public boolean isGooseProviderConfigured() {
+        return goose.provider != null && !goose.provider.isBlank();
+    }
+
     public String getGooseProvider() {
         if (goose.provider != null && !goose.provider.isBlank()) {
             return goose.provider;

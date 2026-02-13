@@ -86,42 +86,49 @@ public class StarblasterManager {
         Path effectivePath = workspaceVolume != null ? Path.of("/workspace") : projectPath;
 
         var envVars = new HashMap<>(extraEnv);
-        envVars.put("GOOSE_PROVIDER", properties.getGooseProvider());
-        envVars.put("GOOSE_MODEL", properties.getGooseModel());
 
-        // Forward provider API keys from the environment.
-        // When GOOSE_PROVIDER__API_KEY is set, entrypoint.sh skips VCAP_SERVICES
-        // entirely — direct keys take precedence over CF service bindings.
-        // When no direct key is provided, VCAP_SERVICES (CredHub) is used.
-        var providerKeyMap = Map.of(
-                "anthropic", "ANTHROPIC_API_KEY",
-                "openai", "OPENAI_API_KEY",
-                "google", "GOOGLE_API_KEY"
-        );
-        String activeKeyName = providerKeyMap.get(properties.getGooseProvider());
-        for (var entry : providerKeyMap.values()) {
-            String val = System.getenv(entry);
-            if (val != null && !val.isBlank()) {
-                envVars.put(entry, val);
+        // Only set GOOSE_PROVIDER/GOOSE_MODEL/API keys when explicitly configured.
+        // When not configured, centurion's entrypoint.sh resolves provider, model,
+        // and API key from VCAP_SERVICES (CF service bindings / CredHub).
+        if (properties.isGooseProviderConfigured()) {
+            envVars.put("GOOSE_PROVIDER", properties.getGooseProvider());
+            envVars.put("GOOSE_MODEL", properties.getGooseModel());
+
+            // Forward provider API keys from the environment.
+            // When GOOSE_PROVIDER__API_KEY is set, entrypoint.sh skips VCAP_SERVICES
+            // entirely — direct keys take precedence over CF service bindings.
+            var providerKeyMap = Map.of(
+                    "anthropic", "ANTHROPIC_API_KEY",
+                    "openai", "OPENAI_API_KEY",
+                    "google", "GOOGLE_API_KEY"
+            );
+            String activeKeyName = providerKeyMap.get(properties.getGooseProvider());
+            for (var entry : providerKeyMap.values()) {
+                String val = System.getenv(entry);
+                if (val != null && !val.isBlank()) {
+                    envVars.put(entry, val);
+                }
             }
-        }
-        // Set the generic Goose key for the active provider — signals entrypoint.sh to skip VCAP.
-        // Check provider-specific key first, then fall back to GOOSE_PROVIDER__API_KEY from env
-        // (for providers not in the map above).
-        String directKey = activeKeyName != null ? System.getenv(activeKeyName) : null;
-        if (directKey == null || directKey.isBlank()) {
-            directKey = System.getenv("GOOSE_PROVIDER__API_KEY");
-        }
-        if (directKey != null && !directKey.isBlank()) {
-            envVars.put("GOOSE_PROVIDER__API_KEY", directKey);
-        }
-        // For openai-compatible local endpoints (LM Studio, etc.), pass the host URL
-        if ("openai".equals(properties.getGooseProvider())) {
-            String lmUrl = properties.getLmStudioUrl();
-            if (lmUrl != null && !lmUrl.isBlank()) {
-                if (!lmUrl.endsWith("/")) lmUrl += "/";
-                envVars.put("OPENAI_HOST", lmUrl);
+            // Set the generic Goose key for the active provider — signals entrypoint.sh to skip VCAP.
+            String directKey = activeKeyName != null ? System.getenv(activeKeyName) : null;
+            if (directKey == null || directKey.isBlank()) {
+                directKey = System.getenv("GOOSE_PROVIDER__API_KEY");
             }
+            if (directKey != null && !directKey.isBlank()) {
+                envVars.put("GOOSE_PROVIDER__API_KEY", directKey);
+            }
+            // For openai-compatible local endpoints (LM Studio, etc.), pass the host URL
+            if ("openai".equals(properties.getGooseProvider())) {
+                String lmUrl = properties.getLmStudioUrl();
+                if (lmUrl != null && !lmUrl.isBlank()) {
+                    if (!lmUrl.endsWith("/")) lmUrl += "/";
+                    envVars.put("OPENAI_HOST", lmUrl);
+                }
+            }
+            log.info("Goose provider explicitly configured: provider={}, model={}",
+                    properties.getGooseProvider(), properties.getGooseModel());
+        } else {
+            log.info("No Goose provider configured — centurion will resolve from VCAP_SERVICES");
         }
 
         // Inject MCP server configs for centurion's Goose MCP extensions
