@@ -3,6 +3,7 @@
 </p>
 
 <p align="center">
+  <img src="https://github.com/dbbaskette/Worldmind/actions/workflows/centurion-images.yml/badge.svg" alt="Build Status">
   <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License">
   <img src="https://img.shields.io/badge/Java-21-orange.svg" alt="Java">
   <img src="https://img.shields.io/badge/Spring%20Boot-3.4-green.svg" alt="Spring Boot">
@@ -11,6 +12,13 @@
 </p>
 
 <p align="center">An agentic code assistant that accepts natural language development requests and autonomously plans, implements, tests, and reviews code.</p>
+
+<p align="center">
+  <a href="#getting-started">Getting Started</a> •
+  <a href="#architecture">Architecture</a> •
+  <a href="#usage">Usage</a> •
+  <a href="docs/deployment/cloudfoundry.md">Cloud Foundry Guide</a>
+</p>
 
 ## About
 
@@ -234,15 +242,19 @@ All endpoints are under `/api/v1`.
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/missions` | Submit a new mission (async) |
+| `GET` | `/missions` | List all tracked missions |
 | `GET` | `/missions/{id}` | Get mission status and directives |
 | `GET` | `/missions/{id}/events` | SSE stream of real-time events |
 | `POST` | `/missions/{id}/approve` | Approve a planned mission |
 | `POST` | `/missions/{id}/edit` | Submit plan modifications |
 | `POST` | `/missions/{id}/cancel` | Cancel a running mission |
+| `POST` | `/missions/{id}/retry` | Retry failed directives |
 | `GET` | `/missions/{id}/timeline` | Checkpoint state history |
 | `GET` | `/missions/{id}/directives/{did}` | Detailed directive result |
 | `GET` | `/starblasters` | List active starblasters |
 | `GET` | `/health` | Component health status |
+| `GET` | `/settings` | Get current settings |
+| `PUT` | `/settings` | Update settings |
 
 ### Example: Submit a Mission
 
@@ -365,6 +377,8 @@ worldmind-ui/                              # React 18 + TypeScript + Vite + Tail
 - [x] Cloud Foundry deployment with java-cfenv and git workspaces
 - [x] Multi-provider LLM support (Anthropic, OpenAI, Google Gemini)
 - [x] Runtime-tagged Starblaster images with automatic language detection and base fallback
+- [x] SSE heartbeat for CF gorouter keep-alive
+- [x] GitHub Actions CI for centurion image builds
 - [ ] MCP server integration (Terrain, Chronicle, Spark)
 - [ ] Multi-project workspace support
 - [ ] GraalVM native image compilation
