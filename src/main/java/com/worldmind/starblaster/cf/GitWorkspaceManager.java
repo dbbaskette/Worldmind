@@ -330,6 +330,8 @@ public class GitWorkspaceManager {
     public void mergeDirectiveBranches(List<String> directiveIds, String gitToken, String overrideGitUrl) {
         String gitUrl = authenticatedUrl(gitToken, overrideGitUrl);
         Path tempDir = null;
+        List<String> mergedIds = new ArrayList<>();
+        List<String> conflictedIds = new ArrayList<>();
         try {
             tempDir = java.nio.file.Files.createTempDirectory("worldmind-merge-");
             runGit(tempDir, "clone", gitUrl, ".");
@@ -357,15 +359,24 @@ public class GitWorkspaceManager {
                 if (mergeExit != 0) {
                     log.error("Merge conflict on branch {}, aborting merge", branch);
                     runGit(tempDir, "merge", "--abort");
+                    conflictedIds.add(id);
+                } else {
+                    mergedIds.add(id);
                 }
             }
 
             runGit(tempDir, "push", "origin", "main");
 
-            // Cleanup merged branches from remote
-            for (String id : directiveIds) {
+            // Only delete branches that were successfully merged; keep conflicted branches
+            // so developers can manually resolve them or the system can retry
+            for (String id : mergedIds) {
                 String branch = getBranchName(id);
                 runGit(tempDir, "push", "origin", "--delete", branch);
+            }
+
+            if (!conflictedIds.isEmpty()) {
+                log.warn("Kept {} conflicted branches on remote for manual resolution: {}",
+                        conflictedIds.size(), conflictedIds);
             }
         } catch (Exception e) {
             log.error("Failed to merge directive branches: {}", e.getMessage(), e);
