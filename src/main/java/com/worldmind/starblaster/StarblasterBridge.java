@@ -86,8 +86,20 @@ public class StarblasterBridge {
         Instant completedAt = Instant.now();
         // Goose may exit with code 1 even after successfully creating files
         // (e.g., rate limit hit during session cleanup). Treat as success if files were changed.
-        boolean success = execResult.exitCode() == 0
-                || !execResult.fileChanges().isEmpty();
+        // However, FORGE and PRISM directives MUST produce file changes to be considered successful.
+        // If the model exits cleanly but did no work (the "lazy model" case), mark as failed.
+        boolean hasFileChanges = !execResult.fileChanges().isEmpty();
+        boolean requiresFileChanges = "FORGE".equalsIgnoreCase(directive.centurion())
+                || "PRISM".equalsIgnoreCase(directive.centurion());
+        
+        boolean success;
+        if (requiresFileChanges && !hasFileChanges) {
+            log.warn("Directive {} ({}) exited with code {} but produced no file changes — marking as FAILED",
+                    directive.id(), directive.centurion(), execResult.exitCode());
+            success = false;
+        } else {
+            success = execResult.exitCode() == 0 || hasFileChanges;
+        }
 
         var updatedDirective = new Directive(
             directive.id(),

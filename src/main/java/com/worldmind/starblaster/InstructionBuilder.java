@@ -56,6 +56,9 @@ public final class InstructionBuilder {
         sb.append(directive.successCriteria()).append("\n\n");
 
         sb.append("## Constraints\n\n");
+        sb.append("- **CRITICAL**: You MUST create/modify the files described in the objective. ");
+        sb.append("Do NOT exit until you have actually written the code. ");
+        sb.append("If you only explore the codebase without creating files, this directive will FAIL.\n");
         sb.append("- Only modify files related to this directive\n");
         sb.append("- Do not modify test files (Gauntlet handles tests)\n");
         sb.append("- When finished, stage and commit all changes: `git add -A && git commit -m 'done'`\n");
@@ -219,6 +222,9 @@ public final class InstructionBuilder {
         sb.append(directive.successCriteria()).append("\n\n");
 
         sb.append("## Constraints\n\n");
+        sb.append("- **CRITICAL**: You MUST make refactoring changes to the code. ");
+        sb.append("Do NOT exit until you have actually modified files. ");
+        sb.append("If you only explore the codebase without making changes, this directive will FAIL.\n");
         sb.append("- BEHAVIORAL EQUIVALENCE: Tests must pass identically before and after refactoring\n");
         sb.append("- Do NOT change any public APIs, method signatures, or external behavior\n");
         sb.append("- Focus on internal code quality: extract methods, reduce duplication, improve naming\n");
