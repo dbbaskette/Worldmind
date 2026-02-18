@@ -16,6 +16,7 @@ public record MissionResponse(
     @JsonProperty("execution_strategy") String executionStrategy,
     Classification classification,
     @JsonProperty("product_spec") ProductSpec productSpec,
+    @JsonProperty("clarifying_questions") ClarifyingQuestions clarifyingQuestions,
     List<DirectiveResponse> directives,
     @JsonProperty("seal_granted") boolean sealGranted,
     MissionMetrics metrics,

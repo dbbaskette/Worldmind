@@ -7,6 +7,7 @@ export const STATUS_COLORS = {
   SKIPPED: 'bg-status-warning/20 text-amber-400 border border-amber-500/30',
   CLASSIFYING: 'bg-purple-500/20 text-purple-400 border border-purple-500/30',
   UPLOADING: 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30',
+  CLARIFYING: 'bg-centurion-pulse/20 text-centurion-pulse border border-centurion-pulse/30',
   SPECIFYING: 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30',
   PLANNING: 'bg-blue-500/20 text-blue-400 border border-blue-500/30',
   AWAITING_APPROVAL: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',

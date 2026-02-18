@@ -143,7 +143,7 @@ public class GenerateSpecNode {
                 () -> new IllegalStateException("ProjectContext must be present before spec generation")
         );
 
-        String userPrompt = buildUserPrompt(request, classification, projectContext);
+        String userPrompt = buildUserPrompt(request, classification, projectContext, state);
         ProductSpec spec = (mcpToolProvider != null && mcpToolProvider.hasTools())
                 ? llmService.structuredCallWithTools(SYSTEM_PROMPT, userPrompt, ProductSpec.class, mcpToolProvider.getToolsFor("plan"))
                 : llmService.structuredCall(SYSTEM_PROMPT, userPrompt, ProductSpec.class);
@@ -157,12 +157,14 @@ public class GenerateSpecNode {
         );
     }
 
-    private String buildUserPrompt(String request, Classification classification, ProjectContext projectContext) {
+    private String buildUserPrompt(String request, Classification classification, 
+                                   ProjectContext projectContext, WorldmindState state) {
         List<String> fileTreeExcerpt = projectContext.fileTree().stream()
                 .limit(50)
                 .toList();
 
-        return String.format("""
+        var sb = new StringBuilder();
+        sb.append(String.format("""
                 Request: %s
 
                 Classification:
@@ -186,7 +188,18 @@ public class GenerateSpecNode {
                 projectContext.framework(),
                 projectContext.fileCount(),
                 String.join("\n  ", fileTreeExcerpt)
-        );
+        ));
+
+        // Include clarifying questions and answers if present
+        String answers = state.clarifyingAnswers();
+        if (answers != null && !answers.isBlank()) {
+            sb.append("\n=== CLARIFYING QUESTIONS & ANSWERS ===\n");
+            sb.append("The user answered the following questions to clarify requirements:\n\n");
+            sb.append(answers);
+            sb.append("\n\nUse these answers to create a more precise specification.\n");
+        }
+
+        return sb.toString();
     }
 
     private void writeSpecFile(WorldmindState state, ProductSpec spec) {

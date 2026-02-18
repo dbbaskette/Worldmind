@@ -8,6 +8,7 @@ import { DirectiveCard } from './DirectiveCard'
 import { MetricsPanel } from './MetricsPanel'
 import { EventLog } from './EventLog'
 import { ApprovalPanel } from './ApprovalPanel'
+import { ClarifyingQuestionsPanel } from './ClarifyingQuestionsPanel'
 
 interface MissionDetailProps {
   missionId: string
@@ -150,6 +151,14 @@ export function MissionDetail({ missionId }: MissionDetailProps) {
           )}
         </div>
       </div>
+
+      {mission.status === 'CLARIFYING' && mission.clarifying_questions && (
+        <ClarifyingQuestionsPanel 
+          missionId={mission.mission_id}
+          questions={mission.clarifying_questions}
+          onRefresh={refresh}
+        />
+      )}
 
       {mission.status === 'AWAITING_APPROVAL' && (
         <ApprovalPanel mission={mission} onRefresh={refresh} />

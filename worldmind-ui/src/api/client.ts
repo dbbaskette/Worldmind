@@ -79,6 +79,22 @@ class ApiClient {
     }
   }
 
+  async submitClarifyingAnswers(
+    id: string, 
+    answers: { question_id: string; question: string; answer: string }[]
+  ): Promise<void> {
+    const response = await fetch(`${API_BASE}/missions/${id}/clarify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answers })
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || 'Failed to submit answers')
+    }
+  }
+
   async cancelMission(id: string): Promise<void> {
     const response = await fetch(`${API_BASE}/missions/${id}/cancel`, {
       method: 'POST'

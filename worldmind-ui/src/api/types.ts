@@ -6,11 +6,27 @@ export interface MissionResponse {
   execution_strategy: string
   classification: Classification | null
   product_spec: ProductSpec | null
+  clarifying_questions: ClarifyingQuestions | null
   directives: DirectiveResponse[]
   seal_granted: boolean
   metrics: MissionMetrics | null
   errors: string[]
   wave_count: number
+}
+
+export interface ClarifyingQuestions {
+  questions: ClarifyingQuestion[]
+  summary: string
+}
+
+export interface ClarifyingQuestion {
+  id: string
+  question: string
+  category: string
+  why_asking?: string
+  suggested_options?: string[]
+  required: boolean
+  default_answer?: string
 }
 
 export interface ProductSpec {
@@ -91,6 +107,7 @@ export interface TimelineEntry {
 export type MissionStatus =
   | 'CLASSIFYING'
   | 'UPLOADING'
+  | 'CLARIFYING'
   | 'SPECIFYING'
   | 'PLANNING'
   | 'AWAITING_APPROVAL'

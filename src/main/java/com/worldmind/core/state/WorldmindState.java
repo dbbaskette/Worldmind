@@ -41,6 +41,8 @@ public class WorldmindState extends AgentState {
         Map.entry("reasoningLevel",        Channels.base(() -> "medium")),
         Map.entry("userExecutionStrategy", Channels.base(() -> "")),  // User override for execution strategy
         Map.entry("createCfDeployment",   Channels.base(() -> false)),  // If true, append CF deployment directive
+        Map.entry("clarifyingQuestions",  Channels.base((Reducer<ClarifyingQuestions>) null)),  // Questions for user
+        Map.entry("clarifyingAnswers",    Channels.base(() -> "")),  // User's answers as JSON
 
         // ── Wave execution channels (Phase 4) ────────────────────────
         Map.entry("waveDirectiveIds",      Channels.base((Supplier<List<String>>) List::of)),
@@ -142,6 +144,59 @@ public class WorldmindState extends AgentState {
                             })
                             .toList();
                 }
+                // Parse new PRD fields (may be null for older specs)
+                ProductSpec.ImplementationPlan implPlan = null;
+                if (map.get("implementationPlan") instanceof Map<?, ?> ipMap) {
+                    var ip = (Map<String, Object>) ipMap;
+                    List<ProductSpec.ImplementationStep> steps = List.of();
+                    if (ip.get("steps") instanceof List<?> stepList) {
+                        steps = stepList.stream()
+                                .filter(s -> s instanceof Map<?, ?>)
+                                .map(s -> {
+                                    var sm = (Map<String, Object>) s;
+                                    return new ProductSpec.ImplementationStep(
+                                        (String) sm.get("stepNumber"),
+                                        (String) sm.get("title"),
+                                        (String) sm.get("description"),
+                                        sm.get("filesInvolved") instanceof List<?> l ? (List<String>) l : List.of(),
+                                        sm.get("detailedTasks") instanceof List<?> l ? (List<String>) l : List.of(),
+                                        sm.get("dependencies") instanceof List<?> l ? (List<String>) l : List.of(),
+                                        (String) sm.get("verificationMethod")
+                                    );
+                                }).toList();
+                    }
+                    implPlan = new ProductSpec.ImplementationPlan(
+                        steps,
+                        (String) ip.get("suggestedOrder"),
+                        ip.get("parallelizableGroups") instanceof List<?> l ? (List<String>) l : List.of()
+                    );
+                }
+                List<ProductSpec.FileSpec> fileSpecs = List.of();
+                if (map.get("fileSpecs") instanceof List<?> fsList) {
+                    fileSpecs = fsList.stream()
+                            .filter(f -> f instanceof Map<?, ?>)
+                            .map(f -> {
+                                var fm = (Map<String, Object>) f;
+                                return new ProductSpec.FileSpec(
+                                    (String) fm.get("filePath"),
+                                    (String) fm.get("purpose"),
+                                    fm.get("mustContain") instanceof List<?> l ? (List<String>) l : List.of(),
+                                    fm.get("mustNotContain") instanceof List<?> l ? (List<String>) l : List.of(),
+                                    (String) fm.get("templateOrStructure")
+                                );
+                            }).toList();
+                }
+                ProductSpec.UserExperience ux = null;
+                if (map.get("userExperience") instanceof Map<?, ?> uxMap) {
+                    var um = (Map<String, Object>) uxMap;
+                    ux = new ProductSpec.UserExperience(
+                        (String) um.get("visualStyle"),
+                        um.get("interactions") instanceof List<?> l ? (List<String>) l : List.of(),
+                        um.get("animations") instanceof List<?> l ? (List<String>) l : List.of(),
+                        (String) um.get("colorScheme"),
+                        um.get("accessibilityRequirements") instanceof List<?> l ? (List<String>) l : List.of()
+                    );
+                }
                 return new ProductSpec(
                     (String) map.get("title"),
                     (String) map.get("overview"),
@@ -151,7 +206,10 @@ public class WorldmindState extends AgentState {
                     map.get("acceptanceCriteria") instanceof List<?> l ? (List<String>) l : List.of(),
                     components,
                     map.get("edgeCases") instanceof List<?> l ? (List<String>) l : List.of(),
-                    map.get("outOfScopeAssumptions") instanceof List<?> l ? (List<String>) l : List.of()
+                    map.get("outOfScopeAssumptions") instanceof List<?> l ? (List<String>) l : List.of(),
+                    implPlan,
+                    fileSpecs,
+                    ux
                 );
             }
             return (ProductSpec) obj;
@@ -189,6 +247,41 @@ public class WorldmindState extends AgentState {
 
     public boolean createCfDeployment() {
         return this.<Boolean>value("createCfDeployment").orElse(false);
+    }
+
+    @SuppressWarnings("unchecked")
+    public Optional<ClarifyingQuestions> clarifyingQuestions() {
+        Optional<Object> raw = value("clarifyingQuestions");
+        return raw.map(obj -> {
+            if (obj instanceof ClarifyingQuestions cq) return cq;
+            if (obj instanceof Map<?, ?> m) {
+                var map = (Map<String, Object>) m;
+                List<ClarifyingQuestions.Question> questions = List.of();
+                if (map.get("questions") instanceof List<?> qList) {
+                    questions = qList.stream()
+                            .filter(q -> q instanceof Map<?, ?>)
+                            .map(q -> {
+                                var qMap = (Map<String, Object>) q;
+                                return new ClarifyingQuestions.Question(
+                                        (String) qMap.get("id"),
+                                        (String) qMap.get("question"),
+                                        (String) qMap.get("category"),
+                                        (String) qMap.get("whyAsking"),
+                                        qMap.get("suggestedOptions") instanceof List<?> opts 
+                                                ? opts.stream().map(Object::toString).toList() : List.of(),
+                                        Boolean.TRUE.equals(qMap.get("required")),
+                                        (String) qMap.get("defaultAnswer")
+                                );
+                            }).toList();
+                }
+                return new ClarifyingQuestions(questions, (String) map.get("summary"));
+            }
+            return (ClarifyingQuestions) obj;
+        });
+    }
+
+    public String clarifyingAnswers() {
+        return this.<String>value("clarifyingAnswers").orElse("");
     }
 
     public String runtimeTag() {

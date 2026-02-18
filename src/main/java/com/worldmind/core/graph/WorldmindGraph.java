@@ -24,16 +24,18 @@ import static org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
  * Builds and holds the compiled LangGraph4j {@link StateGraph} that drives
  * the Worldmind planning and execution pipeline.
  * <p>
- * Phase 4 graph topology (wave-based parallel execution):
+ * Phase 4 graph topology (wave-based parallel execution with clarifying questions):
  * <pre>
- *   START -> classify_request -> upload_context -> generate_spec -> plan_mission
- *         -> [routeAfterPlan]
- *            -> await_approval -> END
- *            -> schedule_wave -> [routeAfterSchedule]
- *               -> parallel_dispatch -> evaluate_wave -> [routeAfterWaveEval]
- *                  -> schedule_wave (loop back for next wave)
- *                  -> converge_results -> END
- *               -> converge_results -> END  (empty wave = all done)
+ *   START -> classify_request -> upload_context -> clarify_requirements
+ *         -> [routeAfterClarify]
+ *            -> await_clarification -> END  (waiting for user answers)
+ *            -> generate_spec -> plan_mission -> [routeAfterPlan]
+ *               -> await_approval -> END
+ *               -> schedule_wave -> [routeAfterSchedule]
+ *                  -> parallel_dispatch -> evaluate_wave -> [routeAfterWaveEval]
+ *                     -> schedule_wave (loop back for next wave)
+ *                     -> converge_results -> END
+ *                  -> converge_results -> END  (empty wave = all done)
  * </pre>
  */
 @Component
@@ -46,6 +48,7 @@ public class WorldmindGraph {
     public WorldmindGraph(
             ClassifyRequestNode classifyNode,
             UploadContextNode uploadNode,
+            GenerateClarifyingQuestionsNode clarifyNode,
             GenerateSpecNode generateSpecNode,
             PlanMissionNode planNode,
             ScheduleWaveNode scheduleWaveNode,
@@ -57,6 +60,9 @@ public class WorldmindGraph {
         var graph = new StateGraph<>(WorldmindState.SCHEMA, WorldmindState::new)
                 .addNode("classify_request", node_async(classifyNode::apply))
                 .addNode("upload_context", node_async(uploadNode::apply))
+                .addNode("clarify_requirements", node_async(clarifyNode::apply))
+                .addNode("await_clarification", node_async(
+                        state -> Map.of("status", MissionStatus.CLARIFYING.name())))
                 .addNode("generate_spec", node_async(generateSpecNode::apply))
                 .addNode("plan_mission", node_async(planNode::apply))
                 .addNode("await_approval", node_async(
@@ -67,7 +73,12 @@ public class WorldmindGraph {
                 .addNode("converge_results", node_async(convergeNode::apply))
                 .addEdge(START, "classify_request")
                 .addEdge("classify_request", "upload_context")
-                .addEdge("upload_context", "generate_spec")
+                .addEdge("upload_context", "clarify_requirements")
+                .addConditionalEdges("clarify_requirements",
+                        edge_async(this::routeAfterClarify),
+                        Map.of("await_clarification", "await_clarification",
+                                "generate_spec", "generate_spec"))
+                .addEdge("await_clarification", END)
                 .addEdge("generate_spec", "plan_mission")
                 .addConditionalEdges("plan_mission",
                         edge_async(this::routeAfterPlan),
@@ -94,6 +105,17 @@ public class WorldmindGraph {
             log.info("Graph compiled without checkpoint saver (state will not be persisted)");
         }
         this.compiledGraph = graph.compile(configBuilder.build());
+    }
+
+    /**
+     * Routes after clarify_requirements based on whether questions need answers.
+     * If CLARIFYING status, we wait for user input. Otherwise, proceed to spec generation.
+     */
+    String routeAfterClarify(WorldmindState state) {
+        if (state.status() == MissionStatus.CLARIFYING) {
+            return "await_clarification";
+        }
+        return "generate_spec";
     }
 
     /**

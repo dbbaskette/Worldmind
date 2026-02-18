@@ -192,6 +192,7 @@ public class MissionController {
     private boolean isActiveStatus(MissionStatus status) {
         return status == MissionStatus.CLASSIFYING
                 || status == MissionStatus.UPLOADING
+                || status == MissionStatus.CLARIFYING
                 || status == MissionStatus.SPECIFYING
                 || status == MissionStatus.PLANNING
                 || status == MissionStatus.EXECUTING;
@@ -234,6 +235,54 @@ public class MissionController {
         return ResponseEntity.ok(Map.of(
                 "mission_id", id,
                 "status", MissionStatus.EXECUTING.name()
+        ));
+    }
+
+    /**
+     * POST /api/v1/missions/{id}/clarify — Submit answers to clarifying questions.
+     */
+    @PostMapping("/{id}/clarify")
+    public ResponseEntity<Map<String, String>> submitClarifyingAnswers(
+            @PathVariable String id,
+            @RequestBody ClarifyingAnswersRequest answersRequest) {
+        WorldmindState state = missionStates.get(id);
+        if (state == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (state.status() != MissionStatus.CLARIFYING) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("error", "Mission is not awaiting clarification; current status: " + state.status()));
+        }
+
+        log.info("Received clarifying answers for mission {}", id);
+
+        // Store answers as JSON string for the spec generator
+        String answersJson = answersRequest.toAnswersString();
+
+        // Build new state with answers, transition to SPECIFYING
+        var newStateMap = new HashMap<String, Object>();
+        newStateMap.put("missionId", state.missionId());
+        newStateMap.put("request", state.request());
+        newStateMap.put("interactionMode", state.interactionMode().name());
+        newStateMap.put("status", MissionStatus.SPECIFYING.name());
+        newStateMap.put("clarifyingAnswers", answersJson);
+        state.classification().ifPresent(c -> newStateMap.put("classification", c));
+        state.projectContext().ifPresent(pc -> newStateMap.put("projectContext", pc));
+        state.clarifyingQuestions().ifPresent(cq -> newStateMap.put("clarifyingQuestions", cq));
+        String pp = state.projectPath();
+        if (pp != null && !pp.isBlank()) newStateMap.put("projectPath", pp);
+        String gru = state.gitRemoteUrl();
+        if (gru != null && !gru.isBlank()) newStateMap.put("gitRemoteUrl", gru);
+
+        missionStates.put(id, new WorldmindState(newStateMap));
+
+        // Continue mission with FULL_AUTO to proceed through spec generation → planning
+        launchAsync(id, state.request(), InteractionMode.APPROVE_PLAN,
+                state.projectPath(), state.gitRemoteUrl());
+
+        return ResponseEntity.ok(Map.of(
+                "mission_id", id,
+                "status", MissionStatus.SPECIFYING.name()
         ));
     }
 
@@ -574,6 +623,7 @@ public class MissionController {
                 state.executionStrategy().name(),
                 state.classification().orElse(null),
                 state.productSpec().orElse(null),
+                state.clarifyingQuestions().orElse(null),
                 directives,
                 state.sealGranted(),
                 state.metrics().orElse(null),

@@ -38,6 +38,7 @@ export function useMissionList() {
         execution_strategy: executionStrategy || 'PARALLEL',
         classification: null,
         product_spec: null,
+        clarifying_questions: null,
         directives: [],
         seal_granted: false,
         metrics: null,
