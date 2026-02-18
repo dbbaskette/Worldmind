@@ -61,7 +61,7 @@ export function ApprovalPanel({ mission, onRefresh }: ApprovalPanelProps) {
             </div>
             <div>
               <span className="text-wm_text-muted">Strategy:</span>{' '}
-              <span className="text-wm_text-secondary">{mission.classification.planningStrategy}</span>
+              <span className="text-wm_text-secondary">{mission.execution_strategy.toLowerCase()}</span>
             </div>
             {mission.classification.affectedComponents.length > 0 && (
               <div>
