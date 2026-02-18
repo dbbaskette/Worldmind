@@ -51,7 +51,7 @@ public class WorldmindState extends AgentState {
 
         // ── Appender channels (list accumulation) ────────────────────
         Map.entry("directives",            Channels.appender(ArrayList::new)),
-        Map.entry("completedDirectiveIds", Channels.base(ArrayList::new)),
+        Map.entry("completedDirectiveIds", Channels.appender(ArrayList::new)),  // Must accumulate across waves!
         Map.entry("retryingDirectiveIds", Channels.appender(ArrayList::new)),
         Map.entry("starblasters",             Channels.appender(ArrayList::new)),
         Map.entry("testResults",           Channels.appender(ArrayList::new)),
@@ -144,59 +144,6 @@ public class WorldmindState extends AgentState {
                             })
                             .toList();
                 }
-                // Parse new PRD fields (may be null for older specs)
-                ProductSpec.ImplementationPlan implPlan = null;
-                if (map.get("implementationPlan") instanceof Map<?, ?> ipMap) {
-                    var ip = (Map<String, Object>) ipMap;
-                    List<ProductSpec.ImplementationStep> steps = List.of();
-                    if (ip.get("steps") instanceof List<?> stepList) {
-                        steps = stepList.stream()
-                                .filter(s -> s instanceof Map<?, ?>)
-                                .map(s -> {
-                                    var sm = (Map<String, Object>) s;
-                                    return new ProductSpec.ImplementationStep(
-                                        (String) sm.get("stepNumber"),
-                                        (String) sm.get("title"),
-                                        (String) sm.get("description"),
-                                        sm.get("filesInvolved") instanceof List<?> l ? (List<String>) l : List.of(),
-                                        sm.get("detailedTasks") instanceof List<?> l ? (List<String>) l : List.of(),
-                                        sm.get("dependencies") instanceof List<?> l ? (List<String>) l : List.of(),
-                                        (String) sm.get("verificationMethod")
-                                    );
-                                }).toList();
-                    }
-                    implPlan = new ProductSpec.ImplementationPlan(
-                        steps,
-                        (String) ip.get("suggestedOrder"),
-                        ip.get("parallelizableGroups") instanceof List<?> l ? (List<String>) l : List.of()
-                    );
-                }
-                List<ProductSpec.FileSpec> fileSpecs = List.of();
-                if (map.get("fileSpecs") instanceof List<?> fsList) {
-                    fileSpecs = fsList.stream()
-                            .filter(f -> f instanceof Map<?, ?>)
-                            .map(f -> {
-                                var fm = (Map<String, Object>) f;
-                                return new ProductSpec.FileSpec(
-                                    (String) fm.get("filePath"),
-                                    (String) fm.get("purpose"),
-                                    fm.get("mustContain") instanceof List<?> l ? (List<String>) l : List.of(),
-                                    fm.get("mustNotContain") instanceof List<?> l ? (List<String>) l : List.of(),
-                                    (String) fm.get("templateOrStructure")
-                                );
-                            }).toList();
-                }
-                ProductSpec.UserExperience ux = null;
-                if (map.get("userExperience") instanceof Map<?, ?> uxMap) {
-                    var um = (Map<String, Object>) uxMap;
-                    ux = new ProductSpec.UserExperience(
-                        (String) um.get("visualStyle"),
-                        um.get("interactions") instanceof List<?> l ? (List<String>) l : List.of(),
-                        um.get("animations") instanceof List<?> l ? (List<String>) l : List.of(),
-                        (String) um.get("colorScheme"),
-                        um.get("accessibilityRequirements") instanceof List<?> l ? (List<String>) l : List.of()
-                    );
-                }
                 return new ProductSpec(
                     (String) map.get("title"),
                     (String) map.get("overview"),
@@ -206,10 +153,7 @@ public class WorldmindState extends AgentState {
                     map.get("acceptanceCriteria") instanceof List<?> l ? (List<String>) l : List.of(),
                     components,
                     map.get("edgeCases") instanceof List<?> l ? (List<String>) l : List.of(),
-                    map.get("outOfScopeAssumptions") instanceof List<?> l ? (List<String>) l : List.of(),
-                    implPlan,
-                    fileSpecs,
-                    ux
+                    map.get("outOfScopeAssumptions") instanceof List<?> l ? (List<String>) l : List.of()
                 );
             }
             return (ProductSpec) obj;

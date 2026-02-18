@@ -299,65 +299,6 @@ public class PlanMissionNode {
                 }
             }
 
-            // Include implementation plan steps — these become directive hints
-            if (spec.implementationPlan() != null && spec.implementationPlan().steps() != null) {
-                sb.append("\nIMPLEMENTATION PLAN:\n");
-                var plan = spec.implementationPlan();
-                if (plan.suggestedOrder() != null) {
-                    sb.append("Execution order: ").append(plan.suggestedOrder()).append("\n");
-                }
-                for (var step : plan.steps()) {
-                    sb.append("\n  [").append(step.stepNumber()).append(": ").append(step.title()).append("]\n");
-                    sb.append("    ").append(step.description()).append("\n");
-                    if (step.filesInvolved() != null && !step.filesInvolved().isEmpty()) {
-                        sb.append("    Files: ").append(String.join(", ", step.filesInvolved())).append("\n");
-                    }
-                    if (step.detailedTasks() != null && !step.detailedTasks().isEmpty()) {
-                        sb.append("    Tasks:\n");
-                        for (var task : step.detailedTasks()) {
-                            sb.append("      - ").append(task).append("\n");
-                        }
-                    }
-                    if (step.verificationMethod() != null) {
-                        sb.append("    Verify: ").append(step.verificationMethod()).append("\n");
-                    }
-                }
-            }
-
-            // Include file specifications — centurions use these as blueprints
-            if (spec.fileSpecs() != null && !spec.fileSpecs().isEmpty()) {
-                sb.append("\nFILE SPECIFICATIONS:\n");
-                for (var fileSpec : spec.fileSpecs()) {
-                    sb.append("\n  [").append(fileSpec.filePath()).append("]\n");
-                    sb.append("    Purpose: ").append(fileSpec.purpose()).append("\n");
-                    if (fileSpec.mustContain() != null && !fileSpec.mustContain().isEmpty()) {
-                        sb.append("    Must contain:\n");
-                        for (var item : fileSpec.mustContain()) {
-                            sb.append("      - ").append(item).append("\n");
-                        }
-                    }
-                    if (fileSpec.templateOrStructure() != null) {
-                        sb.append("    Structure: ").append(fileSpec.templateOrStructure()).append("\n");
-                    }
-                }
-            }
-
-            // Include UX requirements for visual applications
-            if (spec.userExperience() != null) {
-                var ux = spec.userExperience();
-                sb.append("\nUSER EXPERIENCE:\n");
-                if (ux.visualStyle() != null) sb.append("  Visual style: ").append(ux.visualStyle()).append("\n");
-                if (ux.colorScheme() != null) sb.append("  Colors: ").append(ux.colorScheme()).append("\n");
-                if (ux.interactions() != null && !ux.interactions().isEmpty()) {
-                    sb.append("  Interactions:\n");
-                    for (var i : ux.interactions()) sb.append("    - ").append(i).append("\n");
-                }
-                if (ux.animations() != null && !ux.animations().isEmpty()) {
-                    sb.append("  Animations:\n");
-                    for (var a : ux.animations()) sb.append("    - ").append(a).append("\n");
-                }
-            }
-
             if (spec.edgeCases() != null && !spec.edgeCases().isEmpty()) {
                 sb.append("\nEDGE CASES:\n");
                 for (var ec : spec.edgeCases()) sb.append("  - ").append(ec).append("\n");

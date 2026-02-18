@@ -118,6 +118,7 @@ export type MissionStatus =
 export type DirectiveStatus =
   | 'PENDING'
   | 'EXECUTING'
+  | 'VERIFYING'
   | 'FULFILLED'
   | 'FAILED'
   | 'SKIPPED'

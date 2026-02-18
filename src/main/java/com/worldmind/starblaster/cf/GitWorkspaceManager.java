@@ -385,9 +385,19 @@ public class GitWorkspaceManager {
             return new MergeResult(mergedIds, conflictedIds);
         }
 
+        // CRITICAL: Sort directive IDs to ensure deterministic merge order
+        // DIR-001 must merge before DIR-002, etc. to prevent race conditions
+        List<String> sortedIds = new ArrayList<>(directiveIds);
+        sortedIds.sort(String::compareTo);
+        
+        if (!sortedIds.equals(directiveIds)) {
+            log.info("Merge: reordered directives for deterministic merge: {} -> {}", 
+                    directiveIds, sortedIds);
+        }
+
         String gitUrl = authenticatedUrl(gitToken, overrideGitUrl);
         if (gitUrl == null || gitUrl.isBlank()) {
-            log.warn("Skipping merge: no git remote URL configured for directive branches {}", directiveIds);
+            log.warn("Skipping merge: no git remote URL configured for directive branches {}", sortedIds);
             return new MergeResult(mergedIds, conflictedIds);
         }
 
@@ -399,21 +409,28 @@ public class GitWorkspaceManager {
             runGit(tempDir, "config", "user.email", "worldmind@worldmind.local");
             runGit(tempDir, "checkout", "main");
 
-            log.info("Merge: processing {} directive branches (delete after: {})", 
-                    directiveIds.size(), deleteBranchesAfterMerge);
+            log.info("Merge: processing {} directive branches in order: {} (delete after: {})", 
+                    sortedIds.size(), sortedIds, deleteBranchesAfterMerge);
 
-            for (String id : directiveIds) {
+            for (String id : sortedIds) {
                 if (mergeSingleBranch(tempDir, id, mergedIds, conflictedIds)) {
                     log.info("Merge: successfully merged {}", id);
-                }
-            }
-
-            if (!mergedIds.isEmpty()) {
-                int pushExit = runGit(tempDir, "push", "origin", "main");
-                if (pushExit != 0) {
-                    log.error("Merge: failed to push main after merging {} directives", mergedIds.size());
-                } else {
-                    log.info("Merge: pushed main with {} merged directives", mergedIds.size());
+                    
+                    // Push main after EACH successful merge so later rebases see the changes
+                    // This is critical for preventing conflicts when parallel directives
+                    // create the same files
+                    int pushExit = runGit(tempDir, "push", "origin", "main");
+                    if (pushExit != 0) {
+                        log.error("Merge: failed to push main after merging {}", id);
+                        // Pull and retry push in case of race condition
+                        runGit(tempDir, "pull", "--rebase", "origin", "main");
+                        pushExit = runGit(tempDir, "push", "origin", "main");
+                        if (pushExit != 0) {
+                            log.error("Merge: push still failed after pull --rebase for {}", id);
+                        }
+                    } else {
+                        log.info("Merge: pushed main with {} merged", id);
+                    }
                 }
             }
 
@@ -425,7 +442,8 @@ public class GitWorkspaceManager {
             }
 
             if (!conflictedIds.isEmpty()) {
-                log.warn("Merge: {} branches had conflicts and were not merged: {}",
+                log.warn("Merge: {} branches had conflicts and were not merged: {} — " +
+                        "these directives will be retried with updated main context",
                         conflictedIds.size(), conflictedIds);
             }
 
@@ -453,6 +471,12 @@ public class GitWorkspaceManager {
                                        List<String> mergedIds, List<String> conflictedIds) {
         String branch = getBranchName(directiveId);
 
+        // Always fetch latest main first - critical for sequential merge ordering
+        // This ensures we're rebasing onto the actual current main (with prior merges)
+        runGit(tempDir, "fetch", "origin", "main");
+        runGit(tempDir, "checkout", "main");
+        runGit(tempDir, "reset", "--hard", "origin/main");
+
         int fetchExit = runGit(tempDir, "fetch", "origin",
                 "refs/heads/" + branch + ":refs/remotes/origin/" + branch);
         if (fetchExit != 0) {
@@ -466,11 +490,13 @@ public class GitWorkspaceManager {
             return false;
         }
 
+        // Rebase onto the freshly-fetched main
         int rebaseExit = runGit(tempDir, "rebase", "main");
         if (rebaseExit != 0) {
             String conflictFiles = runGitOutput(tempDir, "diff", "--name-only", "--diff-filter=U");
-            log.error("Merge: rebase conflict on branch {} — conflicting files: {}", branch, 
-                    conflictFiles.isBlank() ? "(unknown)" : conflictFiles.replace("\n", ", "));
+            log.error("Merge: rebase conflict on {} — conflicting files: {} " +
+                    "(directive will be retried with updated main)", 
+                    branch, conflictFiles.isBlank() ? "(unknown)" : conflictFiles.replace("\n", ", "));
             runGit(tempDir, "rebase", "--abort");
             runGit(tempDir, "checkout", "main");
             conflictedIds.add(directiveId);

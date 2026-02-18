@@ -12,10 +12,12 @@ export function DirectiveTimeline({ directives, waveCount }: DirectiveTimelinePr
   const completed = directives.filter(d => d.status === 'FULFILLED').length
   const failed = directives.filter(d => d.status === 'FAILED').length
   const executing = directives.filter(d => d.status === 'EXECUTING').length
-  const pending = total - completed - failed - executing
+  const verifying = directives.filter(d => d.status === 'VERIFYING').length
+  const pending = total - completed - failed - executing - verifying
 
   const completedPct = (completed / total) * 100
   const executingPct = (executing / total) * 100
+  const verifyingPct = (verifying / total) * 100
   const failedPct = (failed / total) * 100
 
   return (
@@ -38,6 +40,9 @@ export function DirectiveTimeline({ directives, waveCount }: DirectiveTimelinePr
         {completedPct > 0 && (
           <div className="bg-emerald-500 h-full transition-all duration-500" style={{ width: `${completedPct}%` }} />
         )}
+        {verifyingPct > 0 && (
+          <div className="bg-purple-500 h-full animate-pulse transition-all duration-500" style={{ width: `${verifyingPct}%` }} />
+        )}
         {executingPct > 0 && (
           <div className="bg-blue-500 h-full animate-pulse transition-all duration-500" style={{ width: `${executingPct}%` }} />
         )}
@@ -50,6 +55,11 @@ export function DirectiveTimeline({ directives, waveCount }: DirectiveTimelinePr
         {completed > 0 && (
           <span className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-emerald-500" /> {completed} done
+          </span>
+        )}
+        {verifying > 0 && (
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" /> {verifying} verifying
           </span>
         )}
         {executing > 0 && (

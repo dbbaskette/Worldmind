@@ -277,22 +277,37 @@ public class EvaluateWaveNode {
                         log.warn("Wave merge had {} conflicts: {} — will retry on updated main", 
                                 mergeResult.conflictedIds().size(), mergeResult.conflictedIds());
                         
+                        // Determine which directives merged successfully (for conflict context)
+                        String mergedContext = mergeResult.mergedIds().isEmpty() 
+                                ? "" 
+                                : " The following directives have already merged: " + 
+                                  String.join(", ", mergeResult.mergedIds()) + 
+                                  ". Check main branch for their changes before creating your files.";
+                        
                         // Mark conflicted directives for retry so they get re-scheduled
                         // They'll run again in the next wave, now with access to the merged changes
                         for (String conflictedId : mergeResult.conflictedIds()) {
                             retryingIds.add(conflictedId);  // Add to retry list (excludes from completed)
                             completedIds.remove(conflictedId);  // Don't add to completed this wave
                             
-                            // Reset directive status to PENDING so it will be re-dispatched
+                            // Reset directive status to PENDING and add merge conflict context
                             for (int i = 0; i < updatedDirectives.size(); i++) {
                                 Directive d = updatedDirectives.get(i);
                                 if (d.id().equals(conflictedId)) {
+                                    // Enhance input context with merge conflict information
+                                    String enhancedContext = d.inputContext();
+                                    if (enhancedContext == null) enhancedContext = "";
+                                    enhancedContext = "MERGE CONFLICT RETRY: Your previous branch had " +
+                                            "conflicts with main. Start fresh from the current main branch." +
+                                            mergedContext + "\n\n" + enhancedContext;
+                                    
                                     updatedDirectives.set(i, new Directive(
                                             d.id(), d.centurion(), d.description(),
-                                            d.inputContext(), d.successCriteria(), d.dependencies(),
-                                            DirectiveStatus.PENDING, d.iteration(), d.maxIterations(),
+                                            enhancedContext, d.successCriteria(), d.dependencies(),
+                                            DirectiveStatus.PENDING, d.iteration() + 1, d.maxIterations(),
                                             d.onFailure(), d.targetFiles(), List.of(), null));
-                                    log.info("Reset {} to PENDING for retry on updated main", conflictedId);
+                                    log.info("Reset {} to PENDING (iteration {}) for retry on updated main", 
+                                            conflictedId, d.iteration() + 1);
                                     break;
                                 }
                             }

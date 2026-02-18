@@ -105,6 +105,12 @@ public class StarblasterBridge {
             success = execResult.exitCode() == 0 || hasFileChanges;
         }
 
+        // FORGE/PRISM need quality gates (GAUNTLET/VIGIL) — use VERIFYING until seal evaluation.
+        // Other centurions (GAUNTLET, VIGIL, etc.) can be marked PASSED immediately.
+        DirectiveStatus successStatus = requiresFileChanges 
+                ? DirectiveStatus.VERIFYING 
+                : DirectiveStatus.PASSED;
+
         var updatedDirective = new Directive(
             directive.id(),
             directive.centurion(),
@@ -112,7 +118,7 @@ public class StarblasterBridge {
             directive.inputContext(),
             directive.successCriteria(),
             directive.dependencies(),
-            success ? DirectiveStatus.PASSED : DirectiveStatus.FAILED,
+            success ? successStatus : DirectiveStatus.FAILED,
             directive.iteration() + 1,
             directive.maxIterations(),
             directive.onFailure(),
@@ -131,7 +137,7 @@ public class StarblasterBridge {
         );
 
         log.info("Directive {} {} in {}ms",
-                directive.id(), success ? "PASSED" : "FAILED", execResult.elapsedMs());
+                directive.id(), success ? successStatus.name() : "FAILED", execResult.elapsedMs());
 
         return new BridgeResult(updatedDirective, starblasterInfo, truncateOutput(execResult.output()));
     }

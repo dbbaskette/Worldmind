@@ -2,6 +2,7 @@
 export const STATUS_COLORS = {
   PENDING: 'bg-wm-elevated text-wm_text-muted border border-wm-border',
   EXECUTING: 'bg-status-info/20 text-blue-400 border border-blue-500/30',
+  VERIFYING: 'bg-purple-500/20 text-purple-400 border border-purple-500/30',  // Quality gates in progress
   FULFILLED: 'bg-status-success/20 text-emerald-400 border border-emerald-500/30',
   FAILED: 'bg-status-error/20 text-red-400 border border-red-500/30',
   SKIPPED: 'bg-status-warning/20 text-amber-400 border border-amber-500/30',

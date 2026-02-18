@@ -33,6 +33,11 @@ function derivePhase(events: WorldmindEvent[], status: string): { active: Phase 
     PHASES.forEach(p => completed.add(p))
     return { active: null, completed, failed: null }
   }
+  if (status === 'VERIFYING') {
+    // FORGE complete, running quality gates (GAUNTLET/VIGIL)
+    completed.add('FORGE')
+    return { active: 'GAUNTLET', completed, failed: null }
+  }
   if (status === 'FAILED' && events.length === 0) {
     // Without events we don't know which phase failed, show FORGE as failed
     return { active: null, completed, failed: 'FORGE' }
@@ -135,7 +140,7 @@ function PhasePipeline({ directive, events }: { directive: DirectiveResponse; ev
         )
       })}
 
-      {active && directive.status === 'EXECUTING' && (
+      {active && (directive.status === 'EXECUTING' || directive.status === 'VERIFYING') && (
         <div className="ml-3 flex items-center gap-1.5 text-[10px] text-blue-400">
           <span className="w-1 h-1 rounded-full bg-blue-400 animate-pulse" />
           {PHASE_ACTIVITY[active]}

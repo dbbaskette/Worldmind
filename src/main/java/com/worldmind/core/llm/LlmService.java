@@ -55,7 +55,50 @@ public class LlmService {
             throw new LlmEmptyResponseException("LLM returned empty content for " + outputType.getSimpleName()
                     + ". Check that the model is running and supports structured JSON output.");
         }
-        return converter.convert(response);
+        try {
+            return converter.convert(response);
+        } catch (Exception e) {
+            log.error("Failed to parse LLM response to {}: {}", outputType.getSimpleName(), e.getMessage());
+            log.debug("Raw LLM response: {}", response);
+            // Try manual JSON parsing with Jackson for complex nested records
+            return parseWithJackson(response, outputType);
+        }
+    }
+
+    /**
+     * Fallback JSON parsing using Jackson ObjectMapper with lenient settings.
+     */
+    private <T> T parseWithJackson(String json, Class<T> outputType) {
+        log.info("Attempting Jackson fallback parsing for {}", outputType.getSimpleName());
+        try {
+            var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            mapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+            mapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT, true);
+            mapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true);
+            // Enable record support (available in Jackson 2.12+)
+            mapper.registerModule(new com.fasterxml.jackson.module.paramnames.ParameterNamesModule());
+            
+            // Extract JSON from markdown code blocks if present
+            String cleaned = json.trim();
+            if (cleaned.startsWith("```json")) {
+                cleaned = cleaned.substring(7);
+            } else if (cleaned.startsWith("```")) {
+                cleaned = cleaned.substring(3);
+            }
+            if (cleaned.endsWith("```")) {
+                cleaned = cleaned.substring(0, cleaned.length() - 3);
+            }
+            cleaned = cleaned.trim();
+            
+            log.info("Jackson parsing cleaned JSON ({} chars)", cleaned.length());
+            T result = mapper.readValue(cleaned, outputType);
+            log.info("Jackson fallback parsing succeeded for {}", outputType.getSimpleName());
+            return result;
+        } catch (Exception e2) {
+            log.error("Jackson fallback parsing FAILED for {}: {}", outputType.getSimpleName(), e2.getMessage());
+            throw new LlmParseException("Failed to parse LLM response to " + outputType.getSimpleName() 
+                    + ": " + e2.getMessage(), e2);
+        }
     }
 
     /**
@@ -83,6 +126,12 @@ public class LlmService {
             throw new LlmEmptyResponseException("LLM returned empty content for " + outputType.getSimpleName()
                     + ". Check that the model is running and supports structured JSON output.");
         }
-        return converter.convert(response);
+        try {
+            return converter.convert(response);
+        } catch (Exception e) {
+            log.error("Failed to parse LLM response to {}: {}", outputType.getSimpleName(), e.getMessage());
+            log.debug("Raw LLM response: {}", response);
+            return parseWithJackson(response, outputType);
+        }
     }
 }

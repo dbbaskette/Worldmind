@@ -6,6 +6,7 @@ package com.worldmind.core.model;
 public enum DirectiveStatus {
     PENDING,
     RUNNING,
+    VERIFYING,  // FORGE complete, awaiting GAUNTLET/VIGIL quality gates
     PASSED,
     FAILED,
     SKIPPED

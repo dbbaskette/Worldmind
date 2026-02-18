@@ -224,13 +224,16 @@ public class MissionController {
                     Map.of("error", "Mission is not awaiting approval; current status: " + state.status()));
         }
 
-        log.info("Approving mission {} — launching execution", id);
+        log.info("Approving mission {} — launching execution with strategy {}", 
+                id, state.executionStrategy());
 
-        // Transition to EXECUTING, preserving all existing state so the UI keeps showing directives
-        missionStates.put(id, new WorldmindState(buildExecutionStateMap(state)));
+        // Build execution state preserving all existing state including executionStrategy
+        var executionState = buildExecutionStateMap(state);
+        missionStates.put(id, new WorldmindState(executionState));
 
-        launchAsync(id, state.request(), InteractionMode.FULL_AUTO,
-                state.projectPath(), state.gitRemoteUrl());
+        // Use launchAsyncWithState to preserve the full state (including user's strategy choice)
+        // instead of launchAsync which creates a fresh state and loses the strategy
+        launchAsyncWithState(id, executionState);
 
         return ResponseEntity.ok(Map.of(
                 "mission_id", id,
@@ -276,14 +279,34 @@ public class MissionController {
 
         missionStates.put(id, new WorldmindState(newStateMap));
 
-        // Continue mission with FULL_AUTO to proceed through spec generation → planning
-        launchAsync(id, state.request(), InteractionMode.APPROVE_PLAN,
-                state.projectPath(), state.gitRemoteUrl());
+        // Continue mission with the populated state map (includes clarifying answers)
+        launchAsyncWithState(id, newStateMap);
 
         return ResponseEntity.ok(Map.of(
                 "mission_id", id,
                 "status", MissionStatus.SPECIFYING.name()
         ));
+    }
+
+    /**
+     * Launch a mission asynchronously with a pre-populated state map (e.g., after clarifying questions).
+     */
+    private void launchAsyncWithState(String missionId, Map<String, Object> stateMap) {
+        CompletableFuture.runAsync(() -> {
+            try {
+                var finalState = missionEngine.runMissionWithState(missionId, stateMap);
+                missionStates.put(missionId, finalState);
+                log.info("Mission {} resumed and completed with status {}", missionId, finalState.status());
+            } catch (Exception ex) {
+                log.error("Mission {} failed during async resume", missionId, ex);
+                var errorState = new WorldmindState(Map.of(
+                        "missionId", missionId,
+                        "status", MissionStatus.FAILED.name(),
+                        "error", ex.getMessage() != null ? ex.getMessage() : "Unknown error"
+                ));
+                missionStates.put(missionId, errorState);
+            }
+        });
     }
 
     /**
@@ -412,8 +435,8 @@ public class MissionController {
         retryState.put("completedDirectiveIds", completedIds);
         missionStates.put(id, new WorldmindState(retryState));
 
-        launchAsync(id, state.request(), InteractionMode.FULL_AUTO,
-                state.projectPath(), state.gitRemoteUrl());
+        // Use launchAsyncWithState to preserve the full state (including execution strategy)
+        launchAsyncWithState(id, retryState);
 
         return ResponseEntity.ok(Map.of(
                 "mission_id", id,
@@ -511,9 +534,15 @@ public class MissionController {
         map.put("interactionMode", InteractionMode.FULL_AUTO.name());
         map.put("status", MissionStatus.EXECUTING.name());
         map.put("executionStrategy", state.executionStrategy().name());
+        // Preserve user's original strategy choice for re-planning scenarios
+        String userStrategy = state.<String>value("userExecutionStrategy").orElse(null);
+        if (userStrategy != null && !userStrategy.isBlank()) {
+            map.put("userExecutionStrategy", userStrategy);
+        }
         map.put("directives", state.directives());
         state.classification().ifPresent(c -> map.put("classification", c));
         state.projectContext().ifPresent(pc -> map.put("projectContext", pc));
+        state.productSpec().ifPresent(ps -> map.put("productSpec", ps));
         String pp = state.projectPath();
         if (pp != null && !pp.isBlank()) map.put("projectPath", pp);
         String gru = state.gitRemoteUrl();
@@ -676,13 +705,14 @@ public class MissionController {
 
     /**
      * Maps internal DirectiveStatus enum names to UI-expected status strings.
-     * Java: PASSED/RUNNING → UI: FULFILLED/EXECUTING
+     * Java: PASSED/RUNNING/VERIFYING → UI: FULFILLED/EXECUTING/VERIFYING
      */
     private String mapDirectiveStatus(DirectiveStatus status) {
         if (status == null) return null;
         return switch (status) {
             case PASSED -> "FULFILLED";
             case RUNNING -> "EXECUTING";
+            case VERIFYING -> "VERIFYING";  // Quality gates in progress
             default -> status.name();
         };
     }

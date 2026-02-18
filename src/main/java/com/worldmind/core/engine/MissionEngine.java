@@ -136,6 +136,32 @@ public class MissionEngine {
     }
 
     /**
+     * Runs the graph with a pre-populated state map. Used to resume missions
+     * after user interactions (e.g., submitting clarifying answers).
+     */
+    public WorldmindState runMissionWithState(String missionId, Map<String, Object> initialState) {
+        MdcContext.setMission(missionId);
+        try {
+            log.info("Resuming mission {} with pre-populated state", missionId);
+
+            var config = RunnableConfig.builder()
+                    .threadId(missionId)
+                    .build();
+
+            var result = worldmindGraph.getCompiledGraph()
+                    .invoke(initialState, config);
+
+            var state = result.orElseThrow(() ->
+                    new RuntimeException("Graph execution returned empty state for mission " + missionId));
+
+            metrics.recordMissionResult(state.status().name());
+            return state;
+        } finally {
+            MdcContext.clear();
+        }
+    }
+
+    /**
      * Generates a unique mission ID in the format WMND-YYYY-NNNN.
      */
     public String generateMissionId() {

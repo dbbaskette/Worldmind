@@ -71,7 +71,12 @@ public class WorldmindGraph {
                 .addNode("parallel_dispatch", node_async(parallelDispatchNode::apply))
                 .addNode("evaluate_wave", node_async(evaluateWaveNode::apply))
                 .addNode("converge_results", node_async(convergeNode::apply))
-                .addEdge(START, "classify_request")
+                // Conditional start: resume from appropriate point based on incoming status
+                .addConditionalEdges(START,
+                        edge_async(this::routeFromStart),
+                        Map.of("classify_request", "classify_request",
+                                "generate_spec", "generate_spec",
+                                "schedule_wave", "schedule_wave"))
                 .addEdge("classify_request", "upload_context")
                 .addEdge("upload_context", "clarify_requirements")
                 .addConditionalEdges("clarify_requirements",
@@ -105,6 +110,24 @@ public class WorldmindGraph {
             log.info("Graph compiled without checkpoint saver (state will not be persisted)");
         }
         this.compiledGraph = graph.compile(configBuilder.build());
+    }
+
+    /**
+     * Routes from START based on incoming status. Enables resuming missions at
+     * the appropriate point after user interactions (clarifying questions, approval).
+     */
+    String routeFromStart(WorldmindState state) {
+        MissionStatus status = state.status();
+        if (status == MissionStatus.SPECIFYING) {
+            log.info("Resuming from SPECIFYING status — skipping to generate_spec");
+            return "generate_spec";
+        }
+        if (status == MissionStatus.EXECUTING) {
+            log.info("Resuming from EXECUTING status — skipping to schedule_wave");
+            return "schedule_wave";
+        }
+        // Default: start from the beginning
+        return "classify_request";
     }
 
     /**

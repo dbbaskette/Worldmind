@@ -160,6 +160,24 @@ export function MissionDetail({ missionId }: MissionDetailProps) {
         />
       )}
 
+      {(mission.status === 'SPECIFYING' || mission.status === 'PLANNING') && (
+        <div className="bg-wm_bg-surface border border-wm_border-subtle rounded-md p-6 mb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-5 h-5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+            <div>
+              <div className="text-wm_text-secondary font-medium">
+                {mission.status === 'SPECIFYING' ? 'Generating Product Requirements...' : 'Planning Mission...'}
+              </div>
+              <div className="text-wm_text-muted text-xs mt-1">
+                {mission.status === 'SPECIFYING' 
+                  ? 'Creating detailed specifications based on your requirements'
+                  : 'Breaking down the specifications into directives'}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {mission.status === 'AWAITING_APPROVAL' && (
         <ApprovalPanel mission={mission} onRefresh={refresh} />
       )}

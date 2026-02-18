@@ -17,11 +17,10 @@ public record ProductSpec(
     List<String> acceptanceCriteria,
     List<ComponentSpec> components,
     List<String> edgeCases,
-    List<String> outOfScopeAssumptions,
-    // Enhanced PRD fields for implementation detail
-    ImplementationPlan implementationPlan,
-    List<FileSpec> fileSpecs,
-    UserExperience userExperience
+    List<String> outOfScopeAssumptions
+    // Note: Enhanced PRD fields (implementationPlan, fileSpecs, userExperience) 
+    // temporarily removed due to Spring AI BeanOutputConverter parsing issues with 
+    // deeply nested records. The core spec fields above are sufficient for planning.
 ) implements Serializable {
 
     public record ComponentSpec(
