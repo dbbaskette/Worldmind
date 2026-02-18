@@ -115,7 +115,9 @@ public class MissionController {
         CompletableFuture<WorldmindState> future = CompletableFuture.supplyAsync(() -> {
             try {
                 WorldmindState result = missionEngine.runMission(missionId, request.request(), mode, 
-                        request.projectPath(), request.gitRemoteUrl(), request.reasoningLevel());
+                        request.projectPath(), request.gitRemoteUrl(), request.reasoningLevel(),
+                        request.executionStrategy(), 
+                        request.createCfDeployment() != null && request.createCfDeployment());
                 if (result != null) {
                     missionStates.put(missionId, result);
                 }
@@ -338,7 +340,7 @@ public class MissionController {
                                 d.id(), d.centurion(), d.description(),
                                 d.inputContext(), d.successCriteria(), d.dependencies(),
                                 DirectiveStatus.PENDING, 0, d.maxIterations(),
-                                d.onFailure(), d.filesAffected(), null
+                                d.onFailure(), d.targetFiles(), d.filesAffected(), null
                         );
                     }
                     return d;
@@ -472,7 +474,15 @@ public class MissionController {
 
     /**
      * Frees memory-heavy resources after a mission completes (success or failure).
-     * On CF, also merges passed directive branches into main and cleans up all branches.
+     * On CF, cleans up any remaining directive branches.
+     * 
+     * <p>Note: With per-wave merge enabled, passed FORGE/PRISM branches are already merged
+     * into main after each wave (in EvaluateWaveNode). This cleanup handles:
+     * <ul>
+     *   <li>Failed directives (branches preserved for debugging)</li>
+     *   <li>Conflicted branches that couldn't be merged</li>
+     *   <li>All branches if the mission itself failed</li>
+     * </ul>
      */
     private void cleanupMissionResources(String missionId) {
         try {
@@ -482,7 +492,7 @@ public class MissionController {
             RunnableConfig config = RunnableConfig.builder().threadId(missionId).build();
             checkpointSaver.release(config);
 
-            // CF git branch merge/cleanup
+            // CF git branch cleanup
             if (gitWorkspaceManager != null && cfProperties != null) {
                 WorldmindState state = missionStates.get(missionId);
                 if (state != null && !state.directives().isEmpty()) {
@@ -495,7 +505,6 @@ public class MissionController {
                             .toList();
 
                     // Use the mission's git URL, falling back to config if not set
-                    // (centurions use cfProperties.getGitRemoteUrl() as fallback, so merge must too)
                     String missionGitUrl = state.gitRemoteUrl();
                     log.info("Mission {} gitRemoteUrl from state: '{}'", missionId,
                             missionGitUrl != null ? missionGitUrl.replaceAll("://[^@]+@", "://***@") : "null");
@@ -505,19 +514,35 @@ public class MissionController {
                                 missionGitUrl != null ? missionGitUrl.replaceAll("://[^@]+@", "://***@") : "null");
                     }
 
-                    if (state.status() == MissionStatus.COMPLETED && !passedIds.isEmpty()) {
-                        log.info("Merging {} passed directive branches for mission {} to {}", passedIds.size(), missionId,
-                                missionGitUrl != null ? missionGitUrl.replaceAll("://[^@]+@", "://***@") : "null");
-                        gitWorkspaceManager.mergeDirectiveBranches(passedIds, cfProperties.getGitToken(), missionGitUrl);
-                    }
-
-                    // Clean up any branches that weren't merged (failed directives, or all if mission failed)
-                    List<String> unmergedIds = allDirectiveIds.stream()
-                            .filter(id -> !passedIds.contains(id) || state.status() != MissionStatus.COMPLETED)
-                            .toList();
-                    if (!unmergedIds.isEmpty()) {
-                        log.info("Cleaning up {} unmerged directive branches for mission {}", unmergedIds.size(), missionId);
-                        gitWorkspaceManager.cleanupDirectiveBranches(unmergedIds, cfProperties.getGitToken(), missionGitUrl);
+                    // Per-wave merge already handles passed FORGE/PRISM branches during execution.
+                    // At cleanup, we only need to delete branches for:
+                    // 1. Failed directives (for debugging, user may want to inspect)
+                    // 2. All directives if the mission failed (rollback scenario)
+                    // 
+                    // For successful missions, passed branches should already be merged and deleted.
+                    // We still attempt cleanup in case any were missed (e.g., merge conflict).
+                    if (state.status() == MissionStatus.COMPLETED) {
+                        // Mission succeeded — clean up passed branches (should already be deleted,
+                        // but cleanup handles any stragglers from merge conflicts)
+                        if (!passedIds.isEmpty()) {
+                            log.info("Cleaning up {} passed directive branches for completed mission {}", 
+                                    passedIds.size(), missionId);
+                            gitWorkspaceManager.cleanupDirectiveBranches(passedIds, cfProperties.getGitToken(), missionGitUrl);
+                        }
+                        // Clean up failed/skipped directive branches
+                        List<String> failedIds = allDirectiveIds.stream()
+                                .filter(id -> !passedIds.contains(id))
+                                .toList();
+                        if (!failedIds.isEmpty()) {
+                            log.info("Cleaning up {} failed/skipped directive branches for mission {}", 
+                                    failedIds.size(), missionId);
+                            gitWorkspaceManager.cleanupDirectiveBranches(failedIds, cfProperties.getGitToken(), missionGitUrl);
+                        }
+                    } else {
+                        // Mission failed — clean up all branches
+                        log.info("Mission {} failed, cleaning up all {} directive branches", 
+                                missionId, allDirectiveIds.size());
+                        gitWorkspaceManager.cleanupDirectiveBranches(allDirectiveIds, cfProperties.getGitToken(), missionGitUrl);
                     }
                 }
             }

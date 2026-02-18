@@ -89,6 +89,6 @@ class ScheduleWaveNodeTest {
 
     private Directive directive(String id) {
         return new Directive(id, "FORGE", "Do " + id, "", "Done", List.of(),
-                DirectiveStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of(), null);
+                DirectiveStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of(), List.of(), null);
     }
 }

@@ -29,17 +29,17 @@ class EvaluateWaveNodeTest {
     void setUp() {
         mockBridge = mock(StarblasterBridge.class);
         mockSealService = mock(SealEvaluationService.class);
-        node = new EvaluateWaveNode(mockBridge, mockSealService, new EventBus(), mock(WorldmindMetrics.class), new OscillationDetector());
+        node = new EvaluateWaveNode(mockBridge, mockSealService, new EventBus(), mock(WorldmindMetrics.class), new OscillationDetector(), null, null);
     }
 
     private Directive forgeDirective(String id, int iteration, int maxIterations, FailureStrategy onFailure) {
         return new Directive(id, "FORGE", "Do " + id, "", "Done", List.of(),
-                DirectiveStatus.PENDING, iteration, maxIterations, onFailure, List.of(), null);
+                DirectiveStatus.PENDING, iteration, maxIterations, onFailure, List.of(), List.of(), null);
     }
 
     private Directive nonForgeDirective(String id) {
         return new Directive(id, "PULSE", "Research " + id, "", "Done", List.of(),
-                DirectiveStatus.PENDING, 0, 1, FailureStrategy.SKIP, List.of(), null);
+                DirectiveStatus.PENDING, 0, 1, FailureStrategy.SKIP, List.of(), List.of(), null);
     }
 
     private WaveDispatchResult passedResult(String id) {
@@ -57,7 +57,7 @@ class EvaluateWaveNodeTest {
 
     private StarblasterBridge.BridgeResult bridgeResult(String id, String centurion) {
         var d = new Directive(id, centurion, "sub", "", "", List.of(),
-                DirectiveStatus.PASSED, 1, 1, FailureStrategy.SKIP, List.of(), 100L);
+                DirectiveStatus.PASSED, 1, 1, FailureStrategy.SKIP, List.of(), List.of(), 100L);
         return new StarblasterBridge.BridgeResult(d,
                 new StarblasterInfo("c-" + id, centurion, id, "completed", Instant.now(), Instant.now()),
                 "output");

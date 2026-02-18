@@ -105,7 +105,7 @@ class LlmServiceTest {
     void structuredCallWorksDifferentTypes() {
         // Verify it works with the Classification record type
         String jsonResponse = """
-                {"category":"research","complexity":5,"affectedComponents":["api","model","service","ui","config"],"planningStrategy":"adaptive"}
+                {"category":"research","complexity":5,"affectedComponents":["api","model","service","ui","config"],"planningStrategy":"parallel"}
                 """;
         when(mockCallResponse.content()).thenReturn(jsonResponse);
 
@@ -116,7 +116,7 @@ class LlmServiceTest {
         assertEquals("research", result.category());
         assertEquals(5, result.complexity());
         assertEquals(5, result.affectedComponents().size());
-        assertEquals("adaptive", result.planningStrategy());
+        assertEquals("parallel", result.planningStrategy());
     }
 
     @Test

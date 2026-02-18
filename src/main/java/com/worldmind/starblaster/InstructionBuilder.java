@@ -84,13 +84,15 @@ public final class InstructionBuilder {
         sb.append(directive.successCriteria()).append("\n\n");
 
         sb.append("## Constraints\n\n");
+        sb.append("- **NAMING**: Name things according to their function. App names, project names, ");
+        sb.append("and config files should describe what the application does (e.g., `snake-game`, `todo-api`), ");
+        sb.append("not generic names like `my-app` or `worldmind-app`.\n");
         sb.append("- **CRITICAL**: You MUST create/modify the files described in the objective. ");
         sb.append("Do NOT exit until you have actually written the code. ");
         sb.append("If you only explore the codebase without creating files, this directive will FAIL.\n");
-        sb.append("- **FUNCTIONAL COMPLETENESS**: Do NOT deliver scaffolding, shells, or placeholder code. ");
-        sb.append("If the objective asks for a 'game', implement ACTUAL game logic (movement, scoring, win/lose conditions). ");
-        sb.append("If it asks for an 'API', implement REAL endpoints that do something. ");
-        sb.append("A pretty UI with no working functionality is NOT acceptable and will be rejected.\n");
+        sb.append("- **FUNCTIONAL COMPLETENESS**: Deliver working, functional code — not scaffolding or placeholders. ");
+        sb.append("Before committing, verify it actually works: run it, test it, confirm the core functionality operates as expected. ");
+        sb.append("If something doesn't work, fix it before finishing.\n");
         sb.append("- Only modify files related to this directive\n");
         sb.append("- Do not modify test files (Gauntlet handles tests)\n");
         sb.append("- When finished, stage and commit all changes: `git add -A && git commit -m 'done'`\n");
@@ -101,13 +103,13 @@ public final class InstructionBuilder {
         sb.append("best practices, or examples when implementing unfamiliar technologies.\n");
         sb.append("- **File Operations**: Read, write, and modify files in the workspace.\n\n");
 
-        sb.append("## Deployment Validation (IMPORTANT)\n\n");
-        sb.append("If you create a `manifest.yml` for Cloud Foundry deployment, you MUST ensure:\n");
-        sb.append("- **Staticfile apps**: Create a `Staticfile` config with `root: public` and place all HTML/CSS/JS in a `public/` directory\n");
-        sb.append("- **Java apps**: Ensure `manifest.yml` path matches where the JAR is built (usually `target/`)\n");
+        sb.append("## Cloud Foundry Deployment\n\n");
+        sb.append("If you create a `manifest.yml`:\n");
+        sb.append("- Use `default-route: true` — NEVER hardcode routes like `route: app.apps.example.com`\n");
+        sb.append("- **Staticfile apps**: Create a `Staticfile` config with `root: public` and place HTML/CSS/JS in `public/`\n");
+        sb.append("- **Java apps**: Ensure path matches where the JAR is built (usually `target/`)\n");
         sb.append("- **Node apps**: Ensure `package.json` exists with a valid `start` script\n");
-        sb.append("- **VERIFY**: The deployment config (manifest.yml, Staticfile, etc.) MUST match the actual file structure\n");
-        sb.append("- Before committing, check that if `manifest.yml` references any paths, those paths exist\n");
+        sb.append("- Verify the deployment config matches the actual file structure before committing\n");
 
         return sb.toString();
     }
@@ -187,12 +189,9 @@ public final class InstructionBuilder {
         sb.append("- Check that the implementation matches the directive objective\n");
         sb.append("- Look for: bugs, security vulnerabilities, performance issues, code style problems\n\n");
         sb.append("### FUNCTIONAL COMPLETENESS CHECK (CRITICAL)\n");
-        sb.append("- **Does the code ACTUALLY implement the requested feature?** Not just scaffolding or UI shells.\n");
-        sb.append("- If the directive asks for a 'game', verify there is actual game logic, not just a container\n");
-        sb.append("- If the directive asks for an 'API', verify there are actual endpoints with real implementations\n");
-        sb.append("- If the directive asks for 'CRUD operations', verify all Create/Read/Update/Delete actually work\n");
-        sb.append("- **FAIL the review (score <= 4) if the code is just a shell/placeholder without real functionality**\n");
-        sb.append("- A pretty UI with no working backend/logic is NOT a complete implementation\n\n");
+        sb.append("- Does the code actually implement what was requested? Not just scaffolding.\n");
+        sb.append("- Would this work if deployed? Test it mentally — trace through the code.\n");
+        sb.append("- **FAIL (score <= 4) if core functionality is missing or broken.**\n\n");
         sb.append("### Deployment Check\n");
         sb.append("- If there's a `manifest.yml`, verify it matches the file structure:\n");
         sb.append("  - Staticfile apps MUST have `Staticfile` config AND files in `public/` directory\n");

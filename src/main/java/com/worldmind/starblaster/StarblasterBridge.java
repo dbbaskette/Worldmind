@@ -116,6 +116,7 @@ public class StarblasterBridge {
             directive.iteration() + 1,
             directive.maxIterations(),
             directive.onFailure(),
+            directive.targetFiles(),
             execResult.fileChanges(),
             execResult.elapsedMs()
         );

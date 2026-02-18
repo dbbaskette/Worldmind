@@ -38,9 +38,9 @@ class MissionEngineTest {
                         "Implement the requested feature",
                         "sequential",
                         List.of(
-                                new MissionPlan.DirectivePlan("FORGE", "Implement feature", "", "Feature works", List.of()),
-                                new MissionPlan.DirectivePlan("GAUNTLET", "Write tests", "", "Tests pass", List.of("DIR-001")),
-                                new MissionPlan.DirectivePlan("VIGIL", "Review code", "", "Code quality ok", List.of("DIR-002"))
+                                new MissionPlan.DirectivePlan("FORGE", "Implement feature", "", "Feature works", List.of(), List.of()),
+                                new MissionPlan.DirectivePlan("GAUNTLET", "Write tests", "", "Tests pass", List.of("DIR-001"), List.of()),
+                                new MissionPlan.DirectivePlan("VIGIL", "Review code", "", "Code quality ok", List.of("DIR-002"), List.of())
                         )
                 ));
         when(mockLlm.structuredCall(anyString(), anyString(), eq(ProductSpec.class)))

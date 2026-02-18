@@ -14,7 +14,7 @@ class InstructionBuilderTest {
             "DIR-001", "FORGE", "Create hello.py",
             "Python project with pytest", "File hello.py exists and is valid Python",
             List.of(), DirectiveStatus.PENDING, 0, 3,
-            FailureStrategy.RETRY, List.of(), null
+            FailureStrategy.RETRY, List.of(), List.of(), null
         );
         var context = new ProjectContext("/tmp/project", List.of("src/", "  main.py"),
             "python", "flask", Map.of("flask", "2.3", "pytest", "7.4"), 10, "A Flask web app");
@@ -35,7 +35,7 @@ class InstructionBuilderTest {
             "DIR-002", "FORGE", "Add endpoint",
             "", "Endpoint returns 200",
             List.of(), DirectiveStatus.PENDING, 0, 3,
-            FailureStrategy.RETRY, List.of(), null
+            FailureStrategy.RETRY, List.of(), List.of(), null
         );
         var context = new ProjectContext("/tmp/p", List.of(), "java", "spring",
             Map.of(), 5, "");
@@ -52,7 +52,7 @@ class InstructionBuilderTest {
             "DIR-003", "FORGE", "Do something",
             "some context", "It works",
             List.of(), DirectiveStatus.PENDING, 0, 3,
-            FailureStrategy.RETRY, List.of(), null
+            FailureStrategy.RETRY, List.of(), List.of(), null
         );
 
         String instruction = InstructionBuilder.build(directive, null);
@@ -247,7 +247,7 @@ class InstructionBuilderTest {
             id, "FORGE", description,
             "", "It works",
             List.of(), DirectiveStatus.PENDING, 0, 3,
-            FailureStrategy.RETRY, List.of(), null
+            FailureStrategy.RETRY, List.of(), List.of(), null
         );
     }
 

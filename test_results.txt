@@ -1,0 +1,789 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ----------------------< com.worldmind:worldmind >-----------------------
+[INFO] Building worldmind 0.1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- frontend:1.15.0:install-node-and-npm (install node and npm) @ worldmind ---
+[INFO] Node v20.11.0 is already installed.
+[INFO] 
+[INFO] --- frontend:1.15.0:npm (npm install) @ worldmind ---
+[INFO] Running 'npm install' in /workspace/worldmind-ui
+[INFO] 
+[INFO] up to date, audited 141 packages in 482ms
+[INFO] 
+[INFO] 25 packages are looking for funding
+[INFO]   run `npm fund` for details
+[INFO] 
+[INFO] 2 moderate severity vulnerabilities
+[INFO] 
+[INFO] To address all issues (including breaking changes), run:
+[INFO]   npm audit fix --force
+[INFO] 
+[INFO] Run `npm audit` for details.
+[INFO] 
+[INFO] --- frontend:1.15.0:npm (npm build) @ worldmind ---
+[INFO] Running 'npm run build' in /workspace/worldmind-ui
+[INFO] 
+[INFO] > worldmind-ui@0.1.0 build
+[INFO] > tsc && vite build
+[INFO] 
+[INFO] vite v5.4.21 building for production...
+[INFO] transforming...
+[INFO] ✓ 47 modules transformed.
+[INFO] rendering chunks...
+[INFO] computing gzip size...
+[INFO] dist/index.html                   0.58 kB │ gzip:  0.35 kB
+[INFO] dist/assets/index-8j50uiuD.css   15.31 kB │ gzip:  3.61 kB
+[INFO] dist/assets/index-KqpQvbIN.js   164.50 kB │ gzip: 51.77 kB
+[INFO] ✓ built in 696ms
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ worldmind ---
+[INFO] Copying 5 resources from src/main/resources to target/classes
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] 
+[INFO] --- resources:3.3.1:copy-resources (copy-frontend-build) @ worldmind ---
+[INFO] Copying 4 resources from worldmind-ui/dist to target/classes/static
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ worldmind ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ worldmind ---
+[INFO] Copying 1 resource from src/test/resources to target/test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ worldmind ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.5.2:test (default-test) @ worldmind ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.worldmind.core.metrics.WorldmindMetricsTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.074 s -- in com.worldmind.core.metrics.WorldmindMetricsTest
+[INFO] Running com.worldmind.core.llm.LlmServiceTest
+Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build what is described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org/mockito/Mockito.html#0.3
+WARNING: A Java agent has been loaded dynamically (/root/.m2/repository/net/bytebuddy/byte-buddy-agent/1.15.11/byte-buddy-agent-1.15.11.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+01:47:06.241 [main] INFO com.worldmind.core.llm.LlmService -- LlmService initialized — OpenAI base-url: http://test:1234
+01:47:06.243 [main] INFO com.worldmind.core.llm.LlmService -- LLM call started → Classification
+01:47:06.401 [main] INFO com.worldmind.core.llm.LlmService -- Sending prompt to model...
+01:47:06.403 [main] INFO com.worldmind.core.llm.LlmService -- Model responded, extracting content...
+01:47:06.403 [main] INFO com.worldmind.core.llm.LlmService -- LLM call complete → Classification (0.2s)
+01:47:06.423 [main] INFO com.worldmind.core.llm.LlmService -- LlmService initialized — OpenAI base-url: http://test:1234
+01:47:06.424 [main] INFO com.worldmind.core.llm.LlmService -- LLM call started → Classification
+01:47:06.427 [main] INFO com.worldmind.core.llm.LlmService -- Sending prompt to model...
+01:47:06.428 [main] INFO com.worldmind.core.llm.LlmService -- Model responded, extracting content...
+01:47:06.428 [main] INFO com.worldmind.core.llm.LlmService -- LLM call complete → Classification (0.0s)
+01:47:06.436 [main] INFO com.worldmind.core.llm.LlmService -- LlmService initialized — OpenAI base-url: http://test:1234
+01:47:06.436 [main] INFO com.worldmind.core.llm.LlmService -- LLM call started → Classification
+01:47:06.441 [main] INFO com.worldmind.core.llm.LlmService -- Sending prompt to model...
+01:47:06.441 [main] INFO com.worldmind.core.llm.LlmService -- Model responded, extracting content...
+01:47:06.442 [main] INFO com.worldmind.core.llm.LlmService -- LLM call complete → Classification (0.0s)
+01:47:06.444 [main] INFO com.worldmind.core.llm.LlmService -- LlmService initialized — OpenAI base-url: http://test:1234
+01:47:06.444 [main] INFO com.worldmind.core.llm.LlmService -- LLM call started → Classification
+01:47:06.448 [main] INFO com.worldmind.core.llm.LlmService -- Sending prompt to model...
+01:47:06.448 [main] INFO com.worldmind.core.llm.LlmService -- Model responded, extracting content...
+01:47:06.449 [main] INFO com.worldmind.core.llm.LlmService -- LLM call complete → Classification (0.0s)
+01:47:06.452 [main] INFO com.worldmind.core.llm.LlmService -- LlmService initialized — OpenAI base-url: http://test:1234
+01:47:06.452 [main] INFO com.worldmind.core.llm.LlmService -- LLM call started → Classification
+01:47:06.457 [main] INFO com.worldmind.core.llm.LlmService -- Sending prompt to model...
+01:47:06.458 [main] INFO com.worldmind.core.llm.LlmService -- Model responded, extracting content...
+01:47:06.458 [main] INFO com.worldmind.core.llm.LlmService -- LLM call complete → Classification (0.0s)
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.683 s -- in com.worldmind.core.llm.LlmServiceTest
+[INFO] Running com.worldmind.core.security.PathRestrictionServiceTest
+[INFO] Running com.worldmind.core.security.PathRestrictionServiceTest$UnknownTypeTests
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s -- in com.worldmind.core.security.PathRestrictionServiceTest$UnknownTypeTests
+[INFO] Running com.worldmind.core.security.PathRestrictionServiceTest$VigilTests
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s -- in com.worldmind.core.security.PathRestrictionServiceTest$VigilTests
+[INFO] Running com.worldmind.core.security.PathRestrictionServiceTest$GauntletTests
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s -- in com.worldmind.core.security.PathRestrictionServiceTest$GauntletTests
+[INFO] Running com.worldmind.core.security.PathRestrictionServiceTest$ForgeTests
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s -- in com.worldmind.core.security.PathRestrictionServiceTest$ForgeTests
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.015 s -- in com.worldmind.core.security.PathRestrictionServiceTest
+[INFO] Running com.worldmind.core.security.CommandAllowlistServiceTest
+[INFO] Running com.worldmind.core.security.CommandAllowlistServiceTest$UnknownTypeTests
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s -- in com.worldmind.core.security.CommandAllowlistServiceTest$UnknownTypeTests
+[INFO] Running com.worldmind.core.security.CommandAllowlistServiceTest$VigilTests
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s -- in com.worldmind.core.security.CommandAllowlistServiceTest$VigilTests
+[INFO] Running com.worldmind.core.security.CommandAllowlistServiceTest$GauntletTests
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s -- in com.worldmind.core.security.CommandAllowlistServiceTest$GauntletTests
+[INFO] Running com.worldmind.core.security.CommandAllowlistServiceTest$ForgeTests
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s -- in com.worldmind.core.security.CommandAllowlistServiceTest$ForgeTests
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.008 s -- in com.worldmind.core.security.CommandAllowlistServiceTest
+[INFO] Running com.worldmind.core.security.JwtTokenServiceTest
+[INFO] Running com.worldmind.core.security.JwtTokenServiceTest$ValidateTokenTests
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.098 s -- in com.worldmind.core.security.JwtTokenServiceTest$ValidateTokenTests
+[INFO] Running com.worldmind.core.security.JwtTokenServiceTest$GenerateTokenTests
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s -- in com.worldmind.core.security.JwtTokenServiceTest$GenerateTokenTests
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.103 s -- in com.worldmind.core.security.JwtTokenServiceTest
+[INFO] Running com.worldmind.core.nodes.EvaluateWaveNodeTest
+01:47:06.619 [main] INFO com.worldmind.core.nodes.EvaluateWaveNode -- Dispatching GAUNTLET for directive DIR-001
+01:47:06.619 [main] INFO com.worldmind.core.nodes.EvaluateWaveNode -- Dispatching VIGIL for directive DIR-001
+01:47:06.620 [main] INFO com.worldmind.core.nodes.EvaluateWaveNode -- Seal evaluation for DIR-001: DENIED — Skipping
+01:47:06.620 [main] INFO com.worldmind.core.nodes.EvaluateWaveNode -- Skipping directive DIR-001 — marking complete
+01:47:06.622 [main] INFO com.worldmind.core.nodes.EvaluateWaveNode -- Dispatching GAUNTLET for directive DIR-001
+01:47:06.623 [main] ERROR com.worldmind.core.nodes.EvaluateWaveNode -- GAUNTLET dispatch failed for DIR-001: Docker down
+01:47:06.623 [main] INFO com.worldmind.core.nodes.EvaluateWaveNode -- Dispatching VIGIL for directive DIR-001
+01:47:06.623 [main] INFO com.worldmind.core.nodes.EvaluateWaveNode -- Seal evaluation for DIR-001: DENIED — Tests failed due to infra error
+01:47:06.623 [main] INFO com.worldmind.core.nodes.EvaluateWaveNode -- Retrying directive DIR-001 — will re-enter next wave
+01:47:06.624 [main] INFO com.worldmind.core.nodes.EvaluateWaveNode -- Auto-passing non-FORGE directive DIR-001 [PULSE]
+01:47:06.625 [main] INFO com.worldmind.core.nodes.EvaluateWaveNode -- Dispatching GAUNTLET for directive DIR-001
+01:47:06.625 [main] INFO com.worldmind.core.nodes.EvaluateWaveNode -- Dispatching VIGIL for directive DIR-001
+01:47:06.625 [main] INFO com.worldmind.core.nodes.EvaluateWaveNode -- Seal evaluation for DIR-001: GRANTED — All good
+01:47:06.626 [main] INFO com.worldmind.core.nodes.EvaluateWaveNode -- Dispatching GAUNTLET for directive DIR-001
+01:47:06.626 [main] INFO com.worldmind.core.nodes.EvaluateWaveNode -- Dispatching VIGIL for directive DIR-001
+01:47:06.626 [main] INFO com.worldmind.core.nodes.EvaluateWaveNode -- Seal evaluation for DIR-001: DENIED — Critical failure
+01:47:06.626 [main] WARN com.worldmind.core.nodes.EvaluateWaveNode -- Directive DIR-001 ESCALATED — mission failed
+01:47:06.628 [main] INFO com.worldmind.core.nodes.EvaluateWaveNode -- Dispatching GAUNTLET for directive DIR-001
+01:47:06.628 [main] INFO com.worldmind.core.nodes.EvaluateWaveNode -- Dispatching VIGIL for directive DIR-001
+01:47:06.628 [main] INFO com.worldmind.core.nodes.EvaluateWaveNode -- Seal evaluation for DIR-001: DENIED — Tests failed
+01:47:06.628 [main] INFO com.worldmind.core.nodes.EvaluateWaveNode -- Retrying directive DIR-001 — will re-enter next wave
+01:47:06.629 [main] INFO com.worldmind.core.nodes.EvaluateWaveNode -- Dispatching GAUNTLET for directive DIR-001
+01:47:06.629 [main] INFO com.worldmind.core.nodes.EvaluateWaveNode -- Dispatching VIGIL for directive DIR-001
+01:47:06.629 [main] INFO com.worldmind.core.nodes.EvaluateWaveNode -- Seal evaluation for DIR-001: DENIED — Retries exhausted
+01:47:06.629 [main] WARN com.worldmind.core.nodes.EvaluateWaveNode -- Directive DIR-001 ESCALATED — mission failed
+01:47:06.630 [main] INFO com.worldmind.core.nodes.EvaluateWaveNode -- FORGE directive DIR-001 failed at dispatch — applying failure strategy
+01:47:06.630 [main] INFO com.worldmind.core.nodes.EvaluateWaveNode -- Retrying directive DIR-001 — will re-enter next wave
+01:47:06.631 [main] INFO com.worldmind.core.nodes.EvaluateWaveNode -- Dispatching GAUNTLET for directive DIR-001
+01:47:06.631 [main] INFO com.worldmind.core.nodes.EvaluateWaveNode -- Dispatching VIGIL for directive DIR-001
+01:47:06.631 [main] INFO com.worldmind.core.nodes.EvaluateWaveNode -- Seal evaluation for DIR-001: GRANTED — Seal granted
+01:47:06.631 [main] INFO com.worldmind.core.nodes.EvaluateWaveNode -- Auto-passing non-FORGE directive DIR-002 [PULSE]
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.037 s -- in com.worldmind.core.nodes.EvaluateWaveNodeTest
+[INFO] Running com.worldmind.core.nodes.EvaluateSealNodeTest
+01:47:06.635 [main] INFO com.worldmind.core.nodes.EvaluateSealNode -- Dispatching GAUNTLET for directive DIR-001
+01:47:06.635 [main] ERROR com.worldmind.core.nodes.EvaluateSealNode -- GAUNTLET dispatch failed for DIR-001: Docker connection refused
+01:47:06.635 [main] INFO com.worldmind.core.nodes.EvaluateSealNode -- Dispatching VIGIL for directive DIR-001
+01:47:06.635 [main] INFO com.worldmind.core.nodes.EvaluateSealNode -- Seal evaluation for DIR-001: DENIED — Tests failed due to infra error
+01:47:06.635 [main] INFO com.worldmind.core.nodes.EvaluateSealNode -- Retrying directive DIR-001 — index decremented
+01:47:06.636 [main] INFO com.worldmind.core.nodes.EvaluateSealNode -- FORGE directive DIR-001 failed — applying failure strategy
+01:47:06.636 [main] WARN com.worldmind.core.nodes.EvaluateSealNode -- Directive DIR-001 ESCALATED — mission failed
+01:47:06.637 [main] INFO com.worldmind.core.nodes.EvaluateSealNode -- Dispatching GAUNTLET for directive DIR-001
+01:47:06.637 [main] INFO com.worldmind.core.nodes.EvaluateSealNode -- Dispatching VIGIL for directive DIR-001
+01:47:06.637 [main] INFO com.worldmind.core.nodes.EvaluateSealNode -- Seal evaluation for DIR-001: DENIED — Critical failure
+01:47:06.637 [main] WARN com.worldmind.core.nodes.EvaluateSealNode -- Directive DIR-001 ESCALATED — mission failed
+01:47:06.638 [main] INFO com.worldmind.core.nodes.EvaluateSealNode -- Dispatching GAUNTLET for directive DIR-001
+01:47:06.638 [main] INFO com.worldmind.core.nodes.EvaluateSealNode -- Dispatching VIGIL for directive DIR-001
+01:47:06.638 [main] ERROR com.worldmind.core.nodes.EvaluateSealNode -- VIGIL dispatch failed for DIR-001: VIGIL container timeout
+01:47:06.638 [main] INFO com.worldmind.core.nodes.EvaluateSealNode -- Seal evaluation for DIR-001: DENIED — Review failed due to infra error
+01:47:06.638 [main] INFO com.worldmind.core.nodes.EvaluateSealNode -- Retrying directive DIR-001 — index decremented
+01:47:06.639 [main] INFO com.worldmind.core.nodes.EvaluateSealNode -- Skipping seal evaluation for non-FORGE directive DIR-002 [GAUNTLET]
+01:47:06.639 [main] INFO com.worldmind.core.nodes.EvaluateSealNode -- Dispatching GAUNTLET for directive DIR-001
+01:47:06.639 [main] INFO com.worldmind.core.nodes.EvaluateSealNode -- Dispatching VIGIL for directive DIR-001
+01:47:06.640 [main] INFO com.worldmind.core.nodes.EvaluateSealNode -- Seal evaluation for DIR-001: GRANTED — Seal granted
+01:47:06.640 [main] INFO com.worldmind.core.nodes.EvaluateSealNode -- Dispatching GAUNTLET for directive DIR-001
+01:47:06.640 [main] INFO com.worldmind.core.nodes.EvaluateSealNode -- Dispatching VIGIL for directive DIR-001
+01:47:06.640 [main] INFO com.worldmind.core.nodes.EvaluateSealNode -- Seal evaluation for DIR-001: DENIED — Architecture needs rethinking
+01:47:06.641 [main] WARN com.worldmind.core.nodes.EvaluateSealNode -- Directive DIR-001 requires REPLAN — mission failed
+01:47:06.641 [main] INFO com.worldmind.core.nodes.EvaluateSealNode -- Dispatching GAUNTLET for directive DIR-001
+01:47:06.641 [main] INFO com.worldmind.core.nodes.EvaluateSealNode -- Dispatching VIGIL for directive DIR-001
+01:47:06.641 [main] INFO com.worldmind.core.nodes.EvaluateSealNode -- Seal evaluation for DIR-001: DENIED — Review score too low
+01:47:06.641 [main] INFO com.worldmind.core.nodes.EvaluateSealNode -- Skipping directive DIR-001 — moving to next
+01:47:06.642 [main] INFO com.worldmind.core.nodes.EvaluateSealNode -- Dispatching GAUNTLET for directive DIR-001
+01:47:06.642 [main] INFO com.worldmind.core.nodes.EvaluateSealNode -- Dispatching VIGIL for directive DIR-001
+01:47:06.642 [main] INFO com.worldmind.core.nodes.EvaluateSealNode -- Seal evaluation for DIR-001: DENIED — Tests failed
+01:47:06.642 [main] INFO com.worldmind.core.nodes.EvaluateSealNode -- Retrying directive DIR-001 — index decremented
+01:47:06.642 [main] INFO com.worldmind.core.nodes.EvaluateSealNode -- FORGE directive DIR-001 failed — applying failure strategy
+01:47:06.642 [main] INFO com.worldmind.core.nodes.EvaluateSealNode -- Retrying directive DIR-001 — index decremented
+01:47:06.643 [main] WARN com.worldmind.core.nodes.EvaluateSealNode -- No directive to evaluate at index -1
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.010 s -- in com.worldmind.core.nodes.EvaluateSealNodeTest
+[INFO] Running com.worldmind.core.nodes.UploadContextNodeTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.015 s -- in com.worldmind.core.nodes.UploadContextNodeTest
+[INFO] Running com.worldmind.core.nodes.ConvergeResultsNodeTest
+01:47:06.660 [main] INFO com.worldmind.core.nodes.ConvergeResultsNode -- Mission converged — 0 completed, 2 failed, 0 tests (0 passed), 0 files changed
+01:47:06.661 [main] INFO com.worldmind.core.nodes.ConvergeResultsNode -- Mission converged — 2 completed, 0 failed, 0 tests (0 passed), 5 files changed
+01:47:06.661 [main] INFO com.worldmind.core.nodes.ConvergeResultsNode -- Mission converged — 2 completed, 0 failed, 0 tests (0 passed), 0 files changed
+01:47:06.661 [main] INFO com.worldmind.core.nodes.ConvergeResultsNode -- Mission converged — 2 completed, 1 failed, 0 tests (0 passed), 0 files changed
+01:47:06.662 [main] INFO com.worldmind.core.nodes.ConvergeResultsNode -- Mission converged — 2 completed, 1 failed, 0 tests (0 passed), 0 files changed
+01:47:06.662 [main] INFO com.worldmind.core.nodes.ConvergeResultsNode -- Mission converged — 0 completed, 0 failed, 15 tests (13 passed), 0 files changed
+01:47:06.663 [main] INFO com.worldmind.core.nodes.ConvergeResultsNode -- Mission converged — 0 completed, 0 failed, 0 tests (0 passed), 0 files changed
+01:47:06.663 [main] INFO com.worldmind.core.nodes.ConvergeResultsNode -- Mission converged — 0 completed, 0 failed, 0 tests (0 passed), 0 files changed
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s -- in com.worldmind.core.nodes.ConvergeResultsNodeTest
+[INFO] Running com.worldmind.core.nodes.DispatchCenturionNodeTest
+01:47:06.666 [main] INFO com.worldmind.core.nodes.DispatchCenturionNode -- Directive DIR-001 already PASSED, advancing
+01:47:06.666 [main] INFO com.worldmind.core.nodes.DispatchCenturionNode -- Dispatching directive DIR-001 [FORGE]: Create file
+01:47:06.667 [main] INFO com.worldmind.core.nodes.DispatchCenturionNode -- Retrying FAILED directive DIR-001 with retry context
+01:47:06.667 [main] INFO com.worldmind.core.nodes.DispatchCenturionNode -- Dispatching directive DIR-001 [FORGE]: Create file
+01:47:06.668 [main] INFO com.worldmind.core.nodes.DispatchCenturionNode -- No pending directives — mission complete
+01:47:06.669 [main] INFO com.worldmind.core.nodes.DispatchCenturionNode -- Dispatching directive DIR-001 [FORGE]: Create file
+01:47:06.669 [main] INFO com.worldmind.core.nodes.DispatchCenturionNode -- Directive DIR-001 already FAILED, advancing
+01:47:06.670 [main] INFO com.worldmind.core.nodes.DispatchCenturionNode -- Retrying FAILED directive DIR-001 with retry context
+01:47:06.670 [main] INFO com.worldmind.core.nodes.DispatchCenturionNode -- Dispatching directive DIR-001 [FORGE]: Create file
+01:47:06.670 [main] INFO com.worldmind.core.nodes.DispatchCenturionNode -- No pending directives — mission complete
+01:47:06.671 [main] INFO com.worldmind.core.nodes.DispatchCenturionNode -- Retrying FAILED directive DIR-001 with retry context
+01:47:06.671 [main] INFO com.worldmind.core.nodes.DispatchCenturionNode -- Dispatching directive DIR-001 [FORGE]: Create file
+01:47:06.671 [main] INFO com.worldmind.core.nodes.DispatchCenturionNode -- Dispatching directive DIR-001 [FORGE]: Create file
+01:47:06.672 [main] INFO com.worldmind.core.nodes.DispatchCenturionNode -- Dispatching directive DIR-001 [FORGE]: Create file
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.007 s -- in com.worldmind.core.nodes.DispatchCenturionNodeTest
+[INFO] Running com.worldmind.core.nodes.PlanMissionNodeTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.009 s -- in com.worldmind.core.nodes.PlanMissionNodeTest
+[INFO] Running com.worldmind.core.nodes.ScheduleWaveNodeTest
+01:47:06.690 [main] INFO com.worldmind.core.nodes.ScheduleWaveNode -- Wave 3 — no eligible directives, all done
+01:47:06.690 [main] INFO com.worldmind.core.nodes.ScheduleWaveNode -- Wave 2 — scheduling 1 directives: [DIR-003]
+01:47:06.691 [main] INFO com.worldmind.core.nodes.ScheduleWaveNode -- Wave 1 — scheduling 2 directives: [DIR-001, DIR-002]
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.008 s -- in com.worldmind.core.nodes.ScheduleWaveNodeTest
+[INFO] Running com.worldmind.core.nodes.ParallelDispatchNodeTest
+01:47:06.696 [virtual-38] INFO com.worldmind.core.nodes.ParallelDispatchNode -- Dispatching directive DIR-001 [FORGE]: Do DIR-001
+01:47:06.697 [virtual-41] INFO com.worldmind.core.nodes.ParallelDispatchNode -- Dispatching directive DIR-001 [FORGE]: Do something
+01:47:06.698 [virtual-42] INFO com.worldmind.core.nodes.ParallelDispatchNode -- Dispatching directive DIR-001 [FORGE]: Do DIR-001
+01:47:06.699 [virtual-43] INFO com.worldmind.core.nodes.ParallelDispatchNode -- Dispatching directive DIR-002 [FORGE]: Do DIR-002
+01:47:06.699 [virtual-44] INFO com.worldmind.core.nodes.ParallelDispatchNode -- Dispatching directive DIR-003 [FORGE]: Do DIR-003
+01:47:06.700 [virtual-48] INFO com.worldmind.core.nodes.ParallelDispatchNode -- Dispatching directive DIR-001 [FORGE]: Do DIR-001
+01:47:06.700 [virtual-49] INFO com.worldmind.core.nodes.ParallelDispatchNode -- Dispatching directive DIR-002 [FORGE]: Do DIR-002
+01:47:06.700 [virtual-48] ERROR com.worldmind.core.nodes.ParallelDispatchNode -- Infrastructure error dispatching directive DIR-001: Docker unavailable
+01:47:06.701 [virtual-51] INFO com.worldmind.core.nodes.ParallelDispatchNode -- Dispatching directive DIR-002 [FORGE]: Do DIR-002
+01:47:06.701 [virtual-50] INFO com.worldmind.core.nodes.ParallelDispatchNode -- Dispatching directive DIR-001 [FORGE]: Do DIR-001
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.010 s -- in com.worldmind.core.nodes.ParallelDispatchNodeTest
+[INFO] Running com.worldmind.core.nodes.ClassifyRequestNodeTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s -- in com.worldmind.core.nodes.ClassifyRequestNodeTest
+[INFO] Running com.worldmind.core.health.HealthCheckServiceTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.011 s -- in com.worldmind.core.health.HealthCheckServiceTest
+[INFO] Running com.worldmind.core.graph.GraphTest
+01:47:06.737 [main] INFO com.worldmind.core.graph.WorldmindGraph -- Graph compiled without checkpoint saver (state will not be persisted)
+01:47:06.778 [main] INFO com.worldmind.core.graph.WorldmindGraph -- Graph compiled without checkpoint saver (state will not be persisted)
+01:47:06.782 [main] INFO com.worldmind.core.graph.WorldmindGraph -- Graph compiled without checkpoint saver (state will not be persisted)
+01:47:06.783 [main] INFO com.worldmind.core.graph.WorldmindGraph -- Graph compiled without checkpoint saver (state will not be persisted)
+01:47:06.783 [main] INFO com.worldmind.core.graph.WorldmindGraph -- Graph compiled without checkpoint saver (state will not be persisted)
+01:47:06.784 [main] INFO com.worldmind.core.graph.WorldmindGraph -- Graph compiled without checkpoint saver (state will not be persisted)
+01:47:06.785 [main] INFO com.worldmind.core.graph.WorldmindGraph -- Graph compiled without checkpoint saver (state will not be persisted)
+01:47:06.785 [main] INFO com.worldmind.core.graph.WorldmindGraph -- Graph compiled without checkpoint saver (state will not be persisted)
+01:47:06.789 [main] INFO com.worldmind.core.graph.WorldmindGraph -- Graph compiled without checkpoint saver (state will not be persisted)
+01:47:06.790 [main] INFO com.worldmind.core.graph.WorldmindGraph -- Graph compiled without checkpoint saver (state will not be persisted)
+01:47:06.791 [main] INFO com.worldmind.core.graph.WorldmindGraph -- Graph compiled without checkpoint saver (state will not be persisted)
+01:47:06.795 [main] INFO com.worldmind.core.graph.WorldmindGraph -- Graph compiled without checkpoint saver (state will not be persisted)
+01:47:06.795 [main] INFO com.worldmind.core.graph.WorldmindGraph -- Graph compiled without checkpoint saver (state will not be persisted)
+01:47:06.796 [main] INFO com.worldmind.core.graph.WorldmindGraph -- Graph compiled without checkpoint saver (state will not be persisted)
+[INFO] Tests run: 14, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.081 s -- in com.worldmind.core.graph.GraphTest
+[INFO] Running com.worldmind.core.scheduler.DirectiveSchedulerTest
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s -- in com.worldmind.core.scheduler.DirectiveSchedulerTest
+[INFO] Running com.worldmind.core.scheduler.OscillationDetectorTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s -- in com.worldmind.core.scheduler.OscillationDetectorTest
+[INFO] Running com.worldmind.core.seal.SealEvaluationServiceTest
+[INFO] Running com.worldmind.core.seal.SealEvaluationServiceTest$EvaluateSealTests
+01:47:06.804 [main] WARN com.worldmind.core.seal.SealEvaluationService -- Directive DIR-001 exhausted retries (3/3), escalating
+01:47:06.804 [main] INFO com.worldmind.core.seal.SealEvaluationService -- Seal DENIED for directive DIR-001: Tests failed (2 of 10) and review score 5/10 below threshold → ESCALATE
+01:47:06.804 [main] INFO com.worldmind.core.seal.SealEvaluationService -- Seal DENIED for directive DIR-001: Review score 5/10 below threshold (minimum 7) → RETRY
+01:47:06.805 [main] INFO com.worldmind.core.seal.SealEvaluationService -- Seal DENIED for directive DIR-001: Tests failed: 1 of 10 failed → RETRY
+01:47:06.805 [main] INFO com.worldmind.core.seal.SealEvaluationService -- Seal DENIED for directive DIR-001: Tests failed (5 of 10) and review score 3/10 below threshold → SKIP
+01:47:06.805 [main] WARN com.worldmind.core.seal.SealEvaluationService -- Directive DIR-001 exhausted retries (3/3), escalating
+01:47:06.805 [main] INFO com.worldmind.core.seal.SealEvaluationService -- Seal DENIED for directive DIR-001: Tests failed: 1 of 10 failed → ESCALATE
+01:47:06.806 [main] INFO com.worldmind.core.seal.SealEvaluationService -- Seal GRANTED for directive DIR-001: Seal granted — tests pass, review score 7/10
+01:47:06.807 [main] INFO com.worldmind.core.seal.SealEvaluationService -- Seal DENIED for directive DIR-001: Tests failed: 3 of 10 failed → RETRY
+01:47:06.807 [main] INFO com.worldmind.core.seal.SealEvaluationService -- Seal DENIED for directive DIR-001: Tests failed (5 of 10) and review score 3/10 below threshold → REPLAN
+01:47:06.808 [main] INFO com.worldmind.core.seal.SealEvaluationService -- Seal GRANTED for directive DIR-001: Seal granted — tests pass, review score 8/10
+01:47:06.809 [main] INFO com.worldmind.core.seal.SealEvaluationService -- Seal DENIED for directive DIR-001: Tests failed (4 of 10) and review score 3/10 below threshold → RETRY
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.007 s -- in com.worldmind.core.seal.SealEvaluationServiceTest$EvaluateSealTests
+[INFO] Running com.worldmind.core.seal.SealEvaluationServiceTest$ParseReviewOutputTests
+01:47:06.811 [main] WARN com.worldmind.core.seal.SealEvaluationService -- Empty or null review output for directive DIR-003
+01:47:06.812 [main] WARN com.worldmind.core.seal.SealEvaluationService -- Empty or null review output for directive DIR-002
+01:47:06.812 [main] INFO com.worldmind.core.seal.SealEvaluationService -- Parsing review output for directive DIR-001 via LLM
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s -- in com.worldmind.core.seal.SealEvaluationServiceTest$ParseReviewOutputTests
+[INFO] Running com.worldmind.core.seal.SealEvaluationServiceTest$ParseTestOutputTests
+01:47:06.815 [main] WARN com.worldmind.core.seal.SealEvaluationService -- Empty or null test output for directive DIR-009
+01:47:06.817 [main] INFO com.worldmind.core.seal.SealEvaluationService -- Fallback: no failure indicators found in output for DIR-006, treating as passed
+01:47:06.818 [main] INFO com.worldmind.core.seal.SealEvaluationService -- Parsed Maven-style output for DIR-001: 8/10 tests passed
+01:47:06.818 [main] INFO com.worldmind.core.seal.SealEvaluationService -- Fallback: failure indicator found in output for DIR-008
+01:47:06.819 [main] INFO com.worldmind.core.seal.SealEvaluationService -- Parsed pytest-style output for DIR-004: 5/8 tests passed
+01:47:06.820 [main] WARN com.worldmind.core.seal.SealEvaluationService -- Empty or null test output for directive DIR-010
+01:47:06.820 [main] INFO com.worldmind.core.seal.SealEvaluationService -- Parsed Maven-style output for DIR-002: 15/15 tests passed
+01:47:06.821 [main] INFO com.worldmind.core.seal.SealEvaluationService -- Parsed pytest-style output for DIR-005: 12/12 tests passed
+01:47:06.821 [main] INFO com.worldmind.core.seal.SealEvaluationService -- Fallback: failure indicator found in output for DIR-007
+01:47:06.822 [main] INFO com.worldmind.core.seal.SealEvaluationService -- Parsed pytest-style output for DIR-003: 8/8 tests passed
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.008 s -- in com.worldmind.core.seal.SealEvaluationServiceTest$ParseTestOutputTests
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.019 s -- in com.worldmind.core.seal.SealEvaluationServiceTest
+[INFO] Running com.worldmind.core.persistence.CheckpointerTest
+01:47:06.826 [main] INFO com.worldmind.core.graph.WorldmindGraph -- Graph compiled without checkpoint saver (state will not be persisted)
+01:47:06.831 [main] INFO com.worldmind.core.graph.WorldmindGraph -- Graph compiled with checkpoint saver: MemorySaver
+01:47:06.884 [main] INFO com.worldmind.core.persistence.JdbcCheckpointSaver -- Checkpoint table 'lg4j_checkpoints' ensured
+01:47:06.884 [main] INFO com.worldmind.core.persistence.CheckpointerConfig -- Configuring JDBC checkpoint saver (PostgreSQL)
+01:47:06.886 [main] INFO com.worldmind.core.graph.WorldmindGraph -- Graph compiled with checkpoint saver: MemorySaver
+01:47:06.893 [main] INFO com.worldmind.core.persistence.CheckpointerConfig -- Using in-memory checkpoint saver (state will not persist across restarts)
+01:47:06.894 [main] INFO com.worldmind.core.graph.WorldmindGraph -- Graph compiled with checkpoint saver: MemorySaver
+01:47:06.898 [main] INFO com.worldmind.core.graph.WorldmindGraph -- Graph compiled with checkpoint saver: MemorySaver
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.074 s -- in com.worldmind.core.persistence.CheckpointerTest
+[INFO] Running com.worldmind.core.model.ModelTest
+[INFO] Running com.worldmind.core.model.ModelTest$WorldmindStateTests
+[ERROR] Tests run: 16, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.010 s <<< FAILURE! -- in com.worldmind.core.model.ModelTest$WorldmindStateTests
+[ERROR] com.worldmind.core.model.ModelTest$WorldmindStateTests.schemaContainsAllKeys -- Time elapsed: 0.004 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: SCHEMA has unexpected extra keys ==> expected: <20> but was: <21>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:150)
+	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:563)
+	at com.worldmind.core.model.ModelTest$WorldmindStateTests.schemaContainsAllKeys(ModelTest.java:278)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[INFO] Running com.worldmind.core.model.ModelTest$RecordTests
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s -- in com.worldmind.core.model.ModelTest$RecordTests
+[INFO] Running com.worldmind.core.model.ModelTest$EnumTests
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s -- in com.worldmind.core.model.ModelTest$EnumTests
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.016 s -- in com.worldmind.core.model.ModelTest
+[INFO] Running com.worldmind.core.events.EventBusTest
+[INFO] Running com.worldmind.core.events.EventBusTest$EdgeCaseTests
+01:47:06.917 [main] WARN com.worldmind.core.events.EventBus -- Subscriber threw exception processing event directive.started: boom
+java.lang.RuntimeException: boom
+	at com.worldmind.core.events.EventBusTest$EdgeCaseTests.lambda$subscriberExceptionDoesNotPreventOthers$1(EventBusTest.java:291)
+	at com.worldmind.core.events.EventBus.deliverSafely(EventBus.java:93)
+	at com.worldmind.core.events.EventBus.publish(EventBus.java:43)
+	at com.worldmind.core.events.EventBusTest$EdgeCaseTests.subscriberExceptionDoesNotPreventOthers(EventBusTest.java:296)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:767)
+	at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:60)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:131)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.intercept(TimeoutExtension.java:156)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestableMethod(TimeoutExtension.java:147)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestMethod(TimeoutExtension.java:86)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:103)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:93)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:106)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.proceed(InvocationInterceptorChain.java:64)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.chainAndInvoke(InvocationInterceptorChain.java:45)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.invoke(InvocationInterceptorChain.java:37)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:92)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:86)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.lambda$invokeTestMethod$8(TestMethodTestDescriptor.java:217)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.invokeTestMethod(TestMethodTestDescriptor.java:213)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:138)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:68)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:156)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:160)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:160)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:160)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.submit(SameThreadHierarchicalTestExecutorService.java:35)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestExecutor.execute(HierarchicalTestExecutor.java:57)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestEngine.execute(HierarchicalTestEngine.java:54)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:198)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:169)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:93)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:58)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:141)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:57)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:103)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:85)
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:47)
+	at org.apache.maven.surefire.junitplatform.LazyLauncher.execute(LazyLauncher.java:56)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:184)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:148)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:122)
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385)
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162)
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s -- in com.worldmind.core.events.EventBusTest$EdgeCaseTests
+[INFO] Running com.worldmind.core.events.EventBusTest$ConcurrencyTests
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s -- in com.worldmind.core.events.EventBusTest$ConcurrencyTests
+[INFO] Running com.worldmind.core.events.EventBusTest$UnsubscribeTests
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s -- in com.worldmind.core.events.EventBusTest$UnsubscribeTests
+[INFO] Running com.worldmind.core.events.EventBusTest$GlobalSubscriptionTests
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s -- in com.worldmind.core.events.EventBusTest$GlobalSubscriptionTests
+[INFO] Running com.worldmind.core.events.EventBusTest$SubscribeAndPublishTests
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s -- in com.worldmind.core.events.EventBusTest$SubscribeAndPublishTests
+[INFO] Running com.worldmind.core.events.EventBusTest$WorldmindEventTests
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s -- in com.worldmind.core.events.EventBusTest$WorldmindEventTests
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.016 s -- in com.worldmind.core.events.EventBusTest
+[INFO] Running com.worldmind.core.scanner.ProjectScannerTest
+[INFO] Tests run: 13, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.017 s -- in com.worldmind.core.scanner.ProjectScannerTest
+[INFO] Running com.worldmind.core.engine.MissionEngineTest
+01:47:06.951 [main] INFO com.worldmind.core.graph.WorldmindGraph -- Graph compiled without checkpoint saver (state will not be persisted)
+01:47:06.951 [main] INFO com.worldmind.core.engine.MissionEngine -- Starting mission WMND-2026-0001 with mode APPROVE_PLAN — request: Add logging
+01:47:06.955 [main] INFO com.worldmind.core.graph.WorldmindGraph -- Graph compiled without checkpoint saver (state will not be persisted)
+01:47:06.956 [main] INFO com.worldmind.core.engine.MissionEngine -- Starting mission WMND-2026-0002 with mode APPROVE_PLAN — request: Add logging
+01:47:06.958 [main] INFO com.worldmind.core.graph.WorldmindGraph -- Graph compiled without checkpoint saver (state will not be persisted)
+01:47:06.960 [main] INFO com.worldmind.core.engine.MissionEngine -- Starting mission WMND-2026-0003 with mode APPROVE_PLAN — request: 
+01:47:06.964 [main] INFO com.worldmind.core.graph.WorldmindGraph -- Graph compiled without checkpoint saver (state will not be persisted)
+01:47:06.964 [main] INFO com.worldmind.core.graph.WorldmindGraph -- Graph compiled without checkpoint saver (state will not be persisted)
+01:47:06.965 [main] INFO com.worldmind.core.engine.MissionEngine -- Starting mission WMND-2026-0005 with mode STEP_BY_STEP — request: Add logging
+01:47:06.967 [main] INFO com.worldmind.core.graph.WorldmindGraph -- Graph compiled without checkpoint saver (state will not be persisted)
+01:47:06.968 [main] INFO com.worldmind.core.engine.MissionEngine -- Starting mission WMND-2026-0006 with mode FULL_AUTO — request: Add logging
+01:47:06.973 [main] INFO com.worldmind.core.graph.WorldmindGraph -- Graph compiled without checkpoint saver (state will not be persisted)
+01:47:06.974 [main] INFO com.worldmind.core.graph.WorldmindGraph -- Graph compiled without checkpoint saver (state will not be persisted)
+01:47:06.974 [main] INFO com.worldmind.core.engine.MissionEngine -- Starting mission WMND-2026-0009 with mode APPROVE_PLAN — request: Add a REST endpoint
+01:47:06.975 [main] INFO com.worldmind.core.graph.WorldmindGraph -- Graph compiled without checkpoint saver (state will not be persisted)
+01:47:06.976 [main] INFO com.worldmind.core.engine.MissionEngine -- Starting mission WMND-2026-0010 with mode APPROVE_PLAN — request: Add a REST endpoint
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.027 s -- in com.worldmind.core.engine.MissionEngineTest
+[INFO] Running com.worldmind.core.logging.MdcContextTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s -- in com.worldmind.core.logging.MdcContextTest
+[INFO] Running com.worldmind.stargate.StargateProviderTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s -- in com.worldmind.stargate.StargateProviderTest
+[INFO] Running com.worldmind.stargate.cf.GitWorkspaceManagerTest
+01:47:06.982 [main] INFO com.worldmind.stargate.cf.GitWorkspaceManager -- Detecting changes on branch 'worldmind/MISSION-001' since abc123
+01:47:06.982 [main] INFO com.worldmind.stargate.cf.GitWorkspaceManager -- Detecting changes on branch 'worldmind/MISSION-001' since abc123
+01:47:06.982 [main] INFO com.worldmind.stargate.cf.GitWorkspaceManager -- Cleaning up mission branch 'worldmind/MISSION-001'
+01:47:06.982 [main] INFO com.worldmind.stargate.cf.GitWorkspaceManager -- Mission branch 'worldmind/MISSION-001' cleanup complete
+01:47:06.983 [main] INFO com.worldmind.stargate.cf.GitWorkspaceManager -- Detecting changes on branch 'worldmind/MISSION-001' since abc123
+01:47:06.983 [main] INFO com.worldmind.stargate.cf.GitWorkspaceManager -- Detecting changes on branch 'worldmind/MISSION-001' since abc123
+01:47:06.983 [main] INFO com.worldmind.stargate.cf.GitWorkspaceManager -- Creating mission branch 'worldmind/MISSION-001' in /tmp/project
+01:47:06.983 [main] INFO com.worldmind.stargate.cf.GitWorkspaceManager -- Detecting changes on branch 'worldmind/MISSION-001' since abc123
+01:47:06.983 [main] INFO com.worldmind.stargate.cf.GitWorkspaceManager -- Creating mission branch 'worldmind/MISSION-001' in /tmp/project
+01:47:06.983 [main] INFO com.worldmind.stargate.cf.GitWorkspaceManager -- Mission branch 'worldmind/MISSION-001' created and pushed
+01:47:06.983 [main] INFO com.worldmind.stargate.cf.GitWorkspaceManager -- Cleaning up mission branch 'worldmind/MISSION-001'
+01:47:06.983 [main] INFO com.worldmind.stargate.cf.GitWorkspaceManager -- Mission branch 'worldmind/MISSION-001' cleanup complete
+01:47:06.984 [main] INFO com.worldmind.stargate.cf.GitWorkspaceManager -- Detecting changes on branch 'worldmind/MISSION-001' since abc123
+01:47:06.984 [main] INFO com.worldmind.stargate.cf.GitWorkspaceManager -- Creating mission branch 'worldmind/MISSION-001' in /tmp/project
+01:47:06.984 [main] INFO com.worldmind.stargate.cf.GitWorkspaceManager -- Mission branch 'worldmind/MISSION-001' created and pushed
+[INFO] Tests run: 15, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s -- in com.worldmind.stargate.cf.GitWorkspaceManagerTest
+[INFO] Running com.worldmind.stargate.cf.CloudFoundryStargateProviderTest
+01:47:06.986 [main] INFO com.worldmind.stargate.cf.CloudFoundryStargateProvider -- Waiting for task stargate-forge-DIR-001 on app centurion-forge (timeout: 0s)
+01:47:06.986 [main] WARN com.worldmind.stargate.cf.CloudFoundryStargateProvider -- Task stargate-forge-DIR-001 timed out after 0s
+01:47:06.987 [main] INFO com.worldmind.stargate.cf.CloudFoundryStargateProvider -- Waiting for task stargate-forge-DIR-001 on app centurion-forge (timeout: 30s)
+01:47:06.988 [main] INFO com.worldmind.stargate.cf.CloudFoundryStargateProvider -- Task stargate-forge-DIR-001 completed successfully
+01:47:06.988 [main] INFO com.worldmind.stargate.cf.CloudFoundryStargateProvider -- Opening Stargate stargate-forge-DIR-005 for directive DIR-005 on app centurion-forge
+01:47:06.988 [main] INFO com.worldmind.stargate.cf.CloudFoundryStargateProvider -- CF task stargate-forge-DIR-005 started on app centurion-forge: OK
+01:47:06.988 [main] WARN com.worldmind.stargate.cf.CloudFoundryStargateProvider -- Failed to capture output for task stargate-forge-DIR-001: Simulated CF CLI failure: logs centurion-forge --recent
+01:47:06.988 [main] INFO com.worldmind.stargate.cf.CloudFoundryStargateProvider -- Opening Stargate stargate-forge-DIR-001 for directive DIR-001 on app centurion-forge
+01:47:06.989 [main] INFO com.worldmind.stargate.cf.CloudFoundryStargateProvider -- CF task stargate-forge-DIR-001 started on app centurion-forge: Creating task for app centurion-forge...
+OK
+01:47:07.001 [main] INFO com.worldmind.stargate.cf.CloudFoundryStargateProvider -- Opening Stargate stargate-forge-DIR-003 for directive DIR-003 on app centurion-forge
+01:47:07.001 [main] INFO com.worldmind.stargate.cf.CloudFoundryStargateProvider -- CF task stargate-forge-DIR-003 started on app centurion-forge: OK
+01:47:07.001 [main] INFO com.worldmind.stargate.cf.CloudFoundryStargateProvider -- Opening Stargate stargate-forge-DIR-001 for directive DIR-001 on app centurion-forge
+01:47:07.002 [main] INFO com.worldmind.stargate.cf.CloudFoundryStargateProvider -- Waiting for task stargate-forge-DIR-001 on app centurion-forge (timeout: 30s)
+01:47:07.002 [main] WARN com.worldmind.stargate.cf.CloudFoundryStargateProvider -- Task stargate-forge-DIR-001 failed
+01:47:07.002 [main] INFO com.worldmind.stargate.cf.CloudFoundryStargateProvider -- Opening Stargate stargate-forge-DIR-001 for directive DIR-001 on app centurion-forge
+01:47:07.002 [main] INFO com.worldmind.stargate.cf.CloudFoundryStargateProvider -- CF task stargate-forge-DIR-001 started on app centurion-forge: Creating task for app centurion-forge...
+OK
+01:47:07.002 [main] INFO com.worldmind.stargate.cf.CloudFoundryStargateProvider -- Opening Stargate stargate-forge-DIR-002 for directive DIR-002 on app centurion-forge
+01:47:07.002 [main] INFO com.worldmind.stargate.cf.CloudFoundryStargateProvider -- CF task stargate-forge-DIR-002 started on app centurion-forge: OK
+01:47:07.003 [main] INFO com.worldmind.stargate.cf.CloudFoundryStargateProvider -- Opening Stargate stargate-forge-DIR-004 for directive DIR-004 on app centurion-forge
+01:47:07.003 [main] INFO com.worldmind.stargate.cf.CloudFoundryStargateProvider -- CF task stargate-forge-DIR-004 started on app centurion-forge: OK
+01:47:07.004 [main] INFO com.worldmind.stargate.cf.CloudFoundryStargateProvider -- Task stargate-forge-DIR-001 terminated on app centurion-forge
+[INFO] Tests run: 30, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.018 s -- in com.worldmind.stargate.cf.CloudFoundryStargateProviderTest
+[INFO] Running com.worldmind.stargate.cf.CloudFoundryPropertiesTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0 s -- in com.worldmind.stargate.cf.CloudFoundryPropertiesTest
+[INFO] Running com.worldmind.stargate.InstructionBuilderPulseTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s -- in com.worldmind.stargate.InstructionBuilderPulseTest
+[INFO] Running com.worldmind.stargate.DockerStargateProviderTest
+01:47:07.078 [main] INFO com.worldmind.stargate.DockerStargateProvider -- Opening Stargate stargate-forge-DIR-001 for directive DIR-001 (image: worldmind/centurion-forge:latest)
+01:47:07.081 [main] INFO com.worldmind.stargate.DockerStargateProvider -- Stargate stargate-forge-DIR-001 started (container container-abc123)
+01:47:07.081 [main] INFO com.worldmind.stargate.DockerStargateProvider -- Opening Stargate stargate-forge-DIR-004 for directive DIR-004 (image: worldmind/centurion-forge:latest)
+01:47:07.081 [main] INFO com.worldmind.stargate.DockerStargateProvider -- Stargate stargate-forge-DIR-004 started (container container-cmd)
+01:47:07.082 [main] INFO com.worldmind.stargate.DockerStargateProvider -- Opening Stargate stargate-forge-DIR-006 for directive DIR-006 (image: worldmind/centurion-forge:latest)
+01:47:07.082 [main] INFO com.worldmind.stargate.DockerStargateProvider -- Stargate stargate-forge-DIR-006 started (container container-hc)
+01:47:07.087 [main] INFO com.worldmind.stargate.DockerStargateProvider -- Stargate container-123 torn down
+01:47:07.087 [main] INFO com.worldmind.stargate.DockerStargateProvider -- Opening Stargate stargate-forge-DIR-003 for directive DIR-003 (image: worldmind/centurion-forge:latest)
+01:47:07.088 [main] INFO com.worldmind.stargate.DockerStargateProvider -- Stargate stargate-forge-DIR-003 started (container container-env)
+01:47:07.088 [main] WARN com.worldmind.stargate.DockerStargateProvider -- Failed to remove container container-123
+java.lang.RuntimeException: Container not found
+	at com.worldmind.stargate.DockerStargateProvider.teardownStargate(DockerStargateProvider.java:126)
+	at com.worldmind.stargate.DockerStargateProviderTest.lambda$teardownStargateHandlesRemovalFailureGracefully$2(DockerStargateProviderTest.java:285)
+	at org.junit.jupiter.api.AssertDoesNotThrow.assertDoesNotThrow(AssertDoesNotThrow.java:49)
+	at org.junit.jupiter.api.AssertDoesNotThrow.assertDoesNotThrow(AssertDoesNotThrow.java:36)
+	at org.junit.jupiter.api.Assertions.assertDoesNotThrow(Assertions.java:3199)
+	at com.worldmind.stargate.DockerStargateProviderTest.teardownStargateHandlesRemovalFailureGracefully(DockerStargateProviderTest.java:285)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:767)
+	at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:60)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:131)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.intercept(TimeoutExtension.java:156)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestableMethod(TimeoutExtension.java:147)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestMethod(TimeoutExtension.java:86)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:103)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:93)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:106)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.proceed(InvocationInterceptorChain.java:64)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.chainAndInvoke(InvocationInterceptorChain.java:45)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.invoke(InvocationInterceptorChain.java:37)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:92)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:86)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.lambda$invokeTestMethod$8(TestMethodTestDescriptor.java:217)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.invokeTestMethod(TestMethodTestDescriptor.java:213)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:138)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:68)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:156)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:160)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:160)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.submit(SameThreadHierarchicalTestExecutorService.java:35)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestExecutor.execute(HierarchicalTestExecutor.java:57)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestEngine.execute(HierarchicalTestEngine.java:54)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:198)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:169)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:93)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:58)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:141)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:57)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:103)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:85)
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:47)
+	at org.apache.maven.surefire.junitplatform.LazyLauncher.execute(LazyLauncher.java:56)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:184)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:148)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:122)
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385)
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162)
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
+01:47:07.089 [main] INFO com.worldmind.stargate.DockerStargateProvider -- Stargate container-123 torn down
+01:47:07.105 [main] INFO com.worldmind.stargate.DockerStargateProvider -- Opening Stargate stargate-vigil-DIR-002 for directive DIR-002 (image: worldmind/centurion-vigil:latest)
+01:47:07.105 [main] INFO com.worldmind.stargate.DockerStargateProvider -- Stargate stargate-vigil-DIR-002 started (container container-vigil-001)
+01:47:07.105 [main] INFO com.worldmind.stargate.DockerStargateProvider -- Opening Stargate stargate-forge-DIR-001 for directive DIR-001 (image: worldmind/centurion-forge:latest)
+01:47:07.105 [main] INFO com.worldmind.stargate.DockerStargateProvider -- Stargate stargate-forge-DIR-001 started (container container-xyz)
+01:47:07.106 [main] ERROR com.worldmind.stargate.DockerStargateProvider -- Timeout or error waiting for stargate container-123
+java.lang.RuntimeException: Docker daemon unreachable
+	at com.worldmind.stargate.DockerStargateProvider.waitForCompletion(DockerStargateProvider.java:88)
+	at com.worldmind.stargate.DockerStargateProviderTest.waitForCompletionReturnsMinusOneOnException(DockerStargateProviderTest.java:209)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:767)
+	at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:60)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:131)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.intercept(TimeoutExtension.java:156)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestableMethod(TimeoutExtension.java:147)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestMethod(TimeoutExtension.java:86)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:103)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:93)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:106)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.proceed(InvocationInterceptorChain.java:64)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.chainAndInvoke(InvocationInterceptorChain.java:45)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.invoke(InvocationInterceptorChain.java:37)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:92)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:86)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.lambda$invokeTestMethod$8(TestMethodTestDescriptor.java:217)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.invokeTestMethod(TestMethodTestDescriptor.java:213)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:138)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:68)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:156)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:160)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:160)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.submit(SameThreadHierarchicalTestExecutorService.java:35)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestExecutor.execute(HierarchicalTestExecutor.java:57)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestEngine.execute(HierarchicalTestEngine.java:54)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:198)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:169)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:93)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:58)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:141)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:57)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:103)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:85)
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:47)
+	at org.apache.maven.surefire.junitplatform.LazyLauncher.execute(LazyLauncher.java:56)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:184)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:148)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:122)
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385)
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162)
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
+01:47:07.107 [main] INFO com.worldmind.stargate.DockerStargateProvider -- Opening Stargate stargate-forge-DIR-005 for directive DIR-005 (image: worldmind/centurion-forge:latest)
+01:47:07.107 [main] INFO com.worldmind.stargate.DockerStargateProvider -- Stargate stargate-forge-DIR-005 started (container container-wd)
+[INFO] Tests run: 14, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.098 s -- in com.worldmind.stargate.DockerStargateProviderTest
+[INFO] Running com.worldmind.stargate.StargatePropertiesTest
+[ERROR] Tests run: 2, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.001 s <<< FAILURE! -- in com.worldmind.stargate.StargatePropertiesTest
+[ERROR] com.worldmind.stargate.StargatePropertiesTest.defaultsAreReasonable -- Time elapsed: 0.001 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: expected: <10> but was: <1>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:150)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:145)
+	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:531)
+	at com.worldmind.stargate.StargatePropertiesTest.defaultsAreReasonable(StargatePropertiesTest.java:15)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[INFO] Running com.worldmind.stargate.StargateBridgeTest
+01:47:07.113 [main] INFO com.worldmind.stargate.StargateBridge -- Executing directive DIR-003 [VIGIL]: Review code
+01:47:07.113 [main] INFO com.worldmind.stargate.StargateBridge -- Directive DIR-003 PASSED in 1000ms
+01:47:07.114 [main] INFO com.worldmind.stargate.StargateBridge -- Executing directive DIR-006 [FORGE]: Failing task
+01:47:07.114 [main] INFO com.worldmind.stargate.StargateBridge -- Directive DIR-006 FAILED in 500ms
+01:47:07.114 [main] INFO com.worldmind.stargate.StargateBridge -- Executing directive DIR-002 [FORGE]: Bad task
+01:47:07.114 [main] INFO com.worldmind.stargate.StargateBridge -- Directive DIR-002 FAILED in 3000ms
+01:47:07.114 [main] INFO com.worldmind.stargate.StargateBridge -- Executing directive DIR-004 [GAUNTLET]: Run tests
+01:47:07.114 [main] INFO com.worldmind.stargate.StargateBridge -- Directive DIR-004 PASSED in 8000ms
+01:47:07.114 [main] INFO com.worldmind.stargate.StargateBridge -- Executing directive DIR-005 [FORGE]: Build feature
+01:47:07.115 [main] INFO com.worldmind.stargate.StargateBridge -- Directive DIR-005 PASSED in 2000ms
+01:47:07.115 [main] INFO com.worldmind.stargate.StargateBridge -- Executing directive DIR-001 [FORGE]: Create hello.py
+01:47:07.115 [main] INFO com.worldmind.stargate.StargateBridge -- Directive DIR-001 PASSED in 5000ms
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.006 s -- in com.worldmind.stargate.StargateBridgeTest
+[INFO] Running com.worldmind.stargate.InstructionBuilderTest
+[INFO] Tests run: 17, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s -- in com.worldmind.stargate.InstructionBuilderTest
+[INFO] Running com.worldmind.stargate.StargateManagerTest
+01:47:07.128 [main] INFO com.worldmind.stargate.StargateManager -- Stargate container-1 completed with exit code 0 in 0ms — 0 file changes
+01:47:07.129 [main] INFO com.worldmind.stargate.StargateManager -- Stargate container-2 completed with exit code 1 in 0ms — 0 file changes
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.009 s -- in com.worldmind.stargate.StargateManagerTest
+[INFO] Running com.worldmind.dispatch.cli.CliTest
+[INFO] Running com.worldmind.dispatch.cli.CliTest$ConsoleOutputTests
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s -- in com.worldmind.dispatch.cli.CliTest$ConsoleOutputTests
+[INFO] Running com.worldmind.dispatch.cli.CliTest$LogTests
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.014 s -- in com.worldmind.dispatch.cli.CliTest$LogTests
+[INFO] Running com.worldmind.dispatch.cli.CliTest$InspectTests
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.016 s -- in com.worldmind.dispatch.cli.CliTest$InspectTests
+[INFO] Running com.worldmind.dispatch.cli.CliTest$TimelineTests
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.011 s -- in com.worldmind.dispatch.cli.CliTest$TimelineTests
+[INFO] Running com.worldmind.dispatch.cli.CliTest$ExecutionTests
+[INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.101 s -- in com.worldmind.dispatch.cli.CliTest$ExecutionTests
+[INFO] Running com.worldmind.dispatch.cli.CliTest$HelpTests
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.025 s -- in com.worldmind.dispatch.cli.CliTest$HelpTests
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.325 s -- in com.worldmind.dispatch.cli.CliTest
+[INFO] Running com.worldmind.dispatch.api.SseStreamingServiceTest
+[INFO] Running com.worldmind.dispatch.api.SseStreamingServiceTest$ConcurrentTests
+01:47:07.464 [main] INFO com.worldmind.dispatch.api.SseStreamingService -- SSE emitter created for mission M-001 (timeout=1800000ms)
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.010 s -- in com.worldmind.dispatch.api.SseStreamingServiceTest$ConcurrentTests
+[INFO] Running com.worldmind.dispatch.api.SseStreamingServiceTest$ActiveCountTests
+01:47:07.467 [main] INFO com.worldmind.dispatch.api.SseStreamingService -- SSE emitter created for mission M-001 (timeout=1800000ms)
+01:47:07.467 [main] INFO com.worldmind.dispatch.api.SseStreamingService -- SSE emitter created for mission M-002 (timeout=1800000ms)
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0 s -- in com.worldmind.dispatch.api.SseStreamingServiceTest$ActiveCountTests
+[INFO] Running com.worldmind.dispatch.api.SseStreamingServiceTest$CleanupTests
+01:47:07.468 [main] INFO com.worldmind.dispatch.api.SseStreamingService -- SSE emitter created for mission M-001 (timeout=100ms)
+01:47:07.771 [main] INFO com.worldmind.dispatch.api.SseStreamingService -- SSE emitter created for mission M-001 (timeout=1800000ms)
+01:47:07.771 [main] INFO com.worldmind.dispatch.api.SseStreamingService -- SSE emitter created for mission M-001 (timeout=1800000ms)
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.303 s -- in com.worldmind.dispatch.api.SseStreamingServiceTest$CleanupTests
+[INFO] Running com.worldmind.dispatch.api.SseStreamingServiceTest$EventForwardingTests
+01:47:07.772 [main] INFO com.worldmind.dispatch.api.SseStreamingService -- SSE emitter created for mission M-001 (timeout=1800000ms)
+01:47:07.772 [main] INFO com.worldmind.dispatch.api.SseStreamingService -- SSE emitter created for mission M-001 (timeout=1800000ms)
+01:47:07.772 [main] INFO com.worldmind.dispatch.api.SseStreamingService -- SSE emitter created for mission M-002 (timeout=1800000ms)
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0 s -- in com.worldmind.dispatch.api.SseStreamingServiceTest$EventForwardingTests
+[INFO] Running com.worldmind.dispatch.api.SseStreamingServiceTest$CreateEmitterTests
+01:47:07.772 [main] INFO com.worldmind.dispatch.api.SseStreamingService -- SSE emitter created for mission M-001 (timeout=1800000ms)
+01:47:07.772 [main] INFO com.worldmind.dispatch.api.SseStreamingService -- SSE emitter created for mission M-001 (timeout=1800000ms)
+01:47:07.773 [main] INFO com.worldmind.dispatch.api.SseStreamingService -- SSE emitter created for mission M-001 (timeout=1800000ms)
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s -- in com.worldmind.dispatch.api.SseStreamingServiceTest$CreateEmitterTests
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.317 s -- in com.worldmind.dispatch.api.SseStreamingServiceTest
+[INFO] Running com.worldmind.dispatch.api.MissionControllerTest
+Standard Commons Logging discovery in action with spring-jcl: please remove commons-logging.jar from classpath in order to avoid potential conflicts
+01:47:07.823 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.worldmind.dispatch.api.MissionControllerTest]: MissionControllerTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+01:47:07.903 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.worldmind.WorldmindApplication for test class com.worldmind.dispatch.api.MissionControllerTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.4.2)
+
+01:47:08.185 [main] INFO  c.w.d.api.MissionControllerTest -- Starting MissionControllerTest using Java 21.0.10 with PID 3700 (started by root in /workspace)
+01:47:08.185 [main] INFO  c.w.d.api.MissionControllerTest -- No active profile set, falling back to 1 default profile: "default"
+01:47:08.772 [main] INFO  c.w.d.api.MissionControllerTest -- Started MissionControllerTest in 0.836 seconds (process running for 3.414)
+01:47:08.818 [main] INFO  c.w.dispatch.api.MissionController -- Accepted mission WMND-2026-0005 — launching async execution
+01:47:08.835 [main] INFO  c.w.dispatch.api.MissionController -- Cancelling mission WMND-2026-0005
+01:47:08.858 [main] INFO  c.w.dispatch.api.MissionController -- Accepted mission WMND-2026-0006 — launching async execution
+01:47:08.868 [main] INFO  c.w.dispatch.api.MissionController -- Accepted mission WMND-2026-0002 — launching async execution
+01:47:08.879 [main] INFO  c.w.dispatch.api.MissionController -- Accepted mission WMND-2026-0004 — launching async execution
+01:47:08.885 [main] INFO  c.w.dispatch.api.MissionController -- Accepted mission WMND-2026-0001 — launching async execution
+01:47:08.888 [main] INFO  c.w.dispatch.api.MissionController -- Accepted mission WMND-2026-0003 — launching async execution
+[INFO] Tests run: 15, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.142 s -- in com.worldmind.dispatch.api.MissionControllerTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[ERROR] Failures: 
+[ERROR]   ModelTest$WorldmindStateTests.schemaContainsAllKeys:278 SCHEMA has unexpected extra keys ==> expected: <20> but was: <21>
+[ERROR]   StargatePropertiesTest.defaultsAreReasonable:15 expected: <10> but was: <1>
+[INFO] 
+[ERROR] Tests run: 402, Failures: 2, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  6.526 s
+[INFO] Finished at: 2026-02-10T01:47:08Z
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.5.2:test (default-test) on project worldmind: There are test failures.
+[ERROR] 
+[ERROR] See /workspace/target/surefire-reports for the individual test results.
+[ERROR] See dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

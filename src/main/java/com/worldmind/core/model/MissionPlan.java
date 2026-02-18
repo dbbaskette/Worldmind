@@ -11,7 +11,7 @@ import java.util.List;
  * by a Centurion worker.
  *
  * @param objective         high-level description of the mission goal
- * @param executionStrategy one of "sequential", "parallel", or "adaptive"
+ * @param executionStrategy one of "sequential" or "parallel"
  * @param directives        ordered list of directive plans to execute
  */
 public record MissionPlan(
@@ -28,12 +28,14 @@ public record MissionPlan(
      * @param inputContext    contextual information the Centurion needs
      * @param successCriteria how to determine if the directive succeeded
      * @param dependencies    IDs of directives this one depends on (e.g. "DIR-001")
+     * @param targetFiles     files this directive intends to create or modify (for conflict detection)
      */
     public record DirectivePlan(
         String centurion,
         String description,
         String inputContext,
         String successCriteria,
-        List<String> dependencies
+        List<String> dependencies,
+        List<String> targetFiles
     ) implements Serializable {}
 }

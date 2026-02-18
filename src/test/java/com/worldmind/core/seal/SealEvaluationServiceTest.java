@@ -373,6 +373,7 @@ class SealEvaluationServiceTest {
                 maxIterations,
                 onFailure,
                 List.of(),
+                List.of(),
                 null
         );
     }

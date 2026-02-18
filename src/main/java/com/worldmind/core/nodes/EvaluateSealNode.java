@@ -180,6 +180,7 @@ public class EvaluateSealNode {
                 0, 1,
                 FailureStrategy.SKIP,
                 List.of(),
+                List.of(),
                 null
         );
     }
@@ -196,6 +197,7 @@ public class EvaluateSealNode {
                 DirectiveStatus.PENDING,
                 0, 1,
                 FailureStrategy.SKIP,
+                List.of(),
                 List.of(),
                 null
         );

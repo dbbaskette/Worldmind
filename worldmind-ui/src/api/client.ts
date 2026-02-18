@@ -8,7 +8,9 @@ class ApiClient {
     mode: string,
     projectPath?: string,
     gitRemoteUrl?: string,
-    reasoningLevel?: string
+    reasoningLevel?: string,
+    executionStrategy?: string,
+    createCfDeployment?: boolean
   ): Promise<{ mission_id: string; status: string }> {
     const response = await fetch(`${API_BASE}/missions`, {
       method: 'POST',
@@ -18,7 +20,9 @@ class ApiClient {
         mode,
         project_path: projectPath || '',
         git_remote_url: gitRemoteUrl || '',
-        reasoning_level: reasoningLevel || 'medium'
+        reasoning_level: reasoningLevel || 'medium',
+        execution_strategy: executionStrategy || 'PARALLEL',
+        create_cf_deployment: createCfDeployment || false
       })
     })
 

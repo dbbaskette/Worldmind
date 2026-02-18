@@ -28,13 +28,13 @@ class ParallelDispatchNodeTest {
 
     private Directive directive(String id) {
         return new Directive(id, "FORGE", "Do " + id, "", "Done", List.of(),
-                DirectiveStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of(), null);
+                DirectiveStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of(), List.of(), null);
     }
 
     private StarblasterBridge.BridgeResult successResult(Directive d) {
         var updated = new Directive(d.id(), d.centurion(), d.description(), d.inputContext(),
                 d.successCriteria(), d.dependencies(), DirectiveStatus.PASSED,
-                1, d.maxIterations(), d.onFailure(),
+                1, d.maxIterations(), d.onFailure(), d.targetFiles(),
                 List.of(new FileRecord("test.java", "created", 10)), 500L);
         return new StarblasterBridge.BridgeResult(updated,
                 new StarblasterInfo("c-" + d.id(), d.centurion(), d.id(), "completed", Instant.now(), Instant.now()),
@@ -44,7 +44,7 @@ class ParallelDispatchNodeTest {
     private StarblasterBridge.BridgeResult failureResult(Directive d) {
         var updated = new Directive(d.id(), d.centurion(), d.description(), d.inputContext(),
                 d.successCriteria(), d.dependencies(), DirectiveStatus.FAILED,
-                1, d.maxIterations(), d.onFailure(), List.of(), 300L);
+                1, d.maxIterations(), d.onFailure(), d.targetFiles(), List.of(), 300L);
         return new StarblasterBridge.BridgeResult(updated,
                 new StarblasterInfo("c-" + d.id(), d.centurion(), d.id(), "failed", Instant.now(), Instant.now()),
                 "Failure output");
@@ -187,7 +187,7 @@ class ParallelDispatchNodeTest {
     @SuppressWarnings("unchecked")
     void retryContextAugmented() {
         var d1 = new Directive("DIR-001", "FORGE", "Do something", "original context", "Done", List.of(),
-                DirectiveStatus.FAILED, 1, 3, FailureStrategy.RETRY, List.of(), null);
+                DirectiveStatus.FAILED, 1, 3, FailureStrategy.RETRY, List.of(), List.of(), null);
 
         when(mockBridge.executeDirective(any(), any(), any(), any(), any())).thenAnswer(inv -> {
             Directive dispatched = inv.getArgument(0);

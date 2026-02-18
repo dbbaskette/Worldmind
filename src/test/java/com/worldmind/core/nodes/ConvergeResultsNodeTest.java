@@ -35,19 +35,19 @@ class ConvergeResultsNodeTest {
             "DIR-001", "FORGE", "Create service",
             "", "Service exists",
             List.of(), DirectiveStatus.PASSED, 1, 3,
-            FailureStrategy.RETRY, List.of(), 2000L
+            FailureStrategy.RETRY, List.of(), List.of(), 2000L
         );
         var d2 = new Directive(
             "DIR-002", "FORGE", "Create controller",
             "", "Controller exists",
             List.of(), DirectiveStatus.PASSED, 1, 3,
-            FailureStrategy.RETRY, List.of(), 3000L
+            FailureStrategy.RETRY, List.of(), List.of(), 3000L
         );
         var d3 = new Directive(
             "DIR-003", "FORGE", "Create tests",
             "", "Tests pass",
             List.of(), DirectiveStatus.FAILED, 2, 3,
-            FailureStrategy.RETRY, List.of(), 5000L
+            FailureStrategy.RETRY, List.of(), List.of(), 5000L
         );
 
         var state = new WorldmindState(Map.of(
@@ -72,13 +72,13 @@ class ConvergeResultsNodeTest {
             "DIR-001", "FORGE", "Create service",
             "", "Service exists",
             List.of(), DirectiveStatus.FAILED, 3, 3,
-            FailureStrategy.RETRY, List.of(), 10000L
+            FailureStrategy.RETRY, List.of(), List.of(), 10000L
         );
         var d2 = new Directive(
             "DIR-002", "FORGE", "Create controller",
             "", "Controller exists",
             List.of(), DirectiveStatus.FAILED, 3, 3,
-            FailureStrategy.RETRY, List.of(), 8000L
+            FailureStrategy.RETRY, List.of(), List.of(), 8000L
         );
 
         var state = new WorldmindState(Map.of(
@@ -145,7 +145,7 @@ class ConvergeResultsNodeTest {
             "DIR-001", "FORGE", "Create files",
             "", "Files exist",
             List.of(), DirectiveStatus.PASSED, 1, 3,
-            FailureStrategy.RETRY,
+            FailureStrategy.RETRY, List.of(),
             List.of(
                 new FileRecord("src/Main.java", "created", 50),
                 new FileRecord("src/Service.java", "created", 30),
@@ -157,7 +157,7 @@ class ConvergeResultsNodeTest {
             "DIR-002", "FORGE", "Update config",
             "", "Config updated",
             List.of(), DirectiveStatus.PASSED, 1, 3,
-            FailureStrategy.RETRY,
+            FailureStrategy.RETRY, List.of(),
             List.of(
                 new FileRecord("application.yml", "modified", 10),
                 new FileRecord("src/Test.java", "created", 40)
@@ -185,19 +185,19 @@ class ConvergeResultsNodeTest {
             "DIR-001", "FORGE", "Create service",
             "", "Service exists",
             List.of(), DirectiveStatus.PASSED, 1, 3,
-            FailureStrategy.RETRY, List.of(), 1000L
+            FailureStrategy.RETRY, List.of(), List.of(), 1000L
         );
         var d2 = new Directive(
             "DIR-002", "FORGE", "Create controller",
             "", "Controller exists",
             List.of(), DirectiveStatus.PASSED, 3, 5,
-            FailureStrategy.RETRY, List.of(), 5000L
+            FailureStrategy.RETRY, List.of(), List.of(), 5000L
         );
         var d3 = new Directive(
             "DIR-003", "FORGE", "Create tests",
             "", "Tests pass",
             List.of(), DirectiveStatus.FAILED, 2, 3,
-            FailureStrategy.RETRY, List.of(), 4000L
+            FailureStrategy.RETRY, List.of(), List.of(), 4000L
         );
 
         var state = new WorldmindState(Map.of(
@@ -219,13 +219,13 @@ class ConvergeResultsNodeTest {
             "DIR-001", "FORGE", "Create service",
             "", "Service exists",
             List.of(), DirectiveStatus.PASSED, 1, 3,
-            FailureStrategy.RETRY, List.of(), 2000L
+            FailureStrategy.RETRY, List.of(), List.of(), 2000L
         );
         var d2 = new Directive(
             "DIR-002", "FORGE", "Create controller",
             "", "Controller exists",
             List.of(), DirectiveStatus.PASSED, 1, 3,
-            FailureStrategy.RETRY, List.of(), 3000L
+            FailureStrategy.RETRY, List.of(), List.of(), 3000L
         );
 
         var state = new WorldmindState(Map.of(

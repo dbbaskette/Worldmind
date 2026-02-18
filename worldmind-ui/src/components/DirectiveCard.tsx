@@ -241,7 +241,7 @@ export function DirectiveCard({ directive, events, onRetry, index, total }: Dire
         <FailureReason events={events} />
 
         <div className="flex items-center gap-3 text-[10px] text-wm_text-muted flex-wrap">
-          <span className="font-mono">iter {directive.iteration}/{directive.max_iterations}</span>
+          <span className="font-mono">iter {directive.iteration + 1}/{directive.max_iterations}</span>
           {directive.elapsed_ms && (
             <span className="font-mono">{formatDuration(directive.elapsed_ms)}</span>
           )}

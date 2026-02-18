@@ -40,13 +40,13 @@ class DispatchCenturionNodeTest {
             "DIR-001", "FORGE", "Create file",
             "", "File exists",
             List.of(), DirectiveStatus.PENDING, 0, 3,
-            FailureStrategy.RETRY, List.of(), null
+            FailureStrategy.RETRY, List.of(), List.of(), null
         );
         var updatedDirective = new Directive(
             "DIR-001", "FORGE", "Create file",
             "", "File exists",
             List.of(), DirectiveStatus.PASSED, 1, 3,
-            FailureStrategy.RETRY, List.of(new FileRecord("hello.py", "created", 1)), 5000L
+            FailureStrategy.RETRY, List.of(), List.of(new FileRecord("hello.py", "created", 1)), 5000L
         );
         var starblasterInfo = new StarblasterInfo("c-1", "FORGE", "DIR-001", "completed",
             Instant.now(), Instant.now());
@@ -91,7 +91,7 @@ class DispatchCenturionNodeTest {
             "DIR-001", "FORGE", "Create file",
             "", "File exists",
             List.of(), DirectiveStatus.PASSED, 1, 3,
-            FailureStrategy.RETRY, List.of(), 1000L
+            FailureStrategy.RETRY, List.of(), List.of(), 1000L
         );
         var state = new WorldmindState(Map.of(
             "directives", List.of(directive),
@@ -111,7 +111,7 @@ class DispatchCenturionNodeTest {
             "DIR-001", "FORGE", "Create file",
             "", "File exists",
             List.of(), DirectiveStatus.PASSED, 1, 3,
-            FailureStrategy.RETRY, List.of(), 2000L
+            FailureStrategy.RETRY, List.of(), List.of(), 2000L
         );
         var state = new WorldmindState(Map.of(
             "directives", List.of(directive),
@@ -131,13 +131,13 @@ class DispatchCenturionNodeTest {
             "DIR-001", "FORGE", "Create file",
             "", "File exists",
             List.of(), DirectiveStatus.PENDING, 0, 3,
-            FailureStrategy.RETRY, List.of(), null
+            FailureStrategy.RETRY, List.of(), List.of(), null
         );
         var failedDirective = new Directive(
             "DIR-001", "FORGE", "Create file",
             "", "File exists",
             List.of(), DirectiveStatus.FAILED, 1, 3,
-            FailureStrategy.RETRY, List.of(), 3000L
+            FailureStrategy.RETRY, List.of(), List.of(), 3000L
         );
         var starblasterInfo = new StarblasterInfo("c-2", "FORGE", "DIR-001", "failed",
             Instant.now(), Instant.now());
@@ -169,13 +169,13 @@ class DispatchCenturionNodeTest {
             "DIR-001", "FORGE", "Create file",
             "", "File exists",
             List.of(), DirectiveStatus.PENDING, 0, 3,
-            FailureStrategy.RETRY, List.of(), null
+            FailureStrategy.RETRY, List.of(), List.of(), null
         );
         var updatedDirective = new Directive(
             "DIR-001", "FORGE", "Create file",
             "", "File exists",
             List.of(), DirectiveStatus.PASSED, 1, 3,
-            FailureStrategy.RETRY, List.of(), 1000L
+            FailureStrategy.RETRY, List.of(), List.of(), 1000L
         );
         var starblasterInfo = new StarblasterInfo("c-3", "FORGE", "DIR-001", "completed",
             Instant.now(), Instant.now());
@@ -208,13 +208,13 @@ class DispatchCenturionNodeTest {
             "DIR-001", "FORGE", "Create file",
             "", "File exists",
             List.of(), DirectiveStatus.PENDING, 0, 3,
-            FailureStrategy.RETRY, List.of(), null
+            FailureStrategy.RETRY, List.of(), List.of(), null
         );
         var updatedDirective = new Directive(
             "DIR-001", "FORGE", "Create file",
             "", "File exists",
             List.of(), DirectiveStatus.PASSED, 1, 3,
-            FailureStrategy.RETRY, List.of(), 500L
+            FailureStrategy.RETRY, List.of(), List.of(), 500L
         );
         var starblasterInfo = new StarblasterInfo("c-4", "FORGE", "DIR-001", "completed",
             Instant.now(), Instant.now());
@@ -247,13 +247,13 @@ class DispatchCenturionNodeTest {
             "DIR-001", "FORGE", "Create file",
             "original context", "File exists",
             List.of(), DirectiveStatus.FAILED, 1, 3,
-            FailureStrategy.RETRY, List.of(), 2000L
+            FailureStrategy.RETRY, List.of(), List.of(), 2000L
         );
         var updatedDirective = new Directive(
             "DIR-001", "FORGE", "Create file",
             "original context", "File exists",
             List.of(), DirectiveStatus.PASSED, 2, 3,
-            FailureStrategy.RETRY, List.of(new FileRecord("hello.py", "created", 1)), 3000L
+            FailureStrategy.RETRY, List.of(), List.of(new FileRecord("hello.py", "created", 1)), 3000L
         );
         var starblasterInfo = new StarblasterInfo("c-5", "FORGE", "DIR-001", "completed",
             Instant.now(), Instant.now());
@@ -288,7 +288,7 @@ class DispatchCenturionNodeTest {
             "DIR-001", "FORGE", "Create file",
             "", "File exists",
             List.of(), DirectiveStatus.FAILED, 1, 3,
-            FailureStrategy.RETRY, List.of(), 2000L
+            FailureStrategy.RETRY, List.of(), List.of(), 2000L
         );
         var state = new WorldmindState(Map.of(
             "directives", List.of(directive),
@@ -309,13 +309,13 @@ class DispatchCenturionNodeTest {
             "DIR-001", "FORGE", "Create file",
             "", "File exists",
             List.of(), DirectiveStatus.FAILED, 1, 3,
-            FailureStrategy.RETRY, List.of(), 2000L
+            FailureStrategy.RETRY, List.of(), List.of(), 2000L
         );
         var updatedDirective = new Directive(
             "DIR-001", "FORGE", "Create file",
             "", "File exists",
             List.of(), DirectiveStatus.PASSED, 2, 3,
-            FailureStrategy.RETRY, List.of(), 1500L
+            FailureStrategy.RETRY, List.of(), List.of(), 1500L
         );
         var starblasterInfo = new StarblasterInfo("c-6", "FORGE", "DIR-001", "completed",
             Instant.now(), Instant.now());
@@ -344,13 +344,13 @@ class DispatchCenturionNodeTest {
             "DIR-001", "FORGE", "Create file",
             "original context", "File exists",
             List.of(), DirectiveStatus.FAILED, 1, 3,
-            FailureStrategy.RETRY, List.of(), 2000L
+            FailureStrategy.RETRY, List.of(), List.of(), 2000L
         );
         var updatedDirective = new Directive(
             "DIR-001", "FORGE", "Create file",
             "original context", "File exists",
             List.of(), DirectiveStatus.PASSED, 2, 3,
-            FailureStrategy.RETRY, List.of(), 1500L
+            FailureStrategy.RETRY, List.of(), List.of(), 1500L
         );
         var starblasterInfo = new StarblasterInfo("c-7", "FORGE", "DIR-001", "completed",
             Instant.now(), Instant.now());

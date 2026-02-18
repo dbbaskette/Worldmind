@@ -56,7 +56,7 @@ class CliTest {
                 "executionStrategy", ExecutionStrategy.SEQUENTIAL.name(),
                 "directives", List.of(
                         new Directive("DIR-001", "FORGE", "Implement feature", "", "Works", List.of(),
-                                DirectiveStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of(), null)
+                                DirectiveStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of(), List.of(), null)
                 )
         ));
         when(mockEngine.runMission(anyString(), any(InteractionMode.class))).thenReturn(state);
@@ -96,10 +96,10 @@ class CliTest {
                 "sealGranted", true,
                 "directives", List.of(
                         new Directive("DIR-001", "FORGE", "Implement logging", "", "Works", List.of(),
-                                DirectiveStatus.PASSED, 1, 3, FailureStrategy.RETRY,
+                                DirectiveStatus.PASSED, 1, 3, FailureStrategy.RETRY, List.of(),
                                 List.of(new FileRecord("src/Logger.java", "created", 50)), 1500L),
                         new Directive("DIR-002", "VIGIL", "Review code", "", "Quality ok", List.of("DIR-001"),
-                                DirectiveStatus.PASSED, 1, 3, FailureStrategy.RETRY, List.of(), 800L)
+                                DirectiveStatus.PASSED, 1, 3, FailureStrategy.RETRY, List.of(), List.of(), 800L)
                 ),
                 "testResults", List.of(
                         new TestResult("DIR-001", true, 5, 0, "All tests passed", 200L)

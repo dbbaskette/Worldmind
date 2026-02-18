@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { INTERACTION_MODES } from '../utils/constants'
 
 interface MissionFormProps {
-  onSubmit: (request: string, mode: string, projectPath?: string, gitRemoteUrl?: string, reasoningLevel?: string) => Promise<void>
+  onSubmit: (request: string, mode: string, projectPath?: string, gitRemoteUrl?: string, reasoningLevel?: string, executionStrategy?: string, createCfDeployment?: boolean) => Promise<void>
   submitting: boolean
   error: string | null
   showSettings?: boolean
@@ -16,18 +16,25 @@ const REASONING_LEVELS = [
   { value: 'max', label: 'Deep', description: 'Maximum reasoning, quality focus' },
 ]
 
+const EXECUTION_STRATEGIES = [
+  { value: 'SEQUENTIAL', label: 'Sequential', description: 'One directive at a time — safest, no conflicts' },
+  { value: 'PARALLEL', label: 'Parallel', description: 'Multiple directives at once — faster, auto-detects conflicts' },
+]
+
 export function MissionForm({ onSubmit, submitting, error, showSettings, onToggleSettings }: MissionFormProps) {
   const [request, setRequest] = useState('')
   const [mode, setMode] = useState('APPROVE_PLAN')
   const [projectPath, setProjectPath] = useState('')
   const [gitRemoteUrl, setGitRemoteUrl] = useState('')
   const [reasoningLevel, setReasoningLevel] = useState('medium')
+  const [executionStrategy, setExecutionStrategy] = useState('PARALLEL')
+  const [createCfDeployment, setCreateCfDeployment] = useState(false)
   const [showOptions, setShowOptions] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (request.trim()) {
-      await onSubmit(request, mode, projectPath || undefined, gitRemoteUrl || undefined, reasoningLevel)
+      await onSubmit(request, mode, projectPath || undefined, gitRemoteUrl || undefined, reasoningLevel, executionStrategy, createCfDeployment)
       setRequest('')
     }
   }
@@ -151,6 +158,50 @@ export function MissionForm({ onSubmit, submitting, error, showSettings, onToggl
               <p className="text-[10px] text-wm_text-muted mt-1">
                 {REASONING_LEVELS.find(l => l.value === reasoningLevel)?.description}
               </p>
+            </div>
+
+            {/* Execution Strategy */}
+            <div>
+              <label className="block text-[10px] font-mono uppercase tracking-wider text-wm_text-muted mb-1.5">
+                Execution Strategy
+              </label>
+              <div className="flex gap-2">
+                {EXECUTION_STRATEGIES.map(strategy => (
+                  <button
+                    key={strategy.value}
+                    type="button"
+                    onClick={() => setExecutionStrategy(strategy.value)}
+                    disabled={submitting}
+                    className={`flex-1 px-3 py-1.5 rounded border text-xs transition-all ${
+                      executionStrategy === strategy.value
+                        ? 'bg-centurion-forge/20 border-centurion-forge/50 text-centurion-forge'
+                        : 'bg-wm-bg border-wm-border text-wm_text-muted hover:border-wm_text-muted/50'
+                    }`}
+                    title={strategy.description}
+                  >
+                    {strategy.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-wm_text-muted mt-1">
+                {EXECUTION_STRATEGIES.find(s => s.value === executionStrategy)?.description}
+              </p>
+            </div>
+
+            {/* CF Deployment Checkbox */}
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="createCfDeployment"
+                checked={createCfDeployment}
+                onChange={(e) => setCreateCfDeployment(e.target.checked)}
+                disabled={submitting}
+                className="w-4 h-4 rounded border-wm-border bg-wm-bg text-centurion-forge focus:ring-centurion-forge/50 focus:ring-offset-0"
+              />
+              <label htmlFor="createCfDeployment" className="text-xs text-wm_text-secondary cursor-pointer">
+                Create Cloud Foundry deployment artifacts
+              </label>
+              <span className="text-[10px] text-wm_text-muted">(manifest.yml, Staticfile, etc.)</span>
             </div>
 
             {/* Project Path & Git URL */}

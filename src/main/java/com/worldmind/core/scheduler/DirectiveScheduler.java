@@ -7,12 +7,17 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 /**
  * Computes the next wave of eligible directives based on dependency satisfaction,
  * completed directives, execution strategy, and concurrency limits.
+ * 
+ * <p>For parallel execution, also detects file overlap conflicts: if two directives
+ * both target the same file, they cannot run in the same wave (one would overwrite
+ * the other's changes). Such conflicts are automatically serialized.
  */
 @Service
 public class DirectiveScheduler {
@@ -24,7 +29,7 @@ public class DirectiveScheduler {
      *
      * @param directives   all directives in the mission plan
      * @param completedIds IDs of directives already completed (PASSED, SKIPPED, or FAILED+SKIP)
-     * @param strategy     execution strategy (SEQUENTIAL caps at 1, PARALLEL/ADAPTIVE up to maxParallel)
+     * @param strategy     execution strategy (SEQUENTIAL caps at 1, PARALLEL up to maxParallel)
      * @param maxParallel  maximum concurrent directives
      * @return list of directive IDs to dispatch; empty if all done
      */
@@ -46,6 +51,10 @@ public class DirectiveScheduler {
         }
 
         var wave = new ArrayList<String>();
+        
+        // Track files claimed by directives in this wave (for conflict detection)
+        var claimedFiles = new HashSet<String>();
+        
         for (var directive : directives) {
             if (wave.size() >= limit) break;
             if (completedIds.contains(directive.id())) {
@@ -56,8 +65,21 @@ public class DirectiveScheduler {
                 log.debug("  {} [{}] — deps unsatisfied: {}", directive.id(), directive.centurion(), directive.dependencies());
                 continue;
             }
+            
+            // Check for file overlap with already-scheduled wave directives
+            if (strategy == ExecutionStrategy.PARALLEL && hasFileOverlap(directive, claimedFiles)) {
+                log.info("  {} [{}] — file overlap with wave, deferring to next wave (targets: {})", 
+                        directive.id(), directive.centurion(), directive.targetFiles());
+                continue;
+            }
+            
             log.debug("  {} [{}] — eligible (deps: {})", directive.id(), directive.centurion(), directive.dependencies());
             wave.add(directive.id());
+            
+            // Claim this directive's target files
+            if (directive.targetFiles() != null) {
+                claimedFiles.addAll(directive.targetFiles());
+            }
         }
 
         return wave;
@@ -73,5 +95,43 @@ public class DirectiveScheduler {
             }
         }
         return true;
+    }
+    
+    /**
+     * Checks if a directive's target files overlap with already-claimed files in the wave.
+     * Uses flexible matching: files match if they're equal OR if one is a suffix of the other
+     * (to handle relative vs. absolute paths).
+     */
+    private boolean hasFileOverlap(Directive directive, Set<String> claimedFiles) {
+        List<String> targets = directive.targetFiles();
+        if (targets == null || targets.isEmpty() || claimedFiles.isEmpty()) {
+            return false;
+        }
+        
+        for (String target : targets) {
+            for (String claimed : claimedFiles) {
+                if (filesMatch(target, claimed)) {
+                    log.debug("File overlap: {} conflicts with claimed {}", target, claimed);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * Checks if two file paths refer to the same file.
+     * Handles relative vs. absolute paths by checking if one is a suffix of the other.
+     */
+    private boolean filesMatch(String file1, String file2) {
+        String n1 = normalizePath(file1);
+        String n2 = normalizePath(file2);
+        
+        if (n1.equals(n2)) return true;
+        return n1.endsWith("/" + n2) || n2.endsWith("/" + n1);
+    }
+    
+    private String normalizePath(String path) {
+        return path.startsWith("./") ? path.substring(2) : path;
     }
 }

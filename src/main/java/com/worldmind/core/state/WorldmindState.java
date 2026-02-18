@@ -39,6 +39,8 @@ public class WorldmindState extends AgentState {
         Map.entry("projectPath",           Channels.base(() -> "")),
         Map.entry("gitRemoteUrl",          Channels.base(() -> "")),
         Map.entry("reasoningLevel",        Channels.base(() -> "medium")),
+        Map.entry("userExecutionStrategy", Channels.base(() -> "")),  // User override for execution strategy
+        Map.entry("createCfDeployment",   Channels.base(() -> false)),  // If true, append CF deployment directive
 
         // ── Wave execution channels (Phase 4) ────────────────────────
         Map.entry("waveDirectiveIds",      Channels.base((Supplier<List<String>>) List::of)),
@@ -190,6 +192,10 @@ public class WorldmindState extends AgentState {
         return this.<String>value("reasoningLevel").orElse("medium");
     }
 
+    public boolean createCfDeployment() {
+        return this.<Boolean>value("createCfDeployment").orElse(false);
+    }
+
     public String runtimeTag() {
         return classification().map(Classification::runtimeTag).orElse("base");
     }
@@ -315,6 +321,7 @@ public class WorldmindState extends AgentState {
                     .map(f -> f instanceof FileRecord fr ? fr : fileRecordFromMap((Map<String, Object>) f))
                     .toList();
         }
+        List<String> targetFiles = m.get("targetFiles") instanceof List<?> tf ? (List<String>) tf : List.of();
         return new Directive(
                 (String) m.get("id"),
                 (String) m.get("centurion"),
@@ -326,6 +333,7 @@ public class WorldmindState extends AgentState {
                 m.get("iteration") instanceof Number n ? n.intValue() : 0,
                 m.get("maxIterations") instanceof Number n ? n.intValue() : 3,
                 enumOrNull(FailureStrategy.class, m.get("onFailure")),
+                targetFiles,
                 files,
                 m.get("elapsedMs") instanceof Number n ? n.longValue() : null
         );

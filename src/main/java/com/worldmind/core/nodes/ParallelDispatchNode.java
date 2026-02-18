@@ -199,7 +199,7 @@ public class ParallelDispatchNode {
                 directive.id(), directive.centurion(), directive.description(),
                 augmentedContext, directive.successCriteria(), directive.dependencies(),
                 DirectiveStatus.PENDING, directive.iteration(), directive.maxIterations(),
-                directive.onFailure(), directive.filesAffected(), directive.elapsedMs()
+                directive.onFailure(), directive.targetFiles(), directive.filesAffected(), directive.elapsedMs()
         );
     }
 

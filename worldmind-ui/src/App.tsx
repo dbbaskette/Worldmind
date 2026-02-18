@@ -17,8 +17,8 @@ function App() {
 
   const [showSettings, setShowSettings] = useState(false)
 
-  const handleSubmit = async (request: string, mode: string, projectPath?: string, gitRemoteUrl?: string, reasoningLevel?: string) => {
-    await submitMission(request, mode, projectPath, gitRemoteUrl, reasoningLevel)
+  const handleSubmit = async (request: string, mode: string, projectPath?: string, gitRemoteUrl?: string, reasoningLevel?: string, executionStrategy?: string, createCfDeployment?: boolean) => {
+    await submitMission(request, mode, projectPath, gitRemoteUrl, reasoningLevel, executionStrategy, createCfDeployment)
   }
 
   return (

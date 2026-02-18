@@ -17,7 +17,7 @@ class InstructionBuilderPulseTest {
         var directive = new Directive(
                 "DIR-001", "PULSE", "Analyze dependency tree",
                 "Check for CVEs", "Report generated", List.of(),
-                DirectiveStatus.PENDING, 0, 1, FailureStrategy.SKIP, List.of(), null
+                DirectiveStatus.PENDING, 0, 1, FailureStrategy.SKIP, List.of(), List.of(), null
         );
 
         var result = InstructionBuilder.buildPulseInstruction(directive, null);
@@ -35,7 +35,7 @@ class InstructionBuilderPulseTest {
         var directive = new Directive(
                 "DIR-002", "PULSE", "Review architecture",
                 "", "Architecture documented", List.of(),
-                DirectiveStatus.PENDING, 0, 1, FailureStrategy.SKIP, List.of(), null
+                DirectiveStatus.PENDING, 0, 1, FailureStrategy.SKIP, List.of(), List.of(), null
         );
         var context = new ProjectContext(
                 "/app", List.of("src/Main.java", "pom.xml"),
@@ -55,7 +55,7 @@ class InstructionBuilderPulseTest {
         var directive = new Directive(
                 "DIR-003", "PULSE", "Quick scan",
                 null, "Scan done", List.of(),
-                DirectiveStatus.PENDING, 0, 1, FailureStrategy.SKIP, List.of(), null
+                DirectiveStatus.PENDING, 0, 1, FailureStrategy.SKIP, List.of(), List.of(), null
         );
 
         var result = InstructionBuilder.buildPulseInstruction(directive, null);

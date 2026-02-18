@@ -34,8 +34,8 @@ class GraphTest {
                         "Implement feature",
                         "sequential",
                         List.of(
-                                new MissionPlan.DirectivePlan("FORGE", "Implement feature", "", "Feature works", List.of()),
-                                new MissionPlan.DirectivePlan("VIGIL", "Review code", "", "Code quality ok", List.of("DIR-001"))
+                                new MissionPlan.DirectivePlan("FORGE", "Implement feature", "", "Feature works", List.of(), List.of()),
+                                new MissionPlan.DirectivePlan("VIGIL", "Review code", "", "Code quality ok", List.of("DIR-001"), List.of())
                         )
                 ));
         when(mockLlm.structuredCall(anyString(), anyString(), eq(ProductSpec.class)))
@@ -250,7 +250,7 @@ class GraphTest {
     @DisplayName("routeAfterWaveEval returns 'converge_results' when all directives completed")
     void routeAfterWaveEvalAllComplete() {
         var d1 = new Directive("DIR-001", "FORGE", "Do", "", "Done", List.of(),
-                DirectiveStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of(), null);
+                DirectiveStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of(), List.of(), null);
         var state = new WorldmindState(Map.of(
                 "status", MissionStatus.EXECUTING.name(),
                 "directives", List.of(d1),
@@ -263,9 +263,9 @@ class GraphTest {
     @DisplayName("routeAfterWaveEval returns 'schedule_wave' when directives remain")
     void routeAfterWaveEvalRemaining() {
         var d1 = new Directive("DIR-001", "FORGE", "Do", "", "Done", List.of(),
-                DirectiveStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of(), null);
+                DirectiveStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of(), List.of(), null);
         var d2 = new Directive("DIR-002", "FORGE", "Do2", "", "Done", List.of(),
-                DirectiveStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of(), null);
+                DirectiveStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of(), List.of(), null);
         var state = new WorldmindState(Map.of(
                 "status", MissionStatus.EXECUTING.name(),
                 "directives", List.of(d1, d2),

@@ -26,7 +26,7 @@ public class ClassifyRequestNode {
             - category: one of "feature", "bugfix", "refactor", "test", "docs", "research"
             - complexity: 1-5 scale (1=trivial, 5=system-wide)
             - affectedComponents: list of likely affected areas (e.g., "api", "model", "service", "ui", "config", "test")
-            - planningStrategy: one of "sequential" (simple tasks), "parallel" (independent subtasks), "adaptive" (complex, needs dynamic planning)
+            - planningStrategy: one of "sequential" (tasks with dependencies) or "parallel" (independent subtasks that don't share files)
             - runtimeTag: the Docker image tag for the language/toolchain needed.
               Determine from explicit mentions in the request or common project indicators.
               Must be one of: "java", "python", "node", "rust", "go", "dotnet", or "base" (when unknown).

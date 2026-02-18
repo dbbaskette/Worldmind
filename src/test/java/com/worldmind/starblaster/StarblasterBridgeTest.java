@@ -29,7 +29,7 @@ class StarblasterBridgeTest {
             "DIR-001", "FORGE", "Create hello.py",
             "context", "hello.py exists",
             List.of(), DirectiveStatus.PENDING, 0, 3,
-            FailureStrategy.RETRY, List.of(), null
+            FailureStrategy.RETRY, List.of(), List.of(), null
         );
         var context = new ProjectContext("/tmp/p", List.of(), "python", "none", Map.of(), 0, "");
         var fileChanges = List.of(new FileRecord("hello.py", "created", 1));
@@ -53,7 +53,7 @@ class StarblasterBridgeTest {
             "DIR-002", "FORGE", "Bad task",
             "", "never",
             List.of(), DirectiveStatus.PENDING, 0, 3,
-            FailureStrategy.RETRY, List.of(), null
+            FailureStrategy.RETRY, List.of(), List.of(), null
         );
         var execResult = new StarblasterManager.ExecutionResult(1, "error", "c-2", List.of(), 3000L);
 
@@ -71,7 +71,7 @@ class StarblasterBridgeTest {
             "DIR-003", "VIGIL", "Review code",
             "input", "no issues",
             List.of(), DirectiveStatus.PENDING, 1, 5,
-            FailureStrategy.REPLAN, List.of(), null
+            FailureStrategy.REPLAN, List.of(), List.of(), null
         );
         var execResult = new StarblasterManager.ExecutionResult(0, "ok", "c-3", List.of(), 1000L);
 
@@ -89,7 +89,7 @@ class StarblasterBridgeTest {
             "DIR-004", "GAUNTLET", "Run tests",
             "", "all pass",
             List.of(), DirectiveStatus.PENDING, 0, 3,
-            FailureStrategy.RETRY, List.of(), null
+            FailureStrategy.RETRY, List.of(), List.of(), null
         );
         var execResult = new StarblasterManager.ExecutionResult(0, "tests passed", "container-42", List.of(), 8000L);
 
@@ -112,7 +112,7 @@ class StarblasterBridgeTest {
             "DIR-005", "FORGE", "Build feature",
             "", "feature works",
             List.of(), DirectiveStatus.PENDING, 0, 3,
-            FailureStrategy.RETRY, List.of(), null
+            FailureStrategy.RETRY, List.of(), List.of(), null
         );
         var execResult = new StarblasterManager.ExecutionResult(0, "feature built successfully", "c-5", List.of(), 2000L);
 
@@ -130,7 +130,7 @@ class StarblasterBridgeTest {
             "DIR-006", "FORGE", "Failing task",
             "", "won't pass",
             List.of(), DirectiveStatus.PENDING, 0, 3,
-            FailureStrategy.RETRY, List.of(), null
+            FailureStrategy.RETRY, List.of(), List.of(), null
         );
         var execResult = new StarblasterManager.ExecutionResult(1, "crashed", "c-6", List.of(), 500L);
 

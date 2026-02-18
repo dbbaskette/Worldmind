@@ -43,7 +43,7 @@ class EvaluateSealNodeTest {
                 "DIR-001", "FORGE", "Implement feature",
                 "context", "Feature works",
                 List.of(), status, iteration, maxIterations,
-                onFailure,
+                onFailure, List.of(),
                 List.of(new FileRecord("src/Main.java", "modified", 50)),
                 5000L
         );
@@ -58,7 +58,7 @@ class EvaluateSealNodeTest {
         var updatedDirective = new Directive(
                 directiveId, centurionType, "desc", "", "criteria",
                 List.of(), DirectiveStatus.PASSED, 1, 1,
-                FailureStrategy.SKIP, List.of(), 1000L
+                FailureStrategy.SKIP, List.of(), List.of(), 1000L
         );
         var starblasterInfo = new StarblasterInfo(
                 "c-" + centurionType.toLowerCase(), centurionType, directiveId,
@@ -105,7 +105,7 @@ class EvaluateSealNodeTest {
                 "DIR-002", "GAUNTLET", "Run tests",
                 "", "Tests pass",
                 List.of(), DirectiveStatus.PASSED, 1, 3,
-                FailureStrategy.RETRY, List.of(), 2000L
+                FailureStrategy.RETRY, List.of(), List.of(), 2000L
         );
         var state = stateWithDirective(gauntletDirective);
 

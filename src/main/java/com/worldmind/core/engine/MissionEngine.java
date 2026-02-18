@@ -66,14 +66,27 @@ public class MissionEngine {
 
     public WorldmindState runMission(String missionId, String request, InteractionMode mode,
                                      String projectPath, String gitRemoteUrl) {
-        return runMission(missionId, request, mode, projectPath, gitRemoteUrl, null);
+        return runMission(missionId, request, mode, projectPath, gitRemoteUrl, null, null);
     }
 
     public WorldmindState runMission(String missionId, String request, InteractionMode mode,
                                      String projectPath, String gitRemoteUrl, String reasoningLevel) {
+        return runMission(missionId, request, mode, projectPath, gitRemoteUrl, reasoningLevel, null, false);
+    }
+
+    public WorldmindState runMission(String missionId, String request, InteractionMode mode,
+                                     String projectPath, String gitRemoteUrl, String reasoningLevel,
+                                     String executionStrategy) {
+        return runMission(missionId, request, mode, projectPath, gitRemoteUrl, reasoningLevel, executionStrategy, false);
+    }
+
+    public WorldmindState runMission(String missionId, String request, InteractionMode mode,
+                                     String projectPath, String gitRemoteUrl, String reasoningLevel,
+                                     String executionStrategy, boolean createCfDeployment) {
         MdcContext.setMission(missionId);
         try {
-            log.info("Starting mission {} with mode {}, reasoning={} — request: {}", missionId, mode, reasoningLevel, request);
+            log.info("Starting mission {} with mode {}, reasoning={}, strategy={}, cfDeploy={} — request: {}", 
+                    missionId, mode, reasoningLevel, executionStrategy, createCfDeployment, request);
 
             eventBus.publish(new WorldmindEvent(
                     "mission.created", missionId, null,
@@ -93,6 +106,14 @@ public class MissionEngine {
             }
             if (reasoningLevel != null && !reasoningLevel.isBlank()) {
                 stateMap.put("reasoningLevel", reasoningLevel);
+            }
+            // If user specified an execution strategy, store it (will override planner's choice)
+            if (executionStrategy != null && !executionStrategy.isBlank()) {
+                stateMap.put("userExecutionStrategy", executionStrategy.toUpperCase());
+            }
+            // If user requested CF deployment artifacts
+            if (createCfDeployment) {
+                stateMap.put("createCfDeployment", true);
             }
             Map<String, Object> initialState = Map.copyOf(stateMap);
 

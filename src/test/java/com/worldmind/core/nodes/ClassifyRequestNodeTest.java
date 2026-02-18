@@ -75,7 +75,7 @@ class ClassifyRequestNodeTest {
 
         // Simulate a refactor classification
         var refactorClassification = new Classification(
-                "refactor", 4, List.of("service", "model", "api"), "adaptive", "base"
+                "refactor", 4, List.of("service", "model", "api"), "parallel", "base"
         );
         when(mockLlm.structuredCall(anyString(), eq("Refactor the entire persistence layer"), eq(Classification.class)))
                 .thenReturn(refactorClassification);
@@ -93,7 +93,7 @@ class ClassifyRequestNodeTest {
         var refactorResult = node.apply(refactorState);
         assertEquals("refactor", ((Classification) refactorResult.get("classification")).category());
         assertEquals(4, ((Classification) refactorResult.get("classification")).complexity());
-        assertEquals("adaptive", ((Classification) refactorResult.get("classification")).planningStrategy());
+        assertEquals("parallel", ((Classification) refactorResult.get("classification")).planningStrategy());
     }
 
     @Test

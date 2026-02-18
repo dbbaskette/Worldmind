@@ -56,29 +56,34 @@ public class PlanMissionNode {
             3. Each directive should be a single, focused task with a clear deliverable.
             4. Order directives logically: PULSE (research) -> FORGE/PRISM (implement).
             5. Leave the dependencies list empty — the system assigns them automatically.
-            6. Choose execution strategy based on complexity:
-               - "sequential" for simple, dependent tasks
-               - "parallel" for independent subtasks
-               - "adaptive" for complex tasks needing dynamic planning
+            6. Choose execution strategy based on task dependencies:
+               - "sequential" for tasks where each step depends on prior work (safer, no conflicts)
+               - "parallel" for independent subtasks that don't touch the same files (faster)
             
-            FILE OWNERSHIP RULES (CRITICAL):
-            7. If a later directive is responsible for creating a specific file (e.g., manifest.yml,
-               Dockerfile, README), add to EARLIER directives' inputContext:
-               "DO NOT create [filename] - that is handled by a later directive."
-            8. Each directive's inputContext should list files it should NOT create if another
-               directive owns them. This prevents duplicate/conflicting files.
-            9. Deployment config files (manifest.yml, Staticfile, Dockerfile) should typically
-               be created in the LAST directive so they can reference all created files.
+            FILE OWNERSHIP (CRITICAL for parallel execution):
+            7. For each FORGE/PRISM directive, specify "targetFiles" — the files it will create or modify.
+               Example: ["src/game.js", "src/styles.css", "public/index.html"]
+            8. Directives with overlapping targetFiles CANNOT run in parallel — they will conflict.
+               The system uses targetFiles to detect conflicts and serialize conflicting directives.
+            9. Deployment config files (manifest.yml, Staticfile, Dockerfile, package.json) should
+               typically be in ONE directive's targetFiles — usually the LAST directive.
+            10. If you assign the same file to multiple directives, add to earlier directives'
+                inputContext: "DO NOT create [filename] - that is handled by a later directive."
 
             Example plan for "Add a /health endpoint":
             - PULSE: Analyze existing controller patterns and endpoint conventions
             - FORGE: Create HealthController with GET /health returning status JSON
+              targetFiles: ["src/main/java/com/example/HealthController.java"]
 
-            Example plan for "Build a static web app with CF deployment":
-            - FORGE: Create HTML/CSS/JS files (inputContext: "DO NOT create manifest.yml or Staticfile")
+            Example plan for "Build a snake game with CF deployment":
+            - FORGE: Create HTML/CSS/JS files for the snake game
+              targetFiles: ["public/index.html", "public/styles.css", "public/game.js"]
+              inputContext: "DO NOT create manifest.yml or Staticfile"
             - FORGE: Create Cloud Foundry manifest.yml and Staticfile for deployment
+              targetFiles: ["manifest.yml", "Staticfile"]
+              inputContext: "Use 'default-route: true' instead of hardcoded routes."
             
-            The second directive owns the deployment config, so the first directive is told not to create it.
+            The second directive owns the deployment config, so the first is told not to create it.
 
             Respond with valid JSON matching the schema provided.
             """;
@@ -112,13 +117,28 @@ public class PlanMissionNode {
         List<Directive> directives = convertToDirectives(plan);
         directives = ensureForgeDirective(directives, request);
         directives = assignTypeDependencies(directives);
+        
+        // If user requested CF deployment artifacts, append a final directive
+        if (state.createCfDeployment()) {
+            directives = appendCfDeploymentDirective(directives);
+        }
 
         log.info("Mission plan: {} directives — {}", directives.size(),
                 directives.stream().map(d -> d.id() + "[" + d.centurion() + "](deps:" + d.dependencies() + ")").toList());
 
+        // Use user's execution strategy override if specified, otherwise use planner's suggestion
+        String userStrategy = state.<String>value("userExecutionStrategy").orElse(null);
+        String effectiveStrategy = (userStrategy != null && !userStrategy.isBlank())
+                ? userStrategy
+                : plan.executionStrategy().toUpperCase();
+        
+        if (userStrategy != null) {
+            log.info("Using user-specified execution strategy: {}", effectiveStrategy);
+        }
+
         return Map.of(
                 "directives", directives,
-                "executionStrategy", plan.executionStrategy().toUpperCase(),
+                "executionStrategy", effectiveStrategy,
                 "status", MissionStatus.AWAITING_APPROVAL.name()
         );
     }
@@ -143,7 +163,7 @@ public class PlanMissionNode {
                 "All specified changes are implemented and the code compiles",
                 List.of(),
                 DirectiveStatus.PENDING, 0, 3,
-                FailureStrategy.RETRY, List.of(), null
+                FailureStrategy.RETRY, List.of(), List.of(), null
         );
 
         // Insert FORGE before any trailing VIGIL directive
@@ -159,6 +179,50 @@ public class PlanMissionNode {
         if (!forgeInserted) {
             result.add(forgeDirective);
         }
+        return result;
+    }
+
+    /**
+     * Appends a final FORGE directive to create Cloud Foundry deployment artifacts.
+     * This directive depends on all other FORGE/PRISM directives so it runs last
+     * and can inspect the actual code structure.
+     */
+    private List<Directive> appendCfDeploymentDirective(List<Directive> directives) {
+        // Find all FORGE/PRISM directive IDs as dependencies
+        List<String> forgePrismIds = directives.stream()
+                .filter(d -> "FORGE".equalsIgnoreCase(d.centurion()) || "PRISM".equalsIgnoreCase(d.centurion()))
+                .map(Directive::id)
+                .toList();
+
+        String cfId = String.format("DIR-%03d", directives.size() + 1);
+        var cfDirective = new Directive(
+                cfId, "FORGE",
+                "Create Cloud Foundry deployment artifacts based on the completed application",
+                """
+                Examine the project structure and create appropriate Cloud Foundry deployment files.
+                
+                STEPS:
+                1. List all files to understand what was built (HTML/CSS/JS, Java, Node, etc.)
+                2. Determine the appropriate buildpack based on the file types
+                3. Create manifest.yml with:
+                   - A descriptive app name matching the application's purpose
+                   - 'default-route: true' (NEVER hardcode routes)
+                   - Appropriate memory and disk quotas
+                   - The correct buildpack
+                4. For staticfile apps: Create a Staticfile with 'root: public' if files are in public/
+                5. Verify the manifest references valid paths that exist
+                
+                DO NOT create deployment artifacts if they already exist in the project.
+                """,
+                "Valid manifest.yml created that can be used with 'cf push'",
+                forgePrismIds,
+                DirectiveStatus.PENDING, 0, 3,
+                FailureStrategy.SKIP, List.of("manifest.yml", "Staticfile"), List.of(), null
+        );
+
+        var result = new ArrayList<>(directives);
+        result.add(cfDirective);
+        log.info("Appended CF deployment directive {} with dependencies on {}", cfId, forgePrismIds);
         return result;
     }
 
@@ -251,12 +315,14 @@ public class PlanMissionNode {
         for (int i = 0; i < plan.directives().size(); i++) {
             var dp = plan.directives().get(i);
             String id = String.format("DIR-%03d", i + 1);
+            // Use targetFiles from planner if provided, otherwise empty list
+            List<String> targetFiles = dp.targetFiles() != null ? dp.targetFiles() : List.of();
             directives.add(new Directive(
                     id, dp.centurion(), dp.description(),
                     dp.inputContext(), dp.successCriteria(),
                     List.of(),
                     DirectiveStatus.PENDING, 0, 3,
-                    FailureStrategy.RETRY, List.of(), null
+                    FailureStrategy.RETRY, targetFiles, List.of(), null
             ));
         }
         return directives;
@@ -294,7 +360,7 @@ public class PlanMissionNode {
             result.add(new Directive(d.id(), d.centurion(), d.description(),
                     d.inputContext(), d.successCriteria(), deps,
                     d.status(), d.iteration(), d.maxIterations(),
-                    d.onFailure(), d.filesAffected(), d.elapsedMs()));
+                    d.onFailure(), d.targetFiles(), d.filesAffected(), d.elapsedMs()));
         }
         return result;
     }

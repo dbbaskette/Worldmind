@@ -35,9 +35,9 @@ class PlanMissionNodeTest {
                 "Add user endpoint",
                 "sequential",
                 List.of(
-                        new MissionPlan.DirectivePlan("PULSE", "Research API", "", "Done", List.of()),
-                        new MissionPlan.DirectivePlan("FORGE", "Create model", "", "Model exists", List.of()),
-                        new MissionPlan.DirectivePlan("FORGE", "Create controller", "", "Controller works", List.of())
+                        new MissionPlan.DirectivePlan("PULSE", "Research API", "", "Done", List.of(), List.of()),
+                        new MissionPlan.DirectivePlan("FORGE", "Create model", "", "Model exists", List.of(), List.of()),
+                        new MissionPlan.DirectivePlan("FORGE", "Create controller", "", "Controller works", List.of(), List.of())
                 )
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
@@ -76,8 +76,8 @@ class PlanMissionNodeTest {
                 "Refactor service layer",
                 "parallel",
                 List.of(
-                        new MissionPlan.DirectivePlan("PRISM", "Refactor service", "", "Service refactored", List.of()),
-                        new MissionPlan.DirectivePlan("VIGIL", "Review changes", "", "Review passed", List.of("DIR-001"))
+                        new MissionPlan.DirectivePlan("PRISM", "Refactor service", "", "Service refactored", List.of(), List.of()),
+                        new MissionPlan.DirectivePlan("VIGIL", "Review changes", "", "Review passed", List.of("DIR-001"), List.of())
                 )
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
@@ -101,7 +101,7 @@ class PlanMissionNodeTest {
                 "Write tests",
                 "sequential",
                 List.of(
-                        new MissionPlan.DirectivePlan("GAUNTLET", "Write unit tests", "context", "All pass", List.of())
+                        new MissionPlan.DirectivePlan("GAUNTLET", "Write unit tests", "context", "All pass", List.of(), List.of())
                 )
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
@@ -133,13 +133,13 @@ class PlanMissionNodeTest {
         var mockLlm = mock(LlmService.class);
         var plan = new MissionPlan(
                 "Full feature",
-                "adaptive",
+                "parallel",
                 List.of(
                         // LLM dependencies are ignored — system builds them from centurion types
-                        new MissionPlan.DirectivePlan("PULSE", "Research API", "", "Research done", List.of()),
-                        new MissionPlan.DirectivePlan("FORGE", "Implement feature", "", "Feature works", List.of("garbage_dep")),
-                        new MissionPlan.DirectivePlan("GAUNTLET", "Write tests", "", "Tests pass", List.of("also_garbage")),
-                        new MissionPlan.DirectivePlan("VIGIL", "Final review", "", "Approved", List.of("invalid_ref"))
+                        new MissionPlan.DirectivePlan("PULSE", "Research API", "", "Research done", List.of(), List.of()),
+                        new MissionPlan.DirectivePlan("FORGE", "Implement feature", "", "Feature works", List.of("garbage_dep"), List.of()),
+                        new MissionPlan.DirectivePlan("GAUNTLET", "Write tests", "", "Tests pass", List.of("also_garbage"), List.of()),
+                        new MissionPlan.DirectivePlan("VIGIL", "Final review", "", "Approved", List.of("invalid_ref"), List.of())
                 )
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
@@ -147,7 +147,7 @@ class PlanMissionNodeTest {
         var node = new PlanMissionNode(mockLlm);
         var state = new WorldmindState(Map.of(
                 "request", "Build full feature",
-                "classification", new Classification("feature", 5, List.of("api", "service", "model"), "adaptive", "base"),
+                "classification", new Classification("feature", 5, List.of("api", "service", "model"), "parallel", "base"),
                 "projectContext", new ProjectContext(".", List.of(), "kotlin", "spring-boot", Map.of(), 100, "test")
         ));
 
@@ -173,7 +173,7 @@ class PlanMissionNodeTest {
                 "Stub",
                 "sequential",
                 List.of(
-                        new MissionPlan.DirectivePlan("VIGIL", "Review", "", "Done", List.of())
+                        new MissionPlan.DirectivePlan("VIGIL", "Review", "", "Done", List.of(), List.of())
                 )
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
@@ -235,7 +235,7 @@ class PlanMissionNodeTest {
                 "Test objective",
                 "sequential",
                 List.of(
-                        new MissionPlan.DirectivePlan("VIGIL", "Review", "", "OK", List.of())
+                        new MissionPlan.DirectivePlan("VIGIL", "Review", "", "OK", List.of(), List.of())
                 )
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
@@ -263,7 +263,7 @@ class PlanMissionNodeTest {
                 "Stub",
                 "sequential",
                 List.of(
-                        new MissionPlan.DirectivePlan("VIGIL", "Review", "", "Done", List.of())
+                        new MissionPlan.DirectivePlan("VIGIL", "Review", "", "Done", List.of(), List.of())
                 )
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
@@ -316,8 +316,8 @@ class PlanMissionNodeTest {
                 "Build feature",
                 "sequential",
                 List.of(
-                        new MissionPlan.DirectivePlan("PULSE", "Research codebase", "", "Research done", List.of()),
-                        new MissionPlan.DirectivePlan("VIGIL", "Review code", "", "Review done", List.of())
+                        new MissionPlan.DirectivePlan("PULSE", "Research codebase", "", "Research done", List.of(), List.of()),
+                        new MissionPlan.DirectivePlan("VIGIL", "Review code", "", "Review done", List.of(), List.of())
                 )
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);

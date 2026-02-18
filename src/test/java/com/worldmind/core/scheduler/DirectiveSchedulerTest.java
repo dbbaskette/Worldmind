@@ -21,7 +21,7 @@ class DirectiveSchedulerTest {
 
     private Directive directive(String id, List<String> deps) {
         return new Directive(id, "FORGE", "Do " + id, "", "Done", deps,
-                DirectiveStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of(), null);
+                DirectiveStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of(), List.of(), null);
     }
 
     @Test
@@ -131,11 +131,4 @@ class DirectiveSchedulerTest {
         assertTrue(result.isEmpty());
     }
 
-    @Test
-    @DisplayName("ADAPTIVE strategy behaves like PARALLEL")
-    void adaptiveStrategyBehavesLikeParallel() {
-        var directives = List.of(directive("A", List.of()), directive("B", List.of()), directive("C", List.of()));
-        var result = scheduler.computeNextWave(directives, Set.of(), ExecutionStrategy.ADAPTIVE, 10);
-        assertEquals(3, result.size());
-    }
 }

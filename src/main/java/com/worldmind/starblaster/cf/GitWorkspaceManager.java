@@ -325,25 +325,73 @@ public class GitWorkspaceManager {
     }
 
     /**
+     * Result of a merge operation (wave or final).
+     */
+    public record MergeResult(List<String> mergedIds, List<String> conflictedIds) {
+        public boolean hasConflicts() {
+            return !conflictedIds.isEmpty();
+        }
+    }
+
+    /**
      * Merges all passed directive branches into main and pushes.
-     *
-     * <p>Clones the repo into a temp directory, merges each branch with --no-ff,
-     * pushes to origin, then deletes the merged branches from the remote.
-     * If a merge conflicts, that branch is skipped (merge --abort) and others continue.
+     * Deletes merged branches from remote after successful merge.
      *
      * @param directiveIds list of directive IDs whose branches should be merged
      * @param gitToken     git token for push authentication
-     * @param overrideGitUrl optional git URL override (e.g. from mission request); uses config URL if null/blank
+     * @param overrideGitUrl optional git URL override; uses config URL if null/blank
      */
     public void mergeDirectiveBranches(List<String> directiveIds, String gitToken, String overrideGitUrl) {
+        MergeResult result = doMergeBranches(directiveIds, gitToken, overrideGitUrl, true);
+        if (result.hasConflicts()) {
+            log.warn("Kept {} conflicted branches on remote for manual resolution: {}",
+                    result.conflictedIds().size(), result.conflictedIds());
+        }
+    }
+
+    /**
+     * Merges completed directive branches from a wave into main and pushes.
+     * Called after each wave completes so the next wave can branch from updated main.
+     * Does NOT delete merged branches (cleanup happens at mission end).
+     *
+     * @param directiveIds list of directive IDs from the completed wave
+     * @param gitToken     git token for push authentication
+     * @param overrideGitUrl optional git URL override; uses config URL if null/blank
+     * @return result containing merged and conflicted directive IDs
+     */
+    public MergeResult mergeWaveBranches(List<String> directiveIds, String gitToken, String overrideGitUrl) {
+        return doMergeBranches(directiveIds, gitToken, overrideGitUrl, false);
+    }
+
+    /**
+     * Core merge logic shared by {@link #mergeDirectiveBranches} and {@link #mergeWaveBranches}.
+     *
+     * <p>Clones the repo into a temp directory, rebases each branch onto main, merges with --no-ff,
+     * and pushes. If a merge conflicts, that branch is skipped and others continue.
+     *
+     * @param directiveIds list of directive IDs whose branches should be merged
+     * @param gitToken     git token for push authentication
+     * @param overrideGitUrl optional git URL override; uses config URL if null/blank
+     * @param deleteBranchesAfterMerge if true, delete merged branches from remote
+     * @return result containing merged and conflicted directive IDs
+     */
+    private MergeResult doMergeBranches(List<String> directiveIds, String gitToken, 
+                                         String overrideGitUrl, boolean deleteBranchesAfterMerge) {
+        List<String> mergedIds = new ArrayList<>();
+        List<String> conflictedIds = new ArrayList<>();
+
+        if (directiveIds == null || directiveIds.isEmpty()) {
+            log.debug("No directive branches to merge");
+            return new MergeResult(mergedIds, conflictedIds);
+        }
+
         String gitUrl = authenticatedUrl(gitToken, overrideGitUrl);
         if (gitUrl == null || gitUrl.isBlank()) {
             log.warn("Skipping merge: no git remote URL configured for directive branches {}", directiveIds);
-            return;
+            return new MergeResult(mergedIds, conflictedIds);
         }
+
         Path tempDir = null;
-        List<String> mergedIds = new ArrayList<>();
-        List<String> conflictedIds = new ArrayList<>();
         try {
             tempDir = java.nio.file.Files.createTempDirectory("worldmind-merge-");
             runGit(tempDir, "clone", gitUrl, ".");
@@ -351,72 +399,94 @@ public class GitWorkspaceManager {
             runGit(tempDir, "config", "user.email", "worldmind@worldmind.local");
             runGit(tempDir, "checkout", "main");
 
-            // Log available remote branches for diagnostics
-            String remoteBranches = runGitOutput(tempDir, "branch", "-r");
-            log.info("Remote branches after clone: {}", remoteBranches);
+            log.info("Merge: processing {} directive branches (delete after: {})", 
+                    directiveIds.size(), deleteBranchesAfterMerge);
 
             for (String id : directiveIds) {
-                String branch = getBranchName(id);
-                // Use explicit refspec so the remote tracking ref is created.
-                // Plain "git fetch origin worldmind/DIR-001" only updates FETCH_HEAD,
-                // not origin/worldmind/DIR-001, so the subsequent merge would fail.
-                int fetchExit = runGit(tempDir, "fetch", "origin",
-                        "refs/heads/" + branch + ":refs/remotes/origin/" + branch);
-                if (fetchExit != 0) {
-                    log.warn("Branch {} not found on remote, skipping", branch);
-                    continue;
-                }
-
-                // Checkout the directive branch and rebase onto current main.
-                // Each directive has its own .worldmind-DIR-XXX/ directory so no conflicts from logs.
-                int checkoutExit = runGit(tempDir, "checkout", "-B", "temp-" + id, "origin/" + branch);
-                if (checkoutExit != 0) {
-                    log.warn("Could not checkout branch {} for rebase, skipping", branch);
-                    continue;
-                }
-
-                int rebaseExit = runGit(tempDir, "rebase", "main");
-                if (rebaseExit != 0) {
-                    log.error("Rebase conflict on branch {}, aborting", branch);
-                    runGit(tempDir, "rebase", "--abort");
-                    runGit(tempDir, "checkout", "main");
-                    conflictedIds.add(id);
-                    continue;
-                }
-
-                // Switch back to main and merge the rebased branch
-                runGit(tempDir, "checkout", "main");
-                int mergeExit = runGit(tempDir, "merge", "temp-" + id,
-                        "--no-ff", "-m", "merge directive " + id);
-                if (mergeExit != 0) {
-                    log.error("Merge conflict on branch {} after rebase, aborting merge", branch);
-                    runGit(tempDir, "merge", "--abort");
-                    conflictedIds.add(id);
-                } else {
-                    mergedIds.add(id);
+                if (mergeSingleBranch(tempDir, id, mergedIds, conflictedIds)) {
+                    log.info("Merge: successfully merged {}", id);
                 }
             }
 
-            runGit(tempDir, "push", "origin", "main");
+            if (!mergedIds.isEmpty()) {
+                int pushExit = runGit(tempDir, "push", "origin", "main");
+                if (pushExit != 0) {
+                    log.error("Merge: failed to push main after merging {} directives", mergedIds.size());
+                } else {
+                    log.info("Merge: pushed main with {} merged directives", mergedIds.size());
+                }
+            }
 
-            // Only delete branches that were successfully merged; keep conflicted branches
-            // so developers can manually resolve them or the system can retry
-            for (String id : mergedIds) {
-                String branch = getBranchName(id);
-                runGit(tempDir, "push", "origin", "--delete", branch);
+            if (deleteBranchesAfterMerge) {
+                for (String id : mergedIds) {
+                    String branch = getBranchName(id);
+                    runGit(tempDir, "push", "origin", "--delete", branch);
+                }
             }
 
             if (!conflictedIds.isEmpty()) {
-                log.warn("Kept {} conflicted branches on remote for manual resolution: {}",
+                log.warn("Merge: {} branches had conflicts and were not merged: {}",
                         conflictedIds.size(), conflictedIds);
             }
+
         } catch (Exception e) {
-            log.error("Failed to merge directive branches: {}", e.getMessage(), e);
+            log.error("Merge failed: {}", e.getMessage(), e);
         } finally {
             if (tempDir != null) {
                 deleteDirectory(tempDir);
             }
         }
+
+        return new MergeResult(mergedIds, conflictedIds);
+    }
+
+    /**
+     * Fetches, rebases, and merges a single directive branch into main.
+     *
+     * @param tempDir      working directory with cloned repo on main branch
+     * @param directiveId  the directive ID to merge
+     * @param mergedIds    list to add successful merges to
+     * @param conflictedIds list to add conflicted merges to
+     * @return true if merge succeeded, false otherwise
+     */
+    private boolean mergeSingleBranch(Path tempDir, String directiveId, 
+                                       List<String> mergedIds, List<String> conflictedIds) {
+        String branch = getBranchName(directiveId);
+
+        int fetchExit = runGit(tempDir, "fetch", "origin",
+                "refs/heads/" + branch + ":refs/remotes/origin/" + branch);
+        if (fetchExit != 0) {
+            log.warn("Merge: branch {} not found on remote, skipping", branch);
+            return false;
+        }
+
+        int checkoutExit = runGit(tempDir, "checkout", "-B", "temp-" + directiveId, "origin/" + branch);
+        if (checkoutExit != 0) {
+            log.warn("Merge: could not checkout branch {} for rebase, skipping", branch);
+            return false;
+        }
+
+        int rebaseExit = runGit(tempDir, "rebase", "main");
+        if (rebaseExit != 0) {
+            log.error("Merge: rebase conflict on branch {}, aborting", branch);
+            runGit(tempDir, "rebase", "--abort");
+            runGit(tempDir, "checkout", "main");
+            conflictedIds.add(directiveId);
+            return false;
+        }
+
+        runGit(tempDir, "checkout", "main");
+        int mergeExit = runGit(tempDir, "merge", "temp-" + directiveId,
+                "--no-ff", "-m", "merge directive " + directiveId);
+        if (mergeExit != 0) {
+            log.error("Merge: merge conflict on branch {} after rebase, aborting", branch);
+            runGit(tempDir, "merge", "--abort");
+            conflictedIds.add(directiveId);
+            return false;
+        }
+
+        mergedIds.add(directiveId);
+        return true;
     }
 
     /**

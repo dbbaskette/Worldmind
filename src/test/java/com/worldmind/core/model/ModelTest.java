@@ -53,10 +53,10 @@ class ModelTest {
         @DisplayName("ExecutionStrategy has all expected values")
         void executionStrategyValues() {
             ExecutionStrategy[] expected = {
-                ExecutionStrategy.SEQUENTIAL, ExecutionStrategy.PARALLEL, ExecutionStrategy.ADAPTIVE
+                ExecutionStrategy.SEQUENTIAL, ExecutionStrategy.PARALLEL
             };
             assertArrayEquals(expected, ExecutionStrategy.values());
-            assertEquals(3, ExecutionStrategy.values().length);
+            assertEquals(2, ExecutionStrategy.values().length);
         }
 
         @Test
@@ -151,7 +151,7 @@ class ModelTest {
                 "d-001", "code-writer", "Implement Foo service",
                 "context blob", "tests pass", List.of(),
                 DirectiveStatus.PENDING, 0, 3,
-                FailureStrategy.RETRY, files, null
+                FailureStrategy.RETRY, List.of(), files, null
             );
             assertEquals("d-001", d.id());
             assertEquals("code-writer", d.centurion());
@@ -405,7 +405,7 @@ class ModelTest {
         void appenderChannelAccumulatesDirectives() {
             // Start with one directive
             var d1 = new Directive("d-1", "coder", "First", "", "", List.of(),
-                DirectiveStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of(), null);
+                DirectiveStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of(), List.of(), null);
             var initData = new HashMap<String, Object>();
             initData.put("directives", List.of(d1));
             var state1Data = AgentState.updateState(initData, Map.of(), WorldmindState.SCHEMA);
@@ -414,7 +414,7 @@ class ModelTest {
 
             // Add a second directive via updateState
             var d2 = new Directive("d-2", "tester", "Second", "", "", List.of(),
-                DirectiveStatus.PENDING, 0, 3, FailureStrategy.SKIP, List.of(), null);
+                DirectiveStatus.PENDING, 0, 3, FailureStrategy.SKIP, List.of(), List.of(), null);
             var update = Map.<String, Object>of("directives", List.of(d2));
             var state2Data = AgentState.updateState(state1, update, WorldmindState.SCHEMA);
             var state2 = new WorldmindState(state2Data);

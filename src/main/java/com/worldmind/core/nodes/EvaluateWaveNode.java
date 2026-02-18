@@ -10,8 +10,11 @@ import com.worldmind.core.seal.SealEvaluationService;
 import com.worldmind.core.state.WorldmindState;
 import com.worldmind.starblaster.InstructionBuilder;
 import com.worldmind.starblaster.StarblasterBridge;
+import com.worldmind.starblaster.cf.CloudFoundryProperties;
+import com.worldmind.starblaster.cf.GitWorkspaceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
@@ -22,6 +25,10 @@ import java.util.*;
  * Evaluates all directives in the current wave after dispatch.
  * For FORGE directives: runs GAUNTLET + VIGIL quality gates and evaluates the seal.
  * For non-FORGE directives: auto-passes them.
+ * 
+ * <p>After evaluating all directives in a wave, merges passed FORGE branches into main
+ * so the next wave can build on prior work. This prevents merge conflicts when
+ * multiple directives touch the same files across waves.
  */
 @Component
 public class EvaluateWaveNode {
@@ -33,15 +40,24 @@ public class EvaluateWaveNode {
     private final EventBus eventBus;
     private final WorldmindMetrics metrics;
     private final OscillationDetector oscillationDetector;
+    
+    // Optional dependencies for per-wave merge (only available in CF mode)
+    private final GitWorkspaceManager gitWorkspaceManager;
+    private final CloudFoundryProperties cfProperties;
 
+    @Autowired
     public EvaluateWaveNode(StarblasterBridge bridge, SealEvaluationService sealService,
                             EventBus eventBus, WorldmindMetrics metrics,
-                            OscillationDetector oscillationDetector) {
+                            OscillationDetector oscillationDetector,
+                            @Autowired(required = false) GitWorkspaceManager gitWorkspaceManager,
+                            @Autowired(required = false) CloudFoundryProperties cfProperties) {
         this.bridge = bridge;
         this.sealService = sealService;
         this.eventBus = eventBus;
         this.metrics = metrics;
         this.oscillationDetector = oscillationDetector;
+        this.gitWorkspaceManager = gitWorkspaceManager;
+        this.cfProperties = cfProperties;
     }
 
     public Map<String, Object> apply(WorldmindState state) {
@@ -231,6 +247,43 @@ public class EvaluateWaveNode {
                 }
             }
 
+            // Per-wave merge: merge passed FORGE/PRISM branches into main so next wave can build on them.
+            // Sort by ID to ensure deterministic merge order (DIR-001 before DIR-002, etc.)
+            List<String> passedForgeIds = updatedDirectives.stream()
+                    .filter(d -> d.status() == DirectiveStatus.PASSED)
+                    .filter(d -> "FORGE".equalsIgnoreCase(d.centurion()) || "PRISM".equalsIgnoreCase(d.centurion()))
+                    .map(Directive::id)
+                    .sorted()
+                    .toList();
+            
+            if (!passedForgeIds.isEmpty() && gitWorkspaceManager != null && cfProperties != null) {
+                log.info("Wave {} complete: merging {} passed FORGE/PRISM branches into main", 
+                        state.waveCount(), passedForgeIds.size());
+                try {
+                    var mergeResult = gitWorkspaceManager.mergeWaveBranches(
+                            passedForgeIds, 
+                            cfProperties.getGitToken(), 
+                            state.gitRemoteUrl());
+                    
+                    if (mergeResult.hasConflicts()) {
+                        log.warn("Wave merge had {} conflicts: {}", 
+                                mergeResult.conflictedIds().size(), mergeResult.conflictedIds());
+                        // Add conflict info to errors so it's visible in mission status
+                        errors.add("Wave merge conflicts on: " + mergeResult.conflictedIds());
+                    }
+                    
+                    eventBus.publish(new WorldmindEvent("wave.merged",
+                            state.missionId(), null,
+                            Map.of("merged", mergeResult.mergedIds(),
+                                   "conflicted", mergeResult.conflictedIds(),
+                                   "waveNumber", state.waveCount()),
+                            Instant.now()));
+                } catch (Exception e) {
+                    log.error("Failed to merge wave branches: {}", e.getMessage(), e);
+                    errors.add("Wave merge failed: " + e.getMessage());
+                }
+            }
+
             // Build state updates
             var updates = new HashMap<String, Object>();
             updates.put("completedDirectiveIds", completedIds);
@@ -255,7 +308,7 @@ public class EvaluateWaveNode {
                 d.id(), d.centurion(), d.description(),
                 d.inputContext(), d.successCriteria(), d.dependencies(),
                 status, newIteration, d.maxIterations(),
-                d.onFailure(),
+                d.onFailure(), d.targetFiles(),
                 result != null && result.filesAffected() != null ? result.filesAffected() : d.filesAffected(),
                 result != null ? result.elapsedMs() : d.elapsedMs()
         );
@@ -332,7 +385,7 @@ public class EvaluateWaveNode {
                 InstructionBuilder.buildGauntletInstruction(
                         forgeDirective, null, fileChanges),
                 "All tests pass", List.of(), DirectiveStatus.PENDING,
-                0, 1, FailureStrategy.SKIP, List.of(), null
+                0, 1, FailureStrategy.SKIP, List.of(), List.of(), null
         );
     }
 
@@ -343,7 +396,7 @@ public class EvaluateWaveNode {
                 InstructionBuilder.buildVigilInstruction(
                         forgeDirective, null, fileChanges, null),
                 "Code review complete with score >= 7", List.of(), DirectiveStatus.PENDING,
-                0, 1, FailureStrategy.SKIP, List.of(), null
+                0, 1, FailureStrategy.SKIP, List.of(), List.of(), null
         );
     }
 
