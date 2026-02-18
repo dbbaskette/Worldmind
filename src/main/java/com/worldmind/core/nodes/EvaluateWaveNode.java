@@ -128,14 +128,21 @@ public class EvaluateWaveNode {
                 }
 
                 // FORGE directive that passed dispatch — run GAUNTLET + VIGIL
-                var fileChanges = dispatchResult.filesAffected() != null ? dispatchResult.filesAffected() : List.<FileRecord>of();
+                var allFileChanges = dispatchResult.filesAffected() != null ? dispatchResult.filesAffected() : List.<FileRecord>of();
+                
+                // Filter out Worldmind diagnostic files — only count actual code changes
+                var fileChanges = allFileChanges.stream()
+                        .filter(f -> !f.path().startsWith(".worldmind"))
+                        .filter(f -> !f.path().contains("/goose-logs/"))
+                        .filter(f -> !f.path().endsWith(".log"))
+                        .filter(f -> !f.path().endsWith(".jsonl"))
+                        .toList();
 
-                // FORGE must produce code — if no files were affected, escalate immediately.
-                // Retrying is pointless when the centurion wrote nothing — it's a systemic issue
-                // (wrong model, bad config, broken instruction) that won't resolve on retry.
+                // FORGE must produce code — if no real files were affected, retry.
+                // The centurion may have explored but not written code; retrying often helps.
                 if (fileChanges.isEmpty()) {
                     String outputSnippet = summarizeCenturionOutput(dispatchResult.output());
-                    log.warn("FORGE directive {} produced no file changes — escalating immediately. Centurion output: {}",
+                    log.warn("FORGE directive {} produced no code files (only logs) — will retry. Centurion output: {}",
                             id, outputSnippet);
 
                     eventBus.publish(new WorldmindEvent("directive.failed",
@@ -144,8 +151,8 @@ public class EvaluateWaveNode {
                                    "centurionOutput", outputSnippet),
                             Instant.now()));
 
-                    String failureReason = "FORGE directive produced no code changes. Centurion output:\n" + outputSnippet;
-                    var outcome = applyFailureStrategy(id, directive, FailureStrategy.ESCALATE, failureReason);
+                    String failureReason = "FORGE directive produced no code files. You MUST create/modify actual source files. Centurion output:\n" + outputSnippet;
+                    var outcome = applyFailureStrategy(id, directive, FailureStrategy.RETRY, failureReason);
                     completedIds.addAll(outcome.completedIds);
                     if (!outcome.completedIds.isEmpty()) {
                         updatedDirectives.add(withResult(directive, dispatchResult, DirectiveStatus.SKIPPED));
