@@ -136,7 +136,7 @@ public class PlanMissionNode {
                 : plan.executionStrategy().toUpperCase();
         
         log.info("Effective execution strategy: {} (user override: {})", 
-                effectiveStrategy, userStrategy != null && !userStrategy.isBlank())
+                effectiveStrategy, userStrategy != null && !userStrategy.isBlank());
 
         return Map.of(
                 "directives", directives,
