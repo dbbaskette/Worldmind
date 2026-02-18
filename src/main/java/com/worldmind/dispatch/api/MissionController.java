@@ -279,6 +279,20 @@ public class MissionController {
         if (pp != null && !pp.isBlank()) newStateMap.put("projectPath", pp);
         String gru = state.gitRemoteUrl();
         if (gru != null && !gru.isBlank()) newStateMap.put("gitRemoteUrl", gru);
+        // Preserve user's execution strategy choice through clarification flow
+        String userStrategy = state.<String>value("userExecutionStrategy").orElse(null);
+        if (userStrategy != null && !userStrategy.isBlank()) {
+            newStateMap.put("userExecutionStrategy", userStrategy);
+            log.info("Preserving userExecutionStrategy={} through clarification", userStrategy);
+        }
+        // Preserve other user settings
+        String reasoningLevel = state.<String>value("reasoningLevel").orElse(null);
+        if (reasoningLevel != null && !reasoningLevel.isBlank()) {
+            newStateMap.put("reasoningLevel", reasoningLevel);
+        }
+        if (state.createCfDeployment()) {
+            newStateMap.put("createCfDeployment", true);
+        }
 
         missionStates.put(id, new WorldmindState(newStateMap));
 
