@@ -81,6 +81,7 @@ public class EvaluateWaveNode {
             for (var r : waveResults) resultMap.put(r.directiveId(), r);
 
             var completedIds = new ArrayList<String>();
+            var retryingIds = new ArrayList<String>();  // Directives to retry after merge conflict
             var updatedDirectives = new ArrayList<Directive>();
             var testResultsList = new ArrayList<TestResult>();
             var reviewFeedbackList = new ArrayList<ReviewFeedback>();
@@ -276,10 +277,11 @@ public class EvaluateWaveNode {
                         log.warn("Wave merge had {} conflicts: {} — will retry on updated main", 
                                 mergeResult.conflictedIds().size(), mergeResult.conflictedIds());
                         
-                        // Remove conflicted directives from completed so they get re-scheduled
+                        // Mark conflicted directives for retry so they get re-scheduled
                         // They'll run again in the next wave, now with access to the merged changes
                         for (String conflictedId : mergeResult.conflictedIds()) {
-                            completedIds.remove(conflictedId);
+                            retryingIds.add(conflictedId);  // Add to retry list (excludes from completed)
+                            completedIds.remove(conflictedId);  // Don't add to completed this wave
                             
                             // Reset directive status to PENDING so it will be re-dispatched
                             for (int i = 0; i < updatedDirectives.size(); i++) {
@@ -314,7 +316,8 @@ public class EvaluateWaveNode {
 
             // Build state updates
             var updates = new HashMap<String, Object>();
-            updates.put("completedDirectiveIds", completedIds);
+            if (!completedIds.isEmpty()) updates.put("completedDirectiveIds", completedIds);
+            if (!retryingIds.isEmpty()) updates.put("retryingDirectiveIds", retryingIds);
             if (!updatedDirectives.isEmpty()) updates.put("directives", updatedDirectives);
             if (!testResultsList.isEmpty()) updates.put("testResults", testResultsList);
             if (!reviewFeedbackList.isEmpty()) updates.put("reviewFeedback", reviewFeedbackList);

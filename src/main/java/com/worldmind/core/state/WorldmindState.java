@@ -49,13 +49,8 @@ public class WorldmindState extends AgentState {
 
         // ── Appender channels (list accumulation) ────────────────────
         Map.entry("directives",            Channels.appender(ArrayList::new)),
-        Map.entry("completedDirectiveIds", Channels.base(
-            (Reducer<List<String>>) (old, update) -> {
-                var merged = new java.util.LinkedHashSet<>(old != null ? old : List.of());
-                merged.addAll(update != null ? update : List.of());
-                return List.copyOf(merged);
-            },
-            ArrayList::new)),
+        Map.entry("completedDirectiveIds", Channels.base(ArrayList::new)),
+        Map.entry("retryingDirectiveIds", Channels.appender(ArrayList::new)),
         Map.entry("starblasters",             Channels.appender(ArrayList::new)),
         Map.entry("testResults",           Channels.appender(ArrayList::new)),
         Map.entry("reviewFeedback",        Channels.appender(ArrayList::new)),
@@ -249,7 +244,16 @@ public class WorldmindState extends AgentState {
 
     @SuppressWarnings("unchecked")
     public List<String> completedDirectiveIds() {
-        return this.<List<String>>value("completedDirectiveIds").orElse(List.of());
+        var completed = this.<List<String>>value("completedDirectiveIds").orElse(List.of());
+        var retrying = retryingDirectiveIds();
+        if (retrying.isEmpty()) return completed;
+        // Exclude any IDs that are pending retry (merge conflict reset)
+        return completed.stream().filter(id -> !retrying.contains(id)).toList();
+    }
+    
+    @SuppressWarnings("unchecked")
+    public List<String> retryingDirectiveIds() {
+        return this.<List<String>>value("retryingDirectiveIds").orElse(List.of());
     }
 
     @SuppressWarnings("unchecked")
