@@ -48,6 +48,12 @@ public final class InstructionBuilder {
         if (directive.inputContext() != null && !directive.inputContext().isBlank()) {
             sb.append("## Additional Context\n\n");
             sb.append(directive.inputContext()).append("\n\n");
+            // Emphasize file creation constraints if present
+            if (directive.inputContext().toLowerCase().contains("do not create")) {
+                sb.append("**IMPORTANT**: The constraints above about files you should NOT create ");
+                sb.append("are STRICT. Another directive owns those files. If you create them, ");
+                sb.append("you will cause merge conflicts and the mission will fail.\n\n");
+            }
         }
 
         if (context != null) {

@@ -60,10 +60,25 @@ public class PlanMissionNode {
                - "sequential" for simple, dependent tasks
                - "parallel" for independent subtasks
                - "adaptive" for complex tasks needing dynamic planning
+            
+            FILE OWNERSHIP RULES (CRITICAL):
+            7. If a later directive is responsible for creating a specific file (e.g., manifest.yml,
+               Dockerfile, README), add to EARLIER directives' inputContext:
+               "DO NOT create [filename] - that is handled by a later directive."
+            8. Each directive's inputContext should list files it should NOT create if another
+               directive owns them. This prevents duplicate/conflicting files.
+            9. Deployment config files (manifest.yml, Staticfile, Dockerfile) should typically
+               be created in the LAST directive so they can reference all created files.
 
             Example plan for "Add a /health endpoint":
             - PULSE: Analyze existing controller patterns and endpoint conventions
             - FORGE: Create HealthController with GET /health returning status JSON
+
+            Example plan for "Build a static web app with CF deployment":
+            - FORGE: Create HTML/CSS/JS files (inputContext: "DO NOT create manifest.yml or Staticfile")
+            - FORGE: Create Cloud Foundry manifest.yml and Staticfile for deployment
+            
+            The second directive owns the deployment config, so the first directive is told not to create it.
 
             Respond with valid JSON matching the schema provided.
             """;
