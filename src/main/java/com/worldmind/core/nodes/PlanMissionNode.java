@@ -128,13 +128,15 @@ public class PlanMissionNode {
 
         // Use user's execution strategy override if specified, otherwise use planner's suggestion
         String userStrategy = state.<String>value("userExecutionStrategy").orElse(null);
+        log.info("Planning strategy: userExecutionStrategy='{}', LLM suggested='{}'", 
+                userStrategy, plan.executionStrategy());
+        
         String effectiveStrategy = (userStrategy != null && !userStrategy.isBlank())
                 ? userStrategy
                 : plan.executionStrategy().toUpperCase();
         
-        if (userStrategy != null) {
-            log.info("Using user-specified execution strategy: {}", effectiveStrategy);
-        }
+        log.info("Effective execution strategy: {} (user override: {})", 
+                effectiveStrategy, userStrategy != null && !userStrategy.isBlank())
 
         return Map.of(
                 "directives", directives,

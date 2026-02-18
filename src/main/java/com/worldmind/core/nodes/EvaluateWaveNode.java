@@ -287,13 +287,30 @@ public class EvaluateWaveNode {
                         // Mark conflicted directives for retry so they get re-scheduled
                         // They'll run again in the next wave, now with access to the merged changes
                         for (String conflictedId : mergeResult.conflictedIds()) {
-                            retryingIds.add(conflictedId);  // Add to retry list (excludes from completed)
-                            completedIds.remove(conflictedId);  // Don't add to completed this wave
-                            
                             // Reset directive status to PENDING and add merge conflict context
                             for (int i = 0; i < updatedDirectives.size(); i++) {
                                 Directive d = updatedDirectives.get(i);
                                 if (d.id().equals(conflictedId)) {
+                                    int nextIteration = d.iteration() + 1;
+                                    
+                                    // Check if we've exhausted retries — escalate instead of retrying
+                                    if (nextIteration > d.maxIterations()) {
+                                        log.warn("Directive {} exhausted merge conflict retries ({}/{}), escalating",
+                                                conflictedId, nextIteration - 1, d.maxIterations());
+                                        missionStatus = MissionStatus.FAILED;
+                                        errors.add("Directive " + conflictedId + " escalated: merge conflicts after " 
+                                                + (nextIteration - 1) + " attempts");
+                                        updatedDirectives.set(i, new Directive(
+                                                d.id(), d.centurion(), d.description(),
+                                                d.inputContext(), d.successCriteria(), d.dependencies(),
+                                                DirectiveStatus.FAILED, d.iteration(), d.maxIterations(),
+                                                d.onFailure(), d.targetFiles(), d.filesAffected(), d.elapsedMs()));
+                                        break;
+                                    }
+                                    
+                                    retryingIds.add(conflictedId);  // Add to retry list (excludes from completed)
+                                    completedIds.remove(conflictedId);  // Don't add to completed this wave
+                                    
                                     // Enhance input context with merge conflict information
                                     String enhancedContext = d.inputContext();
                                     if (enhancedContext == null) enhancedContext = "";
@@ -304,10 +321,10 @@ public class EvaluateWaveNode {
                                     updatedDirectives.set(i, new Directive(
                                             d.id(), d.centurion(), d.description(),
                                             enhancedContext, d.successCriteria(), d.dependencies(),
-                                            DirectiveStatus.PENDING, d.iteration() + 1, d.maxIterations(),
+                                            DirectiveStatus.PENDING, nextIteration, d.maxIterations(),
                                             d.onFailure(), d.targetFiles(), List.of(), null));
                                     log.info("Reset {} to PENDING (iteration {}) for retry on updated main", 
-                                            conflictedId, d.iteration() + 1);
+                                            conflictedId, nextIteration);
                                     break;
                                 }
                             }

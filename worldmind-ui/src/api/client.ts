@@ -21,7 +21,7 @@ class ApiClient {
         project_path: projectPath || '',
         git_remote_url: gitRemoteUrl || '',
         reasoning_level: reasoningLevel || 'medium',
-        execution_strategy: executionStrategy || 'PARALLEL',
+        execution_strategy: executionStrategy || 'SEQUENTIAL',
         create_cf_deployment: createCfDeployment || false
       })
     })

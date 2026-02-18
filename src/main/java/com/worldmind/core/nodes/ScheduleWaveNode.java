@@ -45,6 +45,11 @@ public class ScheduleWaveNode {
         var completedIds = new HashSet<>(state.completedDirectiveIds());
         var strategy = state.executionStrategy();
         int currentWaveCount = state.waveCount();
+        
+        log.info("ScheduleWaveNode: strategy={}, raw value='{}', userStrategy='{}'",
+                strategy, 
+                state.<String>value("executionStrategy").orElse("(none)"),
+                state.<String>value("userExecutionStrategy").orElse("(none)"));
 
         // Rate-limit cooldown: wait between waves to avoid API token budget exhaustion.
         // The first wave starts immediately; subsequent waves wait to let the token window reset.

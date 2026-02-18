@@ -224,11 +224,14 @@ public class MissionController {
                     Map.of("error", "Mission is not awaiting approval; current status: " + state.status()));
         }
 
-        log.info("Approving mission {} — launching execution with strategy {}", 
-                id, state.executionStrategy());
+        log.info("Approving mission {} — strategy: {}, userExecutionStrategy: '{}'", 
+                id, state.executionStrategy(), 
+                state.<String>value("userExecutionStrategy").orElse("(not set)"));
 
         // Build execution state preserving all existing state including executionStrategy
         var executionState = buildExecutionStateMap(state);
+        log.info("Execution state strategy values: executionStrategy={}, userExecutionStrategy={}", 
+                executionState.get("executionStrategy"), executionState.get("userExecutionStrategy"));
         missionStates.put(id, new WorldmindState(executionState));
 
         // Use launchAsyncWithState to preserve the full state (including user's strategy choice)

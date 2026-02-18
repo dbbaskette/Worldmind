@@ -204,11 +204,16 @@ public class SealEvaluationService {
         // Build reason string
         String reason;
         if (!testsPassed && !reviewApproved) {
-            reason = String.format("Tests failed (%d of %d) and review score %d/10 below threshold",
-                    testResult.failedTests(), testResult.totalTests(), reviewFeedback.score());
+            reason = testResult.totalTests() > 0
+                    ? String.format("Tests failed (%d of %d) and review score %d/10 below threshold",
+                            testResult.failedTests(), testResult.totalTests(), reviewFeedback.score())
+                    : String.format("Build/test failure detected and review score %d/10 below threshold",
+                            reviewFeedback.score());
         } else if (!testsPassed) {
-            reason = String.format("Tests failed: %d of %d failed",
-                    testResult.failedTests(), testResult.totalTests());
+            reason = testResult.totalTests() > 0
+                    ? String.format("Tests failed: %d of %d failed",
+                            testResult.failedTests(), testResult.totalTests())
+                    : "Build or test failure detected (no structured test output)";
         } else {
             reason = String.format("Review score %d/10 below threshold (minimum %d)",
                     reviewFeedback.score(), REVIEW_SCORE_THRESHOLD);

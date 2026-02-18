@@ -27,7 +27,7 @@ export function MissionForm({ onSubmit, submitting, error, showSettings, onToggl
   const [projectPath, setProjectPath] = useState('')
   const [gitRemoteUrl, setGitRemoteUrl] = useState('')
   const [reasoningLevel, setReasoningLevel] = useState('medium')
-  const [executionStrategy, setExecutionStrategy] = useState('PARALLEL')
+  const [executionStrategy, setExecutionStrategy] = useState('SEQUENTIAL')
   const [createCfDeployment, setCreateCfDeployment] = useState(false)
   const [showOptions, setShowOptions] = useState(false)
 
