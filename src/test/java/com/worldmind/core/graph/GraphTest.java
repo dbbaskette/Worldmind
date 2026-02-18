@@ -42,7 +42,7 @@ class GraphTest {
                 .thenReturn(new ProductSpec(
                         "Test Spec", "Overview", List.of("Goal 1"), List.of("Non-goal 1"),
                         List.of("Req 1"), List.of("Criterion 1"),
-                        List.of(), List.of(), List.of()
+                        List.of(), List.of(), List.of(), null, null, null
                 ));
 
         ProjectScanner mockScanner = mock(ProjectScanner.class);
@@ -108,6 +108,7 @@ class GraphTest {
         worldmindGraph = new WorldmindGraph(
                 new ClassifyRequestNode(mockLlm, null),
                 new UploadContextNode(mockScanner),
+                new GenerateClarifyingQuestionsNode(mockLlm),
                 new GenerateSpecNode(mockLlm, null, null),
                 new PlanMissionNode(mockLlm),
                 mockScheduleWave,

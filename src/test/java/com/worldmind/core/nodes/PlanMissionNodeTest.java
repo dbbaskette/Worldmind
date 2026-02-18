@@ -280,7 +280,8 @@ class PlanMissionNodeTest {
                         List.of("UserService", "TokenProvider")
                 )),
                 List.of("Empty password returns 400"),
-                List.of("Database is already configured")
+                List.of("Database is already configured"),
+                null, null, null
         );
 
         var node = new PlanMissionNode(mockLlm);
