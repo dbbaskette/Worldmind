@@ -266,10 +266,31 @@ public class EvaluateWaveNode {
                             state.gitRemoteUrl());
                     
                     if (mergeResult.hasConflicts()) {
-                        log.warn("Wave merge had {} conflicts: {}", 
+                        log.warn("Wave merge had {} conflicts: {} — will retry on updated main", 
                                 mergeResult.conflictedIds().size(), mergeResult.conflictedIds());
-                        // Add conflict info to errors so it's visible in mission status
-                        errors.add("Wave merge conflicts on: " + mergeResult.conflictedIds());
+                        
+                        // Remove conflicted directives from completed so they get re-scheduled
+                        // They'll run again in the next wave, now with access to the merged changes
+                        for (String conflictedId : mergeResult.conflictedIds()) {
+                            completedIds.remove(conflictedId);
+                            
+                            // Reset directive status to PENDING so it will be re-dispatched
+                            for (int i = 0; i < updatedDirectives.size(); i++) {
+                                Directive d = updatedDirectives.get(i);
+                                if (d.id().equals(conflictedId)) {
+                                    updatedDirectives.set(i, new Directive(
+                                            d.id(), d.centurion(), d.description(),
+                                            d.inputContext(), d.successCriteria(), d.dependencies(),
+                                            DirectiveStatus.PENDING, d.iteration(), d.maxIterations(),
+                                            d.onFailure(), d.targetFiles(), List.of(), null));
+                                    log.info("Reset {} to PENDING for retry on updated main", conflictedId);
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        errors.add("Merge conflicts on " + mergeResult.conflictedIds() + 
+                                " — retrying on updated main in next wave");
                     }
                     
                     eventBus.publish(new WorldmindEvent("wave.merged",

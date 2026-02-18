@@ -468,7 +468,9 @@ public class GitWorkspaceManager {
 
         int rebaseExit = runGit(tempDir, "rebase", "main");
         if (rebaseExit != 0) {
-            log.error("Merge: rebase conflict on branch {}, aborting", branch);
+            String conflictFiles = runGitOutput(tempDir, "diff", "--name-only", "--diff-filter=U");
+            log.error("Merge: rebase conflict on branch {} — conflicting files: {}", branch, 
+                    conflictFiles.isBlank() ? "(unknown)" : conflictFiles.replace("\n", ", "));
             runGit(tempDir, "rebase", "--abort");
             runGit(tempDir, "checkout", "main");
             conflictedIds.add(directiveId);
