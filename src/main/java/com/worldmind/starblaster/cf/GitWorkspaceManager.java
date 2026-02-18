@@ -42,6 +42,14 @@ public class GitWorkspaceManager {
             "^\\s*(.+?)\\s*\\|\\s*(\\d+)\\s*[+\\-]*\\s*$"
     );
 
+    /**
+     * Pattern to match embedded credentials in URLs (e.g., https://user:token@host).
+     * Used to mask sensitive data before logging.
+     */
+    private static final Pattern SENSITIVE_URL_PATTERN = Pattern.compile(
+            "(https?://)([^:]+:[^@]+)@"
+    );
+
     private final String gitRemoteUrl;
 
     /**
@@ -213,7 +221,7 @@ public class GitWorkspaceManager {
      */
     int runGit(Path workDir, String... args) {
         var command = buildCommand(args);
-        log.debug("Running: {}", String.join(" ", command));
+        log.debug("Running: {}", maskCommand(command));
 
         try {
             var process = new ProcessBuilder(command)
@@ -225,13 +233,13 @@ public class GitWorkspaceManager {
             try (var reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    log.debug("git: {}", line);
+                    log.debug("git: {}", maskSensitiveData(line));
                 }
             }
 
             return process.waitFor();
         } catch (IOException | InterruptedException e) {
-            log.error("Git command failed: {}", String.join(" ", command), e);
+            log.error("Git command failed: {}", maskCommand(command), e);
             throw new RuntimeException("Git command failed", e);
         }
     }
@@ -245,7 +253,7 @@ public class GitWorkspaceManager {
      */
     String runGitOutput(Path workDir, String... args) {
         var command = buildCommand(args);
-        log.debug("Running (capture): {}", String.join(" ", command));
+        log.debug("Running (capture): {}", maskCommand(command));
 
         try {
             var process = new ProcessBuilder(command)
@@ -260,12 +268,12 @@ public class GitWorkspaceManager {
 
             int exitCode = process.waitFor();
             if (exitCode != 0) {
-                log.warn("Git command exited with code {}: {}", exitCode, String.join(" ", command));
+                log.warn("Git command exited with code {}: {}", exitCode, maskCommand(command));
             }
 
             return output;
         } catch (IOException | InterruptedException e) {
-            log.error("Git command failed: {}", String.join(" ", command), e);
+            log.error("Git command failed: {}", maskCommand(command), e);
             throw new RuntimeException("Git command failed", e);
         }
     }
@@ -329,6 +337,10 @@ public class GitWorkspaceManager {
      */
     public void mergeDirectiveBranches(List<String> directiveIds, String gitToken, String overrideGitUrl) {
         String gitUrl = authenticatedUrl(gitToken, overrideGitUrl);
+        if (gitUrl == null || gitUrl.isBlank()) {
+            log.warn("Skipping merge: no git remote URL configured for directive branches {}", directiveIds);
+            return;
+        }
         Path tempDir = null;
         List<String> mergedIds = new ArrayList<>();
         List<String> conflictedIds = new ArrayList<>();
@@ -354,10 +366,30 @@ public class GitWorkspaceManager {
                     log.warn("Branch {} not found on remote, skipping", branch);
                     continue;
                 }
-                int mergeExit = runGit(tempDir, "merge", "origin/" + branch,
+
+                // Checkout the directive branch and rebase onto current main.
+                // Each directive has its own .worldmind-DIR-XXX/ directory so no conflicts from logs.
+                int checkoutExit = runGit(tempDir, "checkout", "-B", "temp-" + id, "origin/" + branch);
+                if (checkoutExit != 0) {
+                    log.warn("Could not checkout branch {} for rebase, skipping", branch);
+                    continue;
+                }
+
+                int rebaseExit = runGit(tempDir, "rebase", "main");
+                if (rebaseExit != 0) {
+                    log.error("Rebase conflict on branch {}, aborting", branch);
+                    runGit(tempDir, "rebase", "--abort");
+                    runGit(tempDir, "checkout", "main");
+                    conflictedIds.add(id);
+                    continue;
+                }
+
+                // Switch back to main and merge the rebased branch
+                runGit(tempDir, "checkout", "main");
+                int mergeExit = runGit(tempDir, "merge", "temp-" + id,
                         "--no-ff", "-m", "merge directive " + id);
                 if (mergeExit != 0) {
-                    log.error("Merge conflict on branch {}, aborting merge", branch);
+                    log.error("Merge conflict on branch {} after rebase, aborting merge", branch);
                     runGit(tempDir, "merge", "--abort");
                     conflictedIds.add(id);
                 } else {
@@ -397,6 +429,10 @@ public class GitWorkspaceManager {
      */
     public void cleanupDirectiveBranches(List<String> directiveIds, String gitToken, String overrideGitUrl) {
         String gitUrl = authenticatedUrl(gitToken, overrideGitUrl);
+        if (gitUrl == null || gitUrl.isBlank()) {
+            log.warn("Skipping cleanup: no git remote URL configured for directive branches {}", directiveIds);
+            return;
+        }
         Path tempDir = null;
         try {
             tempDir = java.nio.file.Files.createTempDirectory("worldmind-cleanup-");
@@ -429,7 +465,11 @@ public class GitWorkspaceManager {
 
     private String authenticatedUrl(String gitToken, String overrideGitUrl) {
         String baseUrl = (overrideGitUrl != null && !overrideGitUrl.isBlank()) ? sanitizeGitUrl(overrideGitUrl) : gitRemoteUrl;
-        log.info("Resolved git URL for merge/cleanup: {}", baseUrl.replaceAll("://[^@]+@", "://***@"));
+        if (baseUrl == null || baseUrl.isBlank()) {
+            log.warn("No git remote URL configured — cannot perform git operations");
+            return "";
+        }
+        log.info("Resolved git URL for merge/cleanup: {}", maskSensitiveData(baseUrl));
         if (gitToken != null && !gitToken.isBlank() && baseUrl.startsWith("https://")) {
             return baseUrl.replace("https://", "https://x-access-token:" + gitToken + "@");
         }
@@ -444,6 +484,30 @@ public class GitWorkspaceManager {
                         catch (IOException ignored) {}
                     });
         } catch (IOException ignored) {}
+    }
+
+    /**
+     * Masks sensitive data (credentials, tokens) in a string for safe logging.
+     * Replaces embedded URL credentials like https://user:token@host with https://***@host.
+     *
+     * @param input the string that may contain sensitive data
+     * @return the string with sensitive data masked
+     */
+    static String maskSensitiveData(String input) {
+        if (input == null) return null;
+        return SENSITIVE_URL_PATTERN.matcher(input).replaceAll("$1***@");
+    }
+
+    /**
+     * Masks sensitive data in a command list for safe logging.
+     *
+     * @param command the command arguments
+     * @return a single string with sensitive data masked
+     */
+    private static String maskCommand(List<String> command) {
+        return command.stream()
+                .map(GitWorkspaceManager::maskSensitiveData)
+                .collect(java.util.stream.Collectors.joining(" "));
     }
 
     private List<String> buildCommand(String... args) {

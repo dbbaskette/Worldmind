@@ -5,11 +5,32 @@ export interface MissionResponse {
   interaction_mode: string
   execution_strategy: string
   classification: Classification | null
+  product_spec: ProductSpec | null
   directives: DirectiveResponse[]
   seal_granted: boolean
   metrics: MissionMetrics | null
   errors: string[]
   wave_count: number
+}
+
+export interface ProductSpec {
+  title: string
+  overview: string
+  goals: string[]
+  nonGoals: string[]
+  technicalRequirements: string[]
+  acceptanceCriteria: string[]
+  components: ComponentSpec[]
+  edgeCases: string[]
+  outOfScopeAssumptions: string[]
+}
+
+export interface ComponentSpec {
+  name: string
+  responsibility: string
+  affectedFiles: string[]
+  behaviorExpectations: string[]
+  integrationPoints: string[]
 }
 
 export interface DirectiveResponse {

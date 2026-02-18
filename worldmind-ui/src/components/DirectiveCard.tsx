@@ -18,6 +18,8 @@ interface DirectiveCardProps {
   directive: DirectiveResponse
   events: WorldmindEvent[]
   onRetry?: (id: string) => void
+  index?: number
+  total?: number
 }
 
 function derivePhase(events: WorldmindEvent[], status: string): { active: Phase | null; completed: Set<Phase>; failed: Phase | null } {
@@ -25,6 +27,26 @@ function derivePhase(events: WorldmindEvent[], status: string): { active: Phase 
   let active: Phase | null = null
   let failed: Phase | null = null
 
+  // First check directive status to handle page refresh (no events available yet)
+  // This ensures status lights show correctly even before SSE events arrive
+  if (status === 'FULFILLED') {
+    PHASES.forEach(p => completed.add(p))
+    return { active: null, completed, failed: null }
+  }
+  if (status === 'FAILED' && events.length === 0) {
+    // Without events we don't know which phase failed, show FORGE as failed
+    return { active: null, completed, failed: 'FORGE' }
+  }
+  if (status === 'EXECUTING' && events.length === 0) {
+    // Executing but no events yet - show FORGE as active
+    return { active: 'FORGE', completed, failed: null }
+  }
+  if (status === 'PENDING') {
+    // Not started yet
+    return { active: null, completed, failed: null }
+  }
+
+  // Process events to get more precise phase info
   for (const event of events) {
     if (event.eventType === 'directive.started') {
       active = 'FORGE'
@@ -54,6 +76,7 @@ function derivePhase(events: WorldmindEvent[], status: string): { active: Phase 
     }
   }
 
+  // Final status-based overrides
   if (status === 'FULFILLED') {
     PHASES.forEach(p => completed.add(p))
     active = null
@@ -166,7 +189,7 @@ function QualityScore({ score, summary }: { score: number | null; summary: strin
   )
 }
 
-export function DirectiveCard({ directive, events, onRetry }: DirectiveCardProps) {
+export function DirectiveCard({ directive, events, onRetry, index, total }: DirectiveCardProps) {
   const [expanded, setExpanded] = useState(false)
   const accent = CENTURION_ACCENT[directive.centurion] || '#6B7280'
 
@@ -191,6 +214,11 @@ export function DirectiveCard({ directive, events, onRetry }: DirectiveCardProps
       <div className="p-3">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
+            {index != null && total != null && (
+              <span className="text-[10px] font-mono bg-wm-elevated text-wm_text-secondary px-1.5 py-0.5 rounded">
+                {index + 1}/{total}
+              </span>
+            )}
             <span className="text-[11px] font-mono text-wm_text-muted">{directive.id}</span>
             <StatusBadge status={directive.centurion} type="centurion" />
           </div>

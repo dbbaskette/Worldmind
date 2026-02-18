@@ -15,6 +15,7 @@ public record MissionResponse(
     @JsonProperty("interaction_mode") String interactionMode,
     @JsonProperty("execution_strategy") String executionStrategy,
     Classification classification,
+    @JsonProperty("product_spec") ProductSpec productSpec,
     List<DirectiveResponse> directives,
     @JsonProperty("seal_granted") boolean sealGranted,
     MissionMetrics metrics,

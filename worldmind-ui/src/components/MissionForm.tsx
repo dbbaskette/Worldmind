@@ -2,24 +2,32 @@ import { useState } from 'react'
 import { INTERACTION_MODES } from '../utils/constants'
 
 interface MissionFormProps {
-  onSubmit: (request: string, mode: string, projectPath?: string, gitRemoteUrl?: string) => Promise<void>
+  onSubmit: (request: string, mode: string, projectPath?: string, gitRemoteUrl?: string, reasoningLevel?: string) => Promise<void>
   submitting: boolean
   error: string | null
   showSettings?: boolean
   onToggleSettings?: () => void
 }
 
+const REASONING_LEVELS = [
+  { value: 'low', label: 'Quick', description: 'Fast, minimal reasoning' },
+  { value: 'medium', label: 'Balanced', description: 'Default reasoning depth' },
+  { value: 'high', label: 'Thorough', description: 'Step-by-step analysis' },
+  { value: 'max', label: 'Deep', description: 'Maximum reasoning, quality focus' },
+]
+
 export function MissionForm({ onSubmit, submitting, error, showSettings, onToggleSettings }: MissionFormProps) {
   const [request, setRequest] = useState('')
   const [mode, setMode] = useState('APPROVE_PLAN')
   const [projectPath, setProjectPath] = useState('')
   const [gitRemoteUrl, setGitRemoteUrl] = useState('')
+  const [reasoningLevel, setReasoningLevel] = useState('medium')
   const [showOptions, setShowOptions] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (request.trim()) {
-      await onSubmit(request, mode, projectPath || undefined, gitRemoteUrl || undefined)
+      await onSubmit(request, mode, projectPath || undefined, gitRemoteUrl || undefined, reasoningLevel)
       setRequest('')
     }
   }
@@ -116,32 +124,63 @@ export function MissionForm({ onSubmit, submitting, error, showSettings, onToggl
 
         {/* Expandable options */}
         {showOptions && (
-          <div className="flex gap-3 mt-3 animate-fade-in">
-            <div className="flex-1">
-              <label className="block text-[10px] font-mono uppercase tracking-wider text-wm_text-muted mb-1">
-                Project Path
+          <div className="mt-3 animate-fade-in space-y-3">
+            {/* Reasoning Level */}
+            <div>
+              <label className="block text-[10px] font-mono uppercase tracking-wider text-wm_text-muted mb-1.5">
+                Reasoning Depth
               </label>
-              <input
-                type="text"
-                value={projectPath}
-                onChange={(e) => setProjectPath(e.target.value)}
-                placeholder="/path/to/project"
-                className="w-full bg-wm-bg border border-wm-border rounded px-3 py-1.5 text-xs font-mono text-wm_text-secondary placeholder:text-wm_text-dim focus:outline-none focus:border-centurion-vigil/50"
-                disabled={submitting}
-              />
+              <div className="flex gap-2">
+                {REASONING_LEVELS.map(level => (
+                  <button
+                    key={level.value}
+                    type="button"
+                    onClick={() => setReasoningLevel(level.value)}
+                    disabled={submitting}
+                    className={`flex-1 px-3 py-1.5 rounded border text-xs transition-all ${
+                      reasoningLevel === level.value
+                        ? 'bg-centurion-vigil/20 border-centurion-vigil/50 text-centurion-vigil'
+                        : 'bg-wm-bg border-wm-border text-wm_text-muted hover:border-wm_text-muted/50'
+                    }`}
+                    title={level.description}
+                  >
+                    {level.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-wm_text-muted mt-1">
+                {REASONING_LEVELS.find(l => l.value === reasoningLevel)?.description}
+              </p>
             </div>
-            <div className="flex-1">
-              <label className="block text-[10px] font-mono uppercase tracking-wider text-wm_text-muted mb-1">
-                Git Remote URL
-              </label>
-              <input
-                type="text"
-                value={gitRemoteUrl}
-                onChange={(e) => setGitRemoteUrl(e.target.value)}
-                placeholder="https://github.com/..."
-                className="w-full bg-wm-bg border border-wm-border rounded px-3 py-1.5 text-xs font-mono text-wm_text-secondary placeholder:text-wm_text-dim focus:outline-none focus:border-centurion-vigil/50"
-                disabled={submitting}
-              />
+
+            {/* Project Path & Git URL */}
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-wm_text-muted mb-1">
+                  Project Path
+                </label>
+                <input
+                  type="text"
+                  value={projectPath}
+                  onChange={(e) => setProjectPath(e.target.value)}
+                  placeholder="/path/to/project"
+                  className="w-full bg-wm-bg border border-wm-border rounded px-3 py-1.5 text-xs font-mono text-wm_text-secondary placeholder:text-wm_text-dim focus:outline-none focus:border-centurion-vigil/50"
+                  disabled={submitting}
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-wm_text-muted mb-1">
+                  Git Remote URL
+                </label>
+                <input
+                  type="text"
+                  value={gitRemoteUrl}
+                  onChange={(e) => setGitRemoteUrl(e.target.value)}
+                  placeholder="https://github.com/..."
+                  className="w-full bg-wm-bg border border-wm-border rounded px-3 py-1.5 text-xs font-mono text-wm_text-secondary placeholder:text-wm_text-dim focus:outline-none focus:border-centurion-vigil/50"
+                  disabled={submitting}
+                />
+              </div>
             </div>
           </div>
         )}

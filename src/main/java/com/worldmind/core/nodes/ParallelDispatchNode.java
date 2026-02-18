@@ -107,7 +107,7 @@ public class ParallelDispatchNode {
 
                             long startMs = System.currentTimeMillis();
                             var result = bridge.executeDirective(
-                                    directiveToDispatch, projectContext, Path.of(projectPath), state.gitRemoteUrl(), state.runtimeTag());
+                                    directiveToDispatch, projectContext, Path.of(projectPath), state.gitRemoteUrl(), state.runtimeTag(), state.reasoningLevel());
                             long elapsedMs = System.currentTimeMillis() - startMs;
                             if (metrics != null) {
                                 metrics.recordDirectiveExecution(directiveToDispatch.centurion(), elapsedMs);

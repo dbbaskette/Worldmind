@@ -114,7 +114,7 @@ export function MissionDetail({ missionId }: MissionDetailProps) {
   const showRetryAll = isTerminal && hasFailedDirectives
 
   return (
-    <div className="p-5 overflow-y-auto h-full">
+    <div className="p-5 overflow-y-auto h-full overflow-x-hidden">
       {/* Header */}
       <div className="mb-5">
         <div className="flex items-center justify-between mb-2">
@@ -167,12 +167,14 @@ export function MissionDetail({ missionId }: MissionDetailProps) {
             Directives ({mission.directives.length})
           </div>
           <div className="space-y-2">
-            {mission.directives.map(directive => (
+            {mission.directives.map((directive, idx) => (
               <DirectiveCard
                 key={directive.id}
                 directive={directive}
                 events={events.filter(e => e.directiveId === directive.id)}
                 onRetry={isTerminal ? handleRetryDirective : undefined}
+                index={idx}
+                total={mission.directives.length}
               />
             ))}
           </div>

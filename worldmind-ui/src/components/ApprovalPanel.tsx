@@ -12,6 +12,7 @@ export function ApprovalPanel({ mission, onRefresh }: ApprovalPanelProps) {
   const [approving, setApproving] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showSpec, setShowSpec] = useState(false)
 
   const handleApprove = async () => {
     setApproving(true)
@@ -69,6 +70,84 @@ export function ApprovalPanel({ mission, onRefresh }: ApprovalPanelProps) {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Product Spec Toggle */}
+      {mission.product_spec && (
+        <div className="mb-3">
+          <button
+            type="button"
+            onClick={() => setShowSpec(!showSpec)}
+            className="flex items-center gap-2 text-xs text-centurion-pulse hover:text-centurion-pulse/80 transition-colors"
+          >
+            <svg className={`w-3 h-3 transition-transform ${showSpec ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+            <span className="font-medium">View Product Spec</span>
+            <span className="text-wm_text-muted">({mission.product_spec.title})</span>
+          </button>
+          
+          {showSpec && (
+            <div className="mt-3 bg-wm-surface rounded-lg p-4 border border-wm-border animate-fade-in">
+              <h4 className="text-sm font-semibold text-wm_text-primary mb-2">{mission.product_spec.title}</h4>
+              <p className="text-xs text-wm_text-secondary mb-3">{mission.product_spec.overview}</p>
+              
+              <div className="grid grid-cols-2 gap-4 text-xs">
+                {mission.product_spec.goals.length > 0 && (
+                  <div>
+                    <h5 className="font-mono text-[10px] uppercase tracking-wider text-emerald-400 mb-1">Goals</h5>
+                    <ul className="space-y-0.5">
+                      {mission.product_spec.goals.map((g, i) => (
+                        <li key={i} className="text-wm_text-secondary flex gap-1">
+                          <span className="text-emerald-400">•</span> {g}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                
+                {mission.product_spec.nonGoals.length > 0 && (
+                  <div>
+                    <h5 className="font-mono text-[10px] uppercase tracking-wider text-red-400 mb-1">Non-Goals</h5>
+                    <ul className="space-y-0.5">
+                      {mission.product_spec.nonGoals.map((g, i) => (
+                        <li key={i} className="text-wm_text-secondary flex gap-1">
+                          <span className="text-red-400">•</span> {g}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              {mission.product_spec.technicalRequirements.length > 0 && (
+                <div className="mt-3">
+                  <h5 className="font-mono text-[10px] uppercase tracking-wider text-blue-400 mb-1">Technical Requirements</h5>
+                  <ul className="space-y-0.5 text-xs">
+                    {mission.product_spec.technicalRequirements.map((r, i) => (
+                      <li key={i} className="text-wm_text-secondary flex gap-1">
+                        <span className="text-blue-400">•</span> {r}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {mission.product_spec.acceptanceCriteria.length > 0 && (
+                <div className="mt-3">
+                  <h5 className="font-mono text-[10px] uppercase tracking-wider text-amber-400 mb-1">Acceptance Criteria</h5>
+                  <ul className="space-y-0.5 text-xs">
+                    {mission.product_spec.acceptanceCriteria.map((c, i) => (
+                      <li key={i} className="text-wm_text-secondary flex gap-1">
+                        <span className="text-amber-400">✓</span> {c}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

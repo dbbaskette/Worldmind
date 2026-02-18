@@ -16,7 +16,29 @@ public final class InstructionBuilder {
     private InstructionBuilder() {}
 
     public static String build(Directive directive, ProjectContext context) {
+        return build(directive, context, "medium");
+    }
+
+    public static String build(Directive directive, ProjectContext context, String reasoningLevel) {
         var sb = new StringBuilder();
+
+        // Add reasoning guidance based on level
+        if ("high".equalsIgnoreCase(reasoningLevel) || "max".equalsIgnoreCase(reasoningLevel)) {
+            sb.append("## Reasoning Approach\n\n");
+            sb.append("- Think through this problem step by step before implementing\n");
+            sb.append("- Consider edge cases and potential issues\n");
+            sb.append("- Evaluate multiple approaches before choosing one\n");
+            if ("max".equalsIgnoreCase(reasoningLevel)) {
+                sb.append("- Take your time — quality and correctness over speed\n");
+                sb.append("- Double-check your implementation before committing\n");
+                sb.append("- Consider how this integrates with existing code\n");
+            }
+            sb.append("\n");
+        } else if ("low".equalsIgnoreCase(reasoningLevel)) {
+            sb.append("## Approach\n\n");
+            sb.append("- Be concise and direct — implement the minimum viable solution\n");
+            sb.append("- Don't over-engineer; simple is better\n\n");
+        }
 
         sb.append("# Directive: ").append(directive.id()).append("\n\n");
 
@@ -59,10 +81,27 @@ public final class InstructionBuilder {
         sb.append("- **CRITICAL**: You MUST create/modify the files described in the objective. ");
         sb.append("Do NOT exit until you have actually written the code. ");
         sb.append("If you only explore the codebase without creating files, this directive will FAIL.\n");
+        sb.append("- **FUNCTIONAL COMPLETENESS**: Do NOT deliver scaffolding, shells, or placeholder code. ");
+        sb.append("If the objective asks for a 'game', implement ACTUAL game logic (movement, scoring, win/lose conditions). ");
+        sb.append("If it asks for an 'API', implement REAL endpoints that do something. ");
+        sb.append("A pretty UI with no working functionality is NOT acceptable and will be rejected.\n");
         sb.append("- Only modify files related to this directive\n");
         sb.append("- Do not modify test files (Gauntlet handles tests)\n");
         sb.append("- When finished, stage and commit all changes: `git add -A && git commit -m 'done'`\n");
-        sb.append("- If you encounter an error, attempt to fix it before reporting failure\n");
+        sb.append("- If you encounter an error, attempt to fix it before reporting failure\n\n");
+
+        sb.append("## Available Tools\n\n");
+        sb.append("- **Web Search**: You have web search available. Use it to look up documentation, APIs, ");
+        sb.append("best practices, or examples when implementing unfamiliar technologies.\n");
+        sb.append("- **File Operations**: Read, write, and modify files in the workspace.\n\n");
+
+        sb.append("## Deployment Validation (IMPORTANT)\n\n");
+        sb.append("If you create a `manifest.yml` for Cloud Foundry deployment, you MUST ensure:\n");
+        sb.append("- **Staticfile apps**: Create a `Staticfile` config with `root: public` and place all HTML/CSS/JS in a `public/` directory\n");
+        sb.append("- **Java apps**: Ensure `manifest.yml` path matches where the JAR is built (usually `target/`)\n");
+        sb.append("- **Node apps**: Ensure `package.json` exists with a valid `start` script\n");
+        sb.append("- **VERIFY**: The deployment config (manifest.yml, Staticfile, etc.) MUST match the actual file structure\n");
+        sb.append("- Before committing, check that if `manifest.yml` references any paths, those paths exist\n");
 
         return sb.toString();
     }
@@ -140,9 +179,21 @@ public final class InstructionBuilder {
         sb.append("## Review Instructions\n\n");
         sb.append("- Review each modified file for correctness, security, and code quality\n");
         sb.append("- Check that the implementation matches the directive objective\n");
-        sb.append("- Look for: bugs, security vulnerabilities, performance issues, code style problems\n");
+        sb.append("- Look for: bugs, security vulnerabilities, performance issues, code style problems\n\n");
+        sb.append("### FUNCTIONAL COMPLETENESS CHECK (CRITICAL)\n");
+        sb.append("- **Does the code ACTUALLY implement the requested feature?** Not just scaffolding or UI shells.\n");
+        sb.append("- If the directive asks for a 'game', verify there is actual game logic, not just a container\n");
+        sb.append("- If the directive asks for an 'API', verify there are actual endpoints with real implementations\n");
+        sb.append("- If the directive asks for 'CRUD operations', verify all Create/Read/Update/Delete actually work\n");
+        sb.append("- **FAIL the review (score <= 4) if the code is just a shell/placeholder without real functionality**\n");
+        sb.append("- A pretty UI with no working backend/logic is NOT a complete implementation\n\n");
+        sb.append("### Deployment Check\n");
+        sb.append("- If there's a `manifest.yml`, verify it matches the file structure:\n");
+        sb.append("  - Staticfile apps MUST have `Staticfile` config AND files in `public/` directory\n");
+        sb.append("  - Java apps MUST have JAR path matching where Maven/Gradle builds it\n");
+        sb.append("  - Node apps MUST have `package.json` with valid start script\n\n");
         sb.append("- Provide a quality score from 1-10\n");
-        sb.append("- List specific issues found\n");
+        sb.append("- List specific issues found (including incomplete implementations and deployment mismatches)\n");
         sb.append("- List improvement suggestions\n\n");
 
         sb.append("## Output Format\n\n");
@@ -178,6 +229,11 @@ public final class InstructionBuilder {
 
         sb.append("## Success Criteria\n\n");
         sb.append(directive.successCriteria()).append("\n\n");
+
+        sb.append("## Available Tools\n\n");
+        sb.append("- **Web Search**: You have web search available. Use it to research documentation, ");
+        sb.append("find best practices, look up error messages, or gather information about technologies.\n");
+        sb.append("- **File Operations**: Read files in the workspace (but do NOT write).\n\n");
 
         sb.append("## Constraints\n\n");
         sb.append("- READ-ONLY: Do NOT create, modify, or delete any files\n");

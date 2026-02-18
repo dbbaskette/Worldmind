@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -37,6 +38,21 @@ import java.util.stream.Collectors;
 public class CloudFoundryStarblasterProvider implements StarblasterProvider {
 
     private static final Logger log = LoggerFactory.getLogger(CloudFoundryStarblasterProvider.class);
+
+    /**
+     * Patterns to match sensitive data in strings for safe logging.
+     */
+    private static final Pattern SENSITIVE_URL_PATTERN = Pattern.compile(
+            "(https?://)([^:]+:[^@]+)@"
+    );
+    private static final Pattern SENSITIVE_KEY_PATTERN = Pattern.compile(
+            "((?:API_KEY|TOKEN|PASSWORD|SECRET)=['\"]?)([^'\"\\s]+)(['\"]?)",
+            Pattern.CASE_INSENSITIVE
+    );
+    private static final Pattern SENSITIVE_EXPORT_PATTERN = Pattern.compile(
+            "(export\\s+[A-Z_]*(?:KEY|TOKEN|PASSWORD|SECRET)[A-Z_]*=['\"]?)([^'\"]+)(['\"]?)",
+            Pattern.CASE_INSENSITIVE
+    );
 
     static final int POLL_INTERVAL_SECONDS = 5;
 
@@ -133,9 +149,15 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
                     + ") || echo 'WARN: parent branch " + parentBranch + " not found, staying on default'";
             postGooseGit = "";
         } else if (isImplementation) {
-            // FORGE/PRISM: create branch — push runs after Goose commits
-            branchSetup = "git checkout -B " + branchName;
+            // FORGE/PRISM: create or continue on existing branch.
+            // On retry, we want to preserve the previous iteration's code and fix it,
+            // not start fresh from main. So we:
+            // 1. Try to fetch the existing branch from remote
+            // 2. If it exists, checkout that branch (preserving previous work)
+            // 3. If it doesn't exist, create a new branch from main
+            branchSetup = "(git fetch origin " + branchName + " 2>/dev/null && git checkout " + branchName + ") || git checkout -b " + branchName;
             // Use semicolons (not &&) so push always runs.
+            // Each directive has its own .worldmind-DIR-XXX/ directory so logs don't conflict.
             // git diff --cached --quiet exits 1 if there ARE staged changes, so || triggers the commit.
             postGooseGit = "; git add -A; git diff --cached --quiet || git commit -m '" + directiveId
                     + "'; git push -uf origin " + branchName;
@@ -154,38 +176,42 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
                 "git clone %s /workspace && cd /workspace".formatted(gitRemoteUrl),
                 "git config user.name 'Worldmind Centurion' && git config user.email 'centurion@worldmind.local'",
                 branchSetup,
-                "mkdir -p .worldmind/directives && curl --retry 3 -fk '%s' > .worldmind/directives/%s.md".formatted(instructionUrl, directiveId),
+                // Use directive-specific directory (.worldmind-DIR-001/) so each directive's logs don't conflict
+                "mkdir -p .worldmind-" + directiveId + " && curl --retry 3 -fk '%s' > .worldmind-%s/instruction.md".formatted(instructionUrl, directiveId),
                 // Dump diagnostics to a file that gets committed to git for debugging.
-                "mkdir -p .worldmind && {"
-                        + " echo '=== ENV ===' && env | grep -iE 'GOOSE|OPENAI|ANTHROPIC|GOOGLE|API_URL|API_KEY|PROVIDER|MODEL|SSL|MCP|HOME' | sed 's/\\(API_KEY\\|TOKEN\\)=.*/\\1=***/';"
-                        + " echo '=== CONFIG ===' && cat $HOME/.config/goose/config.yaml 2>&1;"
-                        + " echo '=== INSTRUCTION ===' && wc -c .worldmind/directives/" + directiveId + ".md 2>&1;"
-                        + " echo '=== INSTRUCTION PREVIEW ===' && head -5 .worldmind/directives/" + directiveId + ".md 2>&1;"
+                // IMPORTANT: Exclude VCAP_SERVICES (contains credentials in JSON) and mask any API keys/tokens.
+                "{"
+                        + " echo '=== ENV ===' && env | grep -iE 'GOOSE|OPENAI|ANTHROPIC|GOOGLE|API_URL|PROVIDER|MODEL|SSL|MCP|HOME' | grep -v VCAP | sed 's/\\(API_KEY\\|TOKEN\\|PASSWORD\\|SECRET\\)=.*/\\1=***/';"
+                        + " echo '=== CONFIG ===' && cat $HOME/.config/goose/config.yaml 2>&1 | sed 's/\\(api_key\\|token\\|password\\|secret\\):.*/\\1: ***/i';"
+                        + " echo '=== INSTRUCTION ===' && wc -c .worldmind-" + directiveId + "/instruction.md 2>&1;"
+                        + " echo '=== INSTRUCTION PREVIEW ===' && head -5 .worldmind-" + directiveId + "/instruction.md 2>&1;"
                         + " echo '=== GOOSE VERSION ===' && goose --version 2>&1;"
                         + " echo '=== GOOSE RUN HELP ===' && goose run --help 2>&1;"
                         + " echo '=== WORKSPACE ===' && ls -la /workspace 2>&1;"
-                        + " } > .worldmind/diagnostics.log 2>&1",
+                        + " } > .worldmind-" + directiveId + "/diagnostics.log 2>&1",
                 // Run Goose headlessly with the instruction file.
                 // -i/--instructions loads the file and executes its commands.
                 // --no-session avoids persisting session state in CF ephemeral containers.
                 // --with-builtin developer loads file-writing tools alongside config.yaml.
+                // --with-builtin web_search enables web search for research-heavy tasks (FORGE, PULSE).
                 // Verify instruction file is non-empty before running — curl may have failed silently.
-                "INSTRUCTION_FILE=.worldmind/directives/" + directiveId + ".md"
+                "INSTRUCTION_FILE=.worldmind-" + directiveId + "/instruction.md"
                         + " && if [ ! -s \"$INSTRUCTION_FILE\" ]; then"
-                        + " echo 'FATAL: instruction file is empty or missing' >> .worldmind/diagnostics.log;"
+                        + " echo 'FATAL: instruction file is empty or missing' >> .worldmind-" + directiveId + "/diagnostics.log;"
                         + " echo 'FATAL: instruction file is empty or missing'; exit 1; fi"
                         + " && GOOSE_DEBUG=true goose run --debug --no-session --with-builtin developer"
-                        + " -i .worldmind/directives/" + directiveId + ".md > .worldmind/goose-output.log 2>&1"
-                        + "; GOOSE_RC=$?; echo \"GOOSE_EXIT_CODE=$GOOSE_RC\" >> .worldmind/diagnostics.log"
-                        + "; cp -r $HOME/.local/state/goose/logs/ .worldmind/goose-logs 2>/dev/null"
+                        + (("forge".equals(type) || "pulse".equals(type)) ? " --with-builtin web_search" : "")
+                        + " -i .worldmind-" + directiveId + "/instruction.md > .worldmind-" + directiveId + "/goose-output.log 2>&1"
+                        + "; GOOSE_RC=$?; echo \"GOOSE_EXIT_CODE=$GOOSE_RC\" >> .worldmind-" + directiveId + "/diagnostics.log"
+                        + "; cp -r $HOME/.local/state/goose/logs/ .worldmind-" + directiveId + "/goose-logs 2>/dev/null"
                         // POST Goose output back to orchestrator (CF API doesn't expose task stdout)
-                        + "; curl -fk -X PUT -H 'Content-Type: text/plain' --data-binary @.worldmind/goose-output.log '%s' 2>/dev/null || true".formatted(outputUrl)
+                        + "; curl -fk -X PUT -H 'Content-Type: text/plain' --data-binary @.worldmind-" + directiveId + "/goose-output.log '%s' 2>/dev/null || true".formatted(outputUrl)
                         + postGooseGit
                         + "; exit $GOOSE_RC"
         );
 
         log.info("Opening Starblaster {} for directive {} on app {}", taskName, directiveId, appName);
-        log.debug("Task command: {}", taskCommand);
+        log.debug("Task command: {}", maskSensitiveData(taskCommand));
 
         var taskGuid = cfApiClient.createTask(appName, taskCommand, taskName, memoryMb, diskMb);
 
@@ -416,5 +442,23 @@ public class CloudFoundryStarblasterProvider implements StarblasterProvider {
 
         starblasterAppNames.put(starblasterId, appName);
         return appName;
+    }
+
+    /**
+     * Masks sensitive data (credentials, API keys, tokens) in a string for safe logging.
+     * Replaces:
+     * - Embedded URL credentials like https://user:token@host with https://***@host
+     * - Environment variables like API_KEY=secret with API_KEY=***
+     * - Export statements like export OPENAI_API_KEY='secret' with export OPENAI_API_KEY='***'
+     *
+     * @param input the string that may contain sensitive data
+     * @return the string with sensitive data masked
+     */
+    static String maskSensitiveData(String input) {
+        if (input == null) return null;
+        String result = SENSITIVE_URL_PATTERN.matcher(input).replaceAll("$1***@");
+        result = SENSITIVE_KEY_PATTERN.matcher(result).replaceAll("$1***$3");
+        result = SENSITIVE_EXPORT_PATTERN.matcher(result).replaceAll("$1***$3");
+        return result;
     }
 }

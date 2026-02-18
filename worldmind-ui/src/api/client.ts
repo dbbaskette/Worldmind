@@ -7,7 +7,8 @@ class ApiClient {
     request: string,
     mode: string,
     projectPath?: string,
-    gitRemoteUrl?: string
+    gitRemoteUrl?: string,
+    reasoningLevel?: string
   ): Promise<{ mission_id: string; status: string }> {
     const response = await fetch(`${API_BASE}/missions`, {
       method: 'POST',
@@ -16,7 +17,8 @@ class ApiClient {
         request,
         mode,
         project_path: projectPath || '',
-        git_remote_url: gitRemoteUrl || ''
+        git_remote_url: gitRemoteUrl || '',
+        reasoning_level: reasoningLevel || 'medium'
       })
     })
 

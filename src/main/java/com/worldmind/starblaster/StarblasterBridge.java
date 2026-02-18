@@ -66,10 +66,14 @@ public class StarblasterBridge {
      * @return bridge result containing updated directive, starblaster info, and output
      */
     public BridgeResult executeDirective(Directive directive, ProjectContext context, Path projectPath, String gitRemoteUrl, String runtimeTag) {
-        log.info("Executing directive {} [{}]: {}",
-                directive.id(), directive.centurion(), directive.description());
+        return executeDirective(directive, context, projectPath, gitRemoteUrl, runtimeTag, "medium");
+    }
 
-        String instruction = InstructionBuilder.build(directive, context);
+    public BridgeResult executeDirective(Directive directive, ProjectContext context, Path projectPath, String gitRemoteUrl, String runtimeTag, String reasoningLevel) {
+        log.info("Executing directive {} [{}]: {} (reasoning={})",
+                directive.id(), directive.centurion(), directive.description(), reasoningLevel);
+
+        String instruction = InstructionBuilder.build(directive, context, reasoningLevel);
         instruction = InstructionBuilder.withRuntimePreamble(instruction, runtimeTag);
         Instant startedAt = Instant.now();
 

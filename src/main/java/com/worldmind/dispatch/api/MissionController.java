@@ -111,10 +111,11 @@ public class MissionController {
                 "status", MissionStatus.CLASSIFYING.name()
         )));
 
-        // Run mission asynchronously (uses overload with projectPath/gitRemoteUrl)
+        // Run mission asynchronously (uses overload with projectPath/gitRemoteUrl/reasoningLevel)
         CompletableFuture<WorldmindState> future = CompletableFuture.supplyAsync(() -> {
             try {
-                WorldmindState result = missionEngine.runMission(missionId, request.request(), mode, request.projectPath(), request.gitRemoteUrl());
+                WorldmindState result = missionEngine.runMission(missionId, request.request(), mode, 
+                        request.projectPath(), request.gitRemoteUrl(), request.reasoningLevel());
                 if (result != null) {
                     missionStates.put(missionId, result);
                 }
@@ -493,11 +494,20 @@ public class MissionController {
                             .map(Directive::id)
                             .toList();
 
-                    // Use the mission's git URL (what centurions actually pushed to)
+                    // Use the mission's git URL, falling back to config if not set
+                    // (centurions use cfProperties.getGitRemoteUrl() as fallback, so merge must too)
                     String missionGitUrl = state.gitRemoteUrl();
+                    log.info("Mission {} gitRemoteUrl from state: '{}'", missionId,
+                            missionGitUrl != null ? missionGitUrl.replaceAll("://[^@]+@", "://***@") : "null");
+                    if (missionGitUrl == null || missionGitUrl.isBlank()) {
+                        missionGitUrl = cfProperties.getGitRemoteUrl();
+                        log.info("Mission {} falling back to config gitRemoteUrl: '{}'", missionId,
+                                missionGitUrl != null ? missionGitUrl.replaceAll("://[^@]+@", "://***@") : "null");
+                    }
 
                     if (state.status() == MissionStatus.COMPLETED && !passedIds.isEmpty()) {
-                        log.info("Merging {} passed directive branches for mission {}", passedIds.size(), missionId);
+                        log.info("Merging {} passed directive branches for mission {} to {}", passedIds.size(), missionId,
+                                missionGitUrl != null ? missionGitUrl.replaceAll("://[^@]+@", "://***@") : "null");
                         gitWorkspaceManager.mergeDirectiveBranches(passedIds, cfProperties.getGitToken(), missionGitUrl);
                     }
 
@@ -538,6 +548,7 @@ public class MissionController {
                 state.interactionMode().name(),
                 state.executionStrategy().name(),
                 state.classification().orElse(null),
+                state.productSpec().orElse(null),
                 directives,
                 state.sealGranted(),
                 state.metrics().orElse(null),

@@ -84,7 +84,7 @@ public class EvaluateSealNode {
             var gauntletDirective = createGauntletDirective(directive);
             log.info("Dispatching GAUNTLET for directive {}", directive.id());
             var gauntletResult = bridge.executeDirective(
-                    gauntletDirective, projectContext, Path.of(projectPath), state.gitRemoteUrl(), state.runtimeTag());
+                    gauntletDirective, projectContext, Path.of(projectPath), state.gitRemoteUrl(), state.runtimeTag(), state.reasoningLevel());
             starblasterInfos.add(gauntletResult.starblasterInfo());
             testResult = sealService.parseTestOutput(
                     directive.id(), gauntletResult.output(),
@@ -101,7 +101,7 @@ public class EvaluateSealNode {
             var vigilDirective = createVigilDirective(directive);
             log.info("Dispatching VIGIL for directive {}", directive.id());
             var vigilResult = bridge.executeDirective(
-                    vigilDirective, projectContext, Path.of(projectPath), state.gitRemoteUrl(), state.runtimeTag());
+                    vigilDirective, projectContext, Path.of(projectPath), state.gitRemoteUrl(), state.runtimeTag(), state.reasoningLevel());
             starblasterInfos.add(vigilResult.starblasterInfo());
             reviewFeedback = sealService.parseReviewOutput(
                     directive.id(), vigilResult.output());

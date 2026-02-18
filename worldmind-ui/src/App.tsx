@@ -17,8 +17,8 @@ function App() {
 
   const [showSettings, setShowSettings] = useState(false)
 
-  const handleSubmit = async (request: string, mode: string, projectPath?: string, gitRemoteUrl?: string) => {
-    await submitMission(request, mode, projectPath, gitRemoteUrl)
+  const handleSubmit = async (request: string, mode: string, projectPath?: string, gitRemoteUrl?: string, reasoningLevel?: string) => {
+    await submitMission(request, mode, projectPath, gitRemoteUrl, reasoningLevel)
   }
 
   return (
@@ -34,8 +34,8 @@ function App() {
 
       {/* Main */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
-        <div className="w-72 border-r border-wm-border bg-wm-surface overflow-y-auto shrink-0">
+        {/* Sidebar - fixed width, never shrinks */}
+        <aside className="w-72 min-w-[288px] max-w-[288px] border-r border-wm-border bg-wm-surface overflow-y-auto flex-shrink-0">
           <div className="px-3 py-2.5 border-b border-wm-border">
             <span className="text-[10px] font-mono uppercase tracking-wider text-wm_text-muted">
               Missions ({missions.size})
@@ -46,10 +46,10 @@ function App() {
             selectedMissionId={selectedMissionId}
             onSelect={selectMission}
           />
-        </div>
+        </aside>
 
-        {/* Detail */}
-        <div className="flex-1 bg-wm-bg">
+        {/* Detail - takes remaining space, content can't push sidebar */}
+        <main className="flex-1 min-w-0 bg-wm-bg overflow-hidden">
           {showSettings ? (
             <SettingsPanel />
           ) : selectedMissionId ? (
@@ -70,7 +70,7 @@ function App() {
               </div>
             </div>
           )}
-        </div>
+        </main>
       </div>
     </div>
   )

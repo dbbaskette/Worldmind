@@ -150,7 +150,7 @@ public class EvaluateWaveNode {
                 try {
                     var gauntletDirective = createGauntletDirective(directive, fileChanges);
                     log.info("Dispatching GAUNTLET for directive {} ({} file changes)", id, fileChanges.size());
-                    var gauntletResult = bridge.executeDirective(gauntletDirective, projectContext, Path.of(projectPath), state.gitRemoteUrl(), state.runtimeTag());
+                    var gauntletResult = bridge.executeDirective(gauntletDirective, projectContext, Path.of(projectPath), state.gitRemoteUrl(), state.runtimeTag(), state.reasoningLevel());
                     starblasterInfos.add(gauntletResult.starblasterInfo());
                     if (gauntletResult.directive().status() == DirectiveStatus.FAILED) {
                         log.warn("GAUNTLET for {} failed ({}ms): {}", id,
@@ -172,7 +172,7 @@ public class EvaluateWaveNode {
                 try {
                     var vigilDirective = createVigilDirective(directive, fileChanges);
                     log.info("Dispatching VIGIL for directive {} ({} file changes)", id, fileChanges.size());
-                    var vigilResult = bridge.executeDirective(vigilDirective, projectContext, Path.of(projectPath), state.gitRemoteUrl(), state.runtimeTag());
+                    var vigilResult = bridge.executeDirective(vigilDirective, projectContext, Path.of(projectPath), state.gitRemoteUrl(), state.runtimeTag(), state.reasoningLevel());
                     starblasterInfos.add(vigilResult.starblasterInfo());
                     if (vigilResult.directive().status() == DirectiveStatus.FAILED) {
                         log.warn("VIGIL for {} failed ({}ms): {}", id,
@@ -249,10 +249,12 @@ public class EvaluateWaveNode {
     }
 
     private Directive withResult(Directive d, WaveDispatchResult result, DirectiveStatus status) {
+        // Increment iteration count since this directive was executed
+        int newIteration = d.iteration() + 1;
         return new Directive(
                 d.id(), d.centurion(), d.description(),
                 d.inputContext(), d.successCriteria(), d.dependencies(),
-                status, d.iteration(), d.maxIterations(),
+                status, newIteration, d.maxIterations(),
                 d.onFailure(),
                 result != null && result.filesAffected() != null ? result.filesAffected() : d.filesAffected(),
                 result != null ? result.elapsedMs() : d.elapsedMs()

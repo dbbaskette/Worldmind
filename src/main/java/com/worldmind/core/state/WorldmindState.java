@@ -38,6 +38,7 @@ public class WorldmindState extends AgentState {
         Map.entry("productSpec",            Channels.base((Reducer<ProductSpec>) null)),
         Map.entry("projectPath",           Channels.base(() -> "")),
         Map.entry("gitRemoteUrl",          Channels.base(() -> "")),
+        Map.entry("reasoningLevel",        Channels.base(() -> "medium")),
 
         // ── Wave execution channels (Phase 4) ────────────────────────
         Map.entry("waveDirectiveIds",      Channels.base((Supplier<List<String>>) List::of)),
@@ -183,6 +184,10 @@ public class WorldmindState extends AgentState {
 
     public String gitRemoteUrl() {
         return this.<String>value("gitRemoteUrl").orElse("");
+    }
+
+    public String reasoningLevel() {
+        return this.<String>value("reasoningLevel").orElse("medium");
     }
 
     public String runtimeTag() {

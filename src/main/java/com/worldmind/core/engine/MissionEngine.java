@@ -57,18 +57,23 @@ public class MissionEngine {
      * @throws RuntimeException if the graph execution returns empty state
      */
     public WorldmindState runMission(String missionId, String request, InteractionMode mode) {
-        return runMission(missionId, request, mode, null, null);
+        return runMission(missionId, request, mode, null, null, null);
     }
 
     public WorldmindState runMission(String missionId, String request, InteractionMode mode, String projectPath) {
-        return runMission(missionId, request, mode, projectPath, null);
+        return runMission(missionId, request, mode, projectPath, null, null);
     }
 
     public WorldmindState runMission(String missionId, String request, InteractionMode mode,
                                      String projectPath, String gitRemoteUrl) {
+        return runMission(missionId, request, mode, projectPath, gitRemoteUrl, null);
+    }
+
+    public WorldmindState runMission(String missionId, String request, InteractionMode mode,
+                                     String projectPath, String gitRemoteUrl, String reasoningLevel) {
         MdcContext.setMission(missionId);
         try {
-            log.info("Starting mission {} with mode {} — request: {}", missionId, mode, request);
+            log.info("Starting mission {} with mode {}, reasoning={} — request: {}", missionId, mode, reasoningLevel, request);
 
             eventBus.publish(new WorldmindEvent(
                     "mission.created", missionId, null,
@@ -85,6 +90,9 @@ public class MissionEngine {
             }
             if (gitRemoteUrl != null && !gitRemoteUrl.isBlank()) {
                 stateMap.put("gitRemoteUrl", gitRemoteUrl);
+            }
+            if (reasoningLevel != null && !reasoningLevel.isBlank()) {
+                stateMap.put("reasoningLevel", reasoningLevel);
             }
             Map<String, Object> initialState = Map.copyOf(stateMap);
 
