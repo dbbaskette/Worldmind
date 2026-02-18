@@ -28,29 +28,90 @@ public class GenerateSpecNode {
     private static final Logger log = LoggerFactory.getLogger(GenerateSpecNode.class);
 
     private static final String SYSTEM_PROMPT = """
-            You are a product specification writer for Worldmind, an agentic code assistant.
-            Given a user request, its classification, and project context, produce a detailed,
-            implementation-ready product specification. This spec will be the sole input for
-            autonomous agents that implement, test, and review the work — they cannot ask
-            follow-up questions, so the spec must be unambiguous and complete.
+            You are a senior product manager writing a detailed PRD (Product Requirements Document)
+            for Worldmind, an agentic code assistant. Given a user request, its classification,
+            and project context, produce a comprehensive, implementation-ready specification.
+            
+            This PRD will be the SOLE INPUT for autonomous coding agents. They CANNOT ask
+            follow-up questions, so you must anticipate everything they need to know.
+            Be exhaustively specific — vague specs produce vague code.
 
-            The specification should:
-            1. Title and overview: what is being built or changed, and why
-            2. Goals: concrete, measurable outcomes (not vague aspirations)
-            3. Non-goals: explicitly prevent scope creep
-            4. Components: break the work into discrete components, each with:
-               - Name and responsibility (what this component does)
-               - Affected files (exact paths from the project file tree)
-               - Behavior expectations (what should happen, with specific inputs/outputs)
-               - Integration points (what other components or APIs this touches)
-            5. Technical requirements: frameworks, patterns, conventions to follow
-            6. Edge cases: error scenarios, boundary conditions, invalid inputs
-            7. Out-of-scope assumptions: what the agents can assume is already working
-            8. Acceptance criteria: verifiable conditions that prove the work is done
+            ## Required Sections
 
-            Be specific. Instead of "add error handling", write "return 400 with
-            {error: message} when the request body is missing the 'name' field".
-            Instead of "update the service layer", name the exact file and method.
+            ### 1. Title & Overview
+            - Descriptive title that captures what's being built
+            - Overview paragraph explaining the purpose, context, and value
+
+            ### 2. Goals (3-5 specific, measurable outcomes)
+            - Each goal must be verifiable (e.g., "User can move character with arrow keys")
+            - Avoid vague goals like "make it better" or "improve UX"
+
+            ### 3. Non-Goals (explicitly out of scope)
+            - Prevent scope creep by listing what we're NOT building
+            - Include features that might seem related but aren't needed
+
+            ### 4. Components (breakdown of discrete parts)
+            For each component specify:
+            - Name and single responsibility
+            - Exact file paths (e.g., "src/game/player.js", not "the player file")
+            - Behavior expectations with concrete inputs/outputs
+            - Integration points with other components
+
+            ### 5. Implementation Plan (CRITICAL - step-by-step tasks)
+            Provide an ordered list of implementation steps. For each step:
+            - Step number and title (e.g., "Step 1: Create HTML Structure")
+            - Detailed description of what to implement
+            - Files involved (exact paths)
+            - Detailed tasks (specific actions like "Create canvas element 800x600px")
+            - Dependencies (which steps must complete first)
+            - Verification method (how to know it's done)
+            
+            Include suggestedOrder (sequential vs parallel) and parallelizableGroups
+            (which steps can run simultaneously without conflicts).
+
+            ### 6. File Specifications (for each file to create/modify)
+            - File path
+            - Purpose (why this file exists)
+            - Must contain (required elements, functions, classes)
+            - Must NOT contain (anti-patterns, things to avoid)
+            - Template/structure (rough outline of file structure)
+
+            ### 7. User Experience (for visual/interactive applications)
+            - Visual style (modern, retro, minimal, etc.)
+            - Interactions (keyboard, mouse, touch)
+            - Animations (what moves, transitions)
+            - Color scheme (specific colors if relevant)
+            - Accessibility requirements
+
+            ### 8. Technical Requirements
+            - Frameworks, libraries, patterns to use
+            - Code conventions (naming, structure)
+            - Performance requirements
+
+            ### 9. Edge Cases
+            - Error scenarios with expected behavior
+            - Boundary conditions (empty states, maximums)
+            - Invalid inputs and how to handle them
+
+            ### 10. Acceptance Criteria
+            - Checkable conditions that prove the work is complete
+            - "When I do X, Y should happen" format
+
+            ## Example Detail Level
+
+            BAD: "Add player movement"
+            GOOD: "Implement player movement using arrow keys. Player sprite moves 5px per
+                  keypress. Movement is constrained to canvas bounds (0,0 to 800,600).
+                  Holding a key should NOT cause continuous movement — one move per keypress.
+                  Player starts at position (400, 300)."
+
+            BAD: "Create the game file"
+            GOOD: "Create public/game.js containing:
+                  - Game class with init(), update(), render() methods
+                  - requestAnimationFrame loop running at 60fps
+                  - Canvas context stored as this.ctx
+                  - Keyboard event listeners attached in init()
+                  - Export Game as default"
 
             Respond with valid JSON matching the schema provided.
             """;
@@ -251,7 +312,7 @@ public class GenerateSpecNode {
 
     private String formatSpecMarkdown(ProductSpec spec) {
         var sb = new StringBuilder();
-        sb.append("# Product Specification: ").append(spec.title()).append("\n\n");
+        sb.append("# Product Requirements Document: ").append(spec.title()).append("\n\n");
         sb.append("## Overview\n").append(spec.overview()).append("\n\n");
 
         sb.append("## Goals\n");
@@ -295,6 +356,106 @@ public class GenerateSpecNode {
             }
         }
 
+        // Implementation Plan (new section)
+        if (spec.implementationPlan() != null && spec.implementationPlan().steps() != null) {
+            sb.append("## Implementation Plan\n\n");
+            var plan = spec.implementationPlan();
+            if (plan.suggestedOrder() != null) {
+                sb.append("**Execution:** ").append(plan.suggestedOrder()).append("\n");
+            }
+            if (plan.parallelizableGroups() != null && !plan.parallelizableGroups().isEmpty()) {
+                sb.append("**Parallelizable Groups:** ").append(String.join(", ", plan.parallelizableGroups())).append("\n");
+            }
+            sb.append("\n");
+            
+            for (var step : plan.steps()) {
+                sb.append("### ").append(step.stepNumber()).append(": ").append(step.title()).append("\n");
+                sb.append(step.description()).append("\n\n");
+                
+                if (step.filesInvolved() != null && !step.filesInvolved().isEmpty()) {
+                    sb.append("**Files:** ").append(String.join(", ", step.filesInvolved().stream().map(f -> "`" + f + "`").toList())).append("\n\n");
+                }
+                
+                if (step.detailedTasks() != null && !step.detailedTasks().isEmpty()) {
+                    sb.append("**Tasks:**\n");
+                    for (String task : step.detailedTasks()) {
+                        sb.append("- [ ] ").append(task).append("\n");
+                    }
+                    sb.append("\n");
+                }
+                
+                if (step.dependencies() != null && !step.dependencies().isEmpty()) {
+                    sb.append("**Depends on:** ").append(String.join(", ", step.dependencies())).append("\n\n");
+                }
+                
+                if (step.verificationMethod() != null) {
+                    sb.append("**Verification:** ").append(step.verificationMethod()).append("\n\n");
+                }
+            }
+        }
+
+        // File Specifications (new section)
+        if (spec.fileSpecs() != null && !spec.fileSpecs().isEmpty()) {
+            sb.append("## File Specifications\n\n");
+            for (var fileSpec : spec.fileSpecs()) {
+                sb.append("### `").append(fileSpec.filePath()).append("`\n");
+                sb.append("**Purpose:** ").append(fileSpec.purpose()).append("\n\n");
+                
+                if (fileSpec.mustContain() != null && !fileSpec.mustContain().isEmpty()) {
+                    sb.append("**Must Contain:**\n");
+                    for (String item : fileSpec.mustContain()) {
+                        sb.append("- ").append(item).append("\n");
+                    }
+                    sb.append("\n");
+                }
+                
+                if (fileSpec.mustNotContain() != null && !fileSpec.mustNotContain().isEmpty()) {
+                    sb.append("**Must NOT Contain:**\n");
+                    for (String item : fileSpec.mustNotContain()) {
+                        sb.append("- ").append(item).append("\n");
+                    }
+                    sb.append("\n");
+                }
+                
+                if (fileSpec.templateOrStructure() != null) {
+                    sb.append("**Structure:**\n```\n").append(fileSpec.templateOrStructure()).append("\n```\n\n");
+                }
+            }
+        }
+
+        // User Experience (new section)
+        if (spec.userExperience() != null) {
+            sb.append("## User Experience\n\n");
+            var ux = spec.userExperience();
+            if (ux.visualStyle() != null) {
+                sb.append("**Visual Style:** ").append(ux.visualStyle()).append("\n\n");
+            }
+            if (ux.colorScheme() != null) {
+                sb.append("**Color Scheme:** ").append(ux.colorScheme()).append("\n\n");
+            }
+            if (ux.interactions() != null && !ux.interactions().isEmpty()) {
+                sb.append("**Interactions:**\n");
+                for (String interaction : ux.interactions()) {
+                    sb.append("- ").append(interaction).append("\n");
+                }
+                sb.append("\n");
+            }
+            if (ux.animations() != null && !ux.animations().isEmpty()) {
+                sb.append("**Animations:**\n");
+                for (String animation : ux.animations()) {
+                    sb.append("- ").append(animation).append("\n");
+                }
+                sb.append("\n");
+            }
+            if (ux.accessibilityRequirements() != null && !ux.accessibilityRequirements().isEmpty()) {
+                sb.append("**Accessibility:**\n");
+                for (String req : ux.accessibilityRequirements()) {
+                    sb.append("- ").append(req).append("\n");
+                }
+                sb.append("\n");
+            }
+        }
+
         sb.append("## Technical Requirements\n");
         for (String req : spec.technicalRequirements()) {
             sb.append("- ").append(req).append("\n");
@@ -319,7 +480,7 @@ public class GenerateSpecNode {
 
         sb.append("## Acceptance Criteria\n");
         for (String criterion : spec.acceptanceCriteria()) {
-            sb.append("- ").append(criterion).append("\n");
+            sb.append("- [ ] ").append(criterion).append("\n");
         }
         sb.append("\n");
 

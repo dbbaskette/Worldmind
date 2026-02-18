@@ -258,52 +258,122 @@ public class PlanMissionNode {
         productSpec.ifPresent(spec -> {
             sb.append(String.format("""
 
-                Product Specification:
-                - Title: %s
-                - Overview: %s
-                - Goals: %s
-                - Non-Goals: %s
-                - Technical Requirements: %s
-                - Acceptance Criteria: %s
+                === PRODUCT REQUIREMENTS DOCUMENT ===
+                Title: %s
+                Overview: %s
+                
+                GOALS:
+                %s
+                
+                NON-GOALS:
+                %s
+                
+                TECHNICAL REQUIREMENTS:
+                %s
+                
+                ACCEPTANCE CRITERIA:
+                %s
                 """,
                 spec.title(),
                 spec.overview(),
-                String.join("; ", spec.goals()),
-                String.join("; ", spec.nonGoals()),
-                String.join("; ", spec.technicalRequirements()),
-                String.join("; ", spec.acceptanceCriteria())
+                spec.goals().stream().map(g -> "- " + g).reduce((a, b) -> a + "\n" + b).orElse("(none)"),
+                spec.nonGoals().stream().map(g -> "- " + g).reduce((a, b) -> a + "\n" + b).orElse("(none)"),
+                spec.technicalRequirements().stream().map(r -> "- " + r).reduce((a, b) -> a + "\n" + b).orElse("(none)"),
+                spec.acceptanceCriteria().stream().map(c -> "- " + c).reduce((a, b) -> a + "\n" + b).orElse("(none)")
             ));
 
             if (spec.components() != null && !spec.components().isEmpty()) {
-                sb.append("\nComponents:\n");
+                sb.append("\nCOMPONENTS:\n");
                 for (var comp : spec.components()) {
-                    sb.append("  - ").append(comp.name()).append(": ").append(comp.responsibility()).append("\n");
+                    sb.append("  [").append(comp.name()).append("]\n");
+                    sb.append("    Responsibility: ").append(comp.responsibility()).append("\n");
                     if (comp.affectedFiles() != null && !comp.affectedFiles().isEmpty()) {
-                        sb.append("    Affected files: ").append(String.join(", ", comp.affectedFiles())).append("\n");
+                        sb.append("    Files: ").append(String.join(", ", comp.affectedFiles())).append("\n");
                     }
                     if (comp.behaviorExpectations() != null && !comp.behaviorExpectations().isEmpty()) {
-                        sb.append("    Behavior: ").append(String.join("; ", comp.behaviorExpectations())).append("\n");
-                    }
-                    if (comp.integrationPoints() != null && !comp.integrationPoints().isEmpty()) {
-                        sb.append("    Integration points: ").append(String.join(", ", comp.integrationPoints())).append("\n");
+                        sb.append("    Behavior:\n");
+                        for (var b : comp.behaviorExpectations()) {
+                            sb.append("      - ").append(b).append("\n");
+                        }
                     }
                 }
             }
 
-            if (spec.edgeCases() != null && !spec.edgeCases().isEmpty()) {
-                sb.append("\nEdge Cases: ").append(String.join("; ", spec.edgeCases())).append("\n");
+            // Include implementation plan steps — these become directive hints
+            if (spec.implementationPlan() != null && spec.implementationPlan().steps() != null) {
+                sb.append("\nIMPLEMENTATION PLAN:\n");
+                var plan = spec.implementationPlan();
+                if (plan.suggestedOrder() != null) {
+                    sb.append("Execution order: ").append(plan.suggestedOrder()).append("\n");
+                }
+                for (var step : plan.steps()) {
+                    sb.append("\n  [").append(step.stepNumber()).append(": ").append(step.title()).append("]\n");
+                    sb.append("    ").append(step.description()).append("\n");
+                    if (step.filesInvolved() != null && !step.filesInvolved().isEmpty()) {
+                        sb.append("    Files: ").append(String.join(", ", step.filesInvolved())).append("\n");
+                    }
+                    if (step.detailedTasks() != null && !step.detailedTasks().isEmpty()) {
+                        sb.append("    Tasks:\n");
+                        for (var task : step.detailedTasks()) {
+                            sb.append("      - ").append(task).append("\n");
+                        }
+                    }
+                    if (step.verificationMethod() != null) {
+                        sb.append("    Verify: ").append(step.verificationMethod()).append("\n");
+                    }
+                }
             }
 
-            if (spec.outOfScopeAssumptions() != null && !spec.outOfScopeAssumptions().isEmpty()) {
-                sb.append("\nOut-of-Scope Assumptions: ").append(String.join("; ", spec.outOfScopeAssumptions())).append("\n");
+            // Include file specifications — centurions use these as blueprints
+            if (spec.fileSpecs() != null && !spec.fileSpecs().isEmpty()) {
+                sb.append("\nFILE SPECIFICATIONS:\n");
+                for (var fileSpec : spec.fileSpecs()) {
+                    sb.append("\n  [").append(fileSpec.filePath()).append("]\n");
+                    sb.append("    Purpose: ").append(fileSpec.purpose()).append("\n");
+                    if (fileSpec.mustContain() != null && !fileSpec.mustContain().isEmpty()) {
+                        sb.append("    Must contain:\n");
+                        for (var item : fileSpec.mustContain()) {
+                            sb.append("      - ").append(item).append("\n");
+                        }
+                    }
+                    if (fileSpec.templateOrStructure() != null) {
+                        sb.append("    Structure: ").append(fileSpec.templateOrStructure()).append("\n");
+                    }
+                }
+            }
+
+            // Include UX requirements for visual applications
+            if (spec.userExperience() != null) {
+                var ux = spec.userExperience();
+                sb.append("\nUSER EXPERIENCE:\n");
+                if (ux.visualStyle() != null) sb.append("  Visual style: ").append(ux.visualStyle()).append("\n");
+                if (ux.colorScheme() != null) sb.append("  Colors: ").append(ux.colorScheme()).append("\n");
+                if (ux.interactions() != null && !ux.interactions().isEmpty()) {
+                    sb.append("  Interactions:\n");
+                    for (var i : ux.interactions()) sb.append("    - ").append(i).append("\n");
+                }
+                if (ux.animations() != null && !ux.animations().isEmpty()) {
+                    sb.append("  Animations:\n");
+                    for (var a : ux.animations()) sb.append("    - ").append(a).append("\n");
+                }
+            }
+
+            if (spec.edgeCases() != null && !spec.edgeCases().isEmpty()) {
+                sb.append("\nEDGE CASES:\n");
+                for (var ec : spec.edgeCases()) sb.append("  - ").append(ec).append("\n");
             }
 
             sb.append("""
 
-                Use this specification to generate focused, well-scoped directives
-                that address the goals and meet the acceptance criteria.
-                Use the component breakdown to create targeted directives with
-                specific file paths and behavioral expectations.
+                === DIRECTIVE GENERATION INSTRUCTIONS ===
+                Use the IMPLEMENTATION PLAN steps to create directives. Each step typically
+                maps to one FORGE directive. Include the step's detailed tasks in the
+                directive's inputContext so the centurion knows exactly what to implement.
+                
+                Use the FILE SPECIFICATIONS to populate targetFiles for each directive.
+                Include "mustContain" items in the directive's successCriteria.
+                
+                The PRD is the source of truth — directives should implement it completely.
                 """);
         });
 
