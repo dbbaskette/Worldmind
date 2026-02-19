@@ -107,24 +107,34 @@ export function SettingsPanel() {
                 {llmSettings.providers.map(provider => (
                   <button
                     key={provider.id}
-                    onClick={() => handleProviderChange(provider.id)}
+                    onClick={() => provider.available && handleProviderChange(provider.id)}
+                    disabled={!provider.available}
                     className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
                       selectedProvider === provider.id
                         ? 'bg-centurion-vigil/20 border-centurion-vigil/50 text-centurion-vigil'
-                        : 'bg-wm-bg border-wm-border text-wm_text-muted hover:border-wm_text-muted/50'
+                        : provider.available
+                          ? 'bg-wm-bg border-wm-border text-wm_text-muted hover:border-wm_text-muted/50'
+                          : 'bg-wm-bg border-wm-border/50 text-wm_text-dim cursor-not-allowed opacity-60'
                     }`}
+                    title={provider.available ? provider.name : `${provider.name} - API key required`}
                   >
                     {provider.name}
+                    {!provider.available && (
+                      <span className="ml-1 text-[9px] text-red-400">●</span>
+                    )}
                   </button>
                 ))}
               </div>
+              <p className="text-[10px] text-wm_text-dim mt-1.5">
+                <span className="text-red-400">●</span> = API key required (set via environment variable)
+              </p>
             </div>
 
             {/* Model Selection */}
             {currentProvider && (
               <div>
                 <label className="block text-[10px] font-mono uppercase tracking-wider text-wm_text-muted mb-2">
-                  Model
+                  Model {!currentProvider.available && <span className="text-red-400 font-normal">(API key required)</span>}
                 </label>
                 <div className="space-y-2">
                   {currentProvider.models.map(model => (
@@ -132,7 +142,8 @@ export function SettingsPanel() {
                       key={model.id}
                       model={model}
                       selected={selectedModel === model.id}
-                      onSelect={() => setSelectedModel(model.id)}
+                      onSelect={() => currentProvider.available && setSelectedModel(model.id)}
+                      disabled={!currentProvider.available}
                     />
                   ))}
                 </div>
@@ -224,7 +235,7 @@ export function SettingsPanel() {
   )
 }
 
-function ModelCard({ model, selected, onSelect }: { model: LlmModel; selected: boolean; onSelect: () => void }) {
+function ModelCard({ model, selected, onSelect, disabled = false }: { model: LlmModel; selected: boolean; onSelect: () => void; disabled?: boolean }) {
   const tierColors: Record<string, string> = {
     flagship: 'bg-centurion-vigil/10 text-centurion-vigil border-centurion-vigil/30',
     premium: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
@@ -235,17 +246,19 @@ function ModelCard({ model, selected, onSelect }: { model: LlmModel; selected: b
 
   return (
     <div
-      onClick={onSelect}
-      className={`p-3 rounded-lg border cursor-pointer transition-all ${
-        selected
-          ? 'bg-centurion-vigil/10 border-centurion-vigil/40'
-          : 'bg-wm-card border-wm-border hover:border-wm_text-muted/30'
+      onClick={disabled ? undefined : onSelect}
+      className={`p-3 rounded-lg border transition-all ${
+        disabled
+          ? 'bg-wm-card/50 border-wm-border/50 opacity-60 cursor-not-allowed'
+          : selected
+            ? 'bg-centurion-vigil/10 border-centurion-vigil/40 cursor-pointer'
+            : 'bg-wm-card border-wm-border hover:border-wm_text-muted/30 cursor-pointer'
       }`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className={`text-sm font-medium ${selected ? 'text-wm_text-primary' : 'text-wm_text-secondary'}`}>
+            <span className={`text-sm font-medium ${disabled ? 'text-wm_text-dim' : selected ? 'text-wm_text-primary' : 'text-wm_text-secondary'}`}>
               {model.name}
             </span>
             <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold border ${tierColors[model.tier] || tierColors.flagship}`}>

@@ -34,18 +34,12 @@ public class LlmController {
     public ResponseEntity<Map<String, Object>> getProviders(HttpSession session) {
         List<Map<String, Object>> providers = new ArrayList<>();
 
-        if (llmProperties.hasAnthropicKey()) {
-            providers.add(buildProviderInfo("anthropic", "Anthropic", ModelCatalog.ANTHROPIC_MODELS));
-        }
+        // Always show all providers - mark as available/unavailable based on API key
+        providers.add(buildProviderInfo("anthropic", "Anthropic", ModelCatalog.ANTHROPIC_MODELS, llmProperties.hasAnthropicKey()));
+        providers.add(buildProviderInfo("openai", "OpenAI", ModelCatalog.OPENAI_MODELS, llmProperties.hasOpenaiKey()));
+        providers.add(buildProviderInfo("google", "Google", ModelCatalog.GOOGLE_MODELS, llmProperties.hasGoogleKey()));
 
-        if (llmProperties.hasOpenaiKey()) {
-            providers.add(buildProviderInfo("openai", "OpenAI", ModelCatalog.OPENAI_MODELS));
-        }
-
-        if (llmProperties.hasGoogleKey()) {
-            providers.add(buildProviderInfo("google", "Google", ModelCatalog.GOOGLE_MODELS));
-        }
-
+        // Add bound service if present
         Map<String, String> boundService = resolveBoundService();
         if (boundService != null) {
             Map<String, Object> genaiProvider = new LinkedHashMap<>();
@@ -65,7 +59,7 @@ public class LlmController {
             boundModel.put("priceDisplay", "Included with service");
 
             genaiProvider.put("models", List.of(boundModel));
-            providers.add(genaiProvider);
+            providers.add(0, genaiProvider); // Add bound service first
         }
 
         String currentProvider = (String) session.getAttribute(SESSION_PROVIDER_KEY);
@@ -164,11 +158,11 @@ public class LlmController {
         return ResponseEntity.ok(result);
     }
 
-    private Map<String, Object> buildProviderInfo(String id, String name, List<ModelInfo> models) {
+    private Map<String, Object> buildProviderInfo(String id, String name, List<ModelInfo> models, boolean available) {
         Map<String, Object> provider = new LinkedHashMap<>();
         provider.put("id", id);
         provider.put("name", name);
-        provider.put("available", true);
+        provider.put("available", available);
 
         List<Map<String, Object>> modelList = new ArrayList<>();
         for (ModelInfo m : models) {
