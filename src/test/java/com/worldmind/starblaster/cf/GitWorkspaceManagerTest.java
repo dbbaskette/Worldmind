@@ -195,15 +195,17 @@ class GitWorkspaceManagerTest {
 
         var commands = manager.getExecutedCommands();
         // Should clone, config user, config email, checkout main,
-        // then for each: fetch (explicit refspec) + merge, then push main, then 2x push --delete
+        // then for each directive: fetch, checkout temp branch, rebase, checkout main, merge
         assertTrue(commands.stream().anyMatch(c -> c.contains("clone")), "Should clone: " + commands);
         assertTrue(commands.stream().anyMatch(c -> c.contains("checkout") && c.contains("main")), "Should checkout main: " + commands);
-        // Verify explicit refspec is used for fetch (not bare branch name)
-        assertTrue(commands.stream().anyMatch(c -> c.contains("fetch") && c.contains("refs/heads/worldmind/DIR-001:refs/remotes/origin/worldmind/DIR-001")),
-                "Should fetch DIR-001 with explicit refspec: " + commands);
-        assertTrue(commands.stream().anyMatch(c -> c.contains("merge") && c.contains("worldmind/DIR-001")), "Should merge DIR-001: " + commands);
-        assertTrue(commands.stream().anyMatch(c -> c.contains("fetch") && c.contains("refs/heads/worldmind/DIR-002:refs/remotes/origin/worldmind/DIR-002")),
-                "Should fetch DIR-002 with explicit refspec: " + commands);
+        // Verify explicit refspec is used for fetch
+        assertTrue(commands.stream().anyMatch(c -> c.contains("fetch") && c.contains("refs/heads/worldmind/DIR-001")),
+                "Should fetch DIR-001: " + commands);
+        // New flow uses temp branches and merge
+        assertTrue(commands.stream().anyMatch(c -> c.contains("merge") && c.contains("temp-DIR-001")), 
+                "Should merge temp-DIR-001: " + commands);
+        assertTrue(commands.stream().anyMatch(c -> c.contains("fetch") && c.contains("refs/heads/worldmind/DIR-002")),
+                "Should fetch DIR-002: " + commands);
         assertTrue(commands.stream().anyMatch(c -> c.contains("push") && c.contains("main")), "Should push main: " + commands);
         assertTrue(commands.stream().anyMatch(c -> c.contains("--delete") && c.contains("worldmind/DIR-001")), "Should delete DIR-001 branch: " + commands);
         assertTrue(commands.stream().anyMatch(c -> c.contains("--delete") && c.contains("worldmind/DIR-002")), "Should delete DIR-002 branch: " + commands);
@@ -212,27 +214,36 @@ class GitWorkspaceManagerTest {
     @Test
     void mergeDirectiveBranchesSkipsMissingBranches() {
         // Return non-zero exit code for fetch (branch not found), then succeed for everything else
+        // Due to the rebase-based flow, the sequence is longer
         manager.setExitCodeSequence(List.of(
                 0,  // clone
                 0,  // config user.name
                 0,  // config user.email
                 0,  // checkout main
-                // branch -r (diagnostic listing, uses runGitOutput — not in exit code sequence)
-                1,  // fetch DIR-001 (branch not found)
+                0,  // fetch origin main
+                0,  // checkout main
+                0,  // reset --hard origin/main
+                1,  // fetch DIR-001 (branch not found) - causes skip
+                0,  // fetch origin main (for DIR-002)
+                0,  // checkout main
+                0,  // reset --hard origin/main
                 0,  // fetch DIR-002
-                0,  // merge DIR-002
+                0,  // checkout -B temp-DIR-002
+                0,  // rebase main
+                0,  // checkout main
+                0,  // merge temp-DIR-002
                 0,  // push main
-                0,  // delete DIR-001
-                0   // delete DIR-002
+                0,  // delete DIR-002
+                0   // (any remaining deletes)
         ));
         manager.mergeDirectiveBranches(List.of("DIR-001", "DIR-002"), "ghp_token", null);
 
         var commands = manager.getExecutedCommands();
         // Should NOT have a merge for DIR-001 since fetch failed
-        assertFalse(commands.stream().anyMatch(c -> c.contains("merge") && c.contains("worldmind/DIR-001")),
+        assertFalse(commands.stream().anyMatch(c -> c.contains("merge") && c.contains("temp-DIR-001")),
                 "Should skip merge for missing branch: " + commands);
         // Should still merge DIR-002
-        assertTrue(commands.stream().anyMatch(c -> c.contains("merge") && c.contains("worldmind/DIR-002")),
+        assertTrue(commands.stream().anyMatch(c -> c.contains("merge") && c.contains("temp-DIR-002")),
                 "Should merge DIR-002: " + commands);
     }
 
@@ -249,28 +260,38 @@ class GitWorkspaceManagerTest {
     }
 
     @Test
-    void mergeDirectiveBranchesAbortsOnConflict() {
-        // Simulate merge conflict on second merge
+    void mergeDirectiveBranchesHandlesRebaseConflict() {
+        // Simulate conflict during rebase - the new flow uses rebase instead of direct merge
+        // When rebase fails, it aborts and skips that directive
         manager.setExitCodeSequence(List.of(
                 0,  // clone
                 0,  // config user.name
                 0,  // config user.email
                 0,  // checkout main
-                // branch -r (diagnostic listing, uses runGitOutput — not in exit code sequence)
+                0,  // fetch origin main
+                0,  // checkout main
+                0,  // reset --hard origin/main
                 0,  // fetch DIR-001
-                0,  // merge DIR-001
+                0,  // checkout -B temp-DIR-001
+                1,  // rebase main (conflict!)
+                0,  // rebase --abort
+                0,  // fetch origin main (for DIR-002)
+                0,  // checkout main
+                0,  // reset --hard origin/main
                 0,  // fetch DIR-002
-                1,  // merge DIR-002 (conflict!)
-                0,  // merge --abort
+                0,  // checkout -B temp-DIR-002
+                0,  // rebase main
+                0,  // checkout main
+                0,  // merge temp-DIR-002
                 0,  // push main
-                0,  // delete DIR-001
-                0   // delete DIR-002
+                0,  // delete DIR-002
+                0   // (any remaining deletes)
         ));
         manager.mergeDirectiveBranches(List.of("DIR-001", "DIR-002"), "ghp_token", null);
 
         var commands = manager.getExecutedCommands();
-        assertTrue(commands.stream().anyMatch(c -> c.contains("merge") && c.contains("--abort")),
-                "Should abort conflicting merge: " + commands);
+        assertTrue(commands.stream().anyMatch(c -> c.contains("rebase") && c.contains("--abort")),
+                "Should abort conflicting rebase: " + commands);
     }
 
     // --- parseDiffStat directly ---
@@ -294,6 +315,170 @@ class GitWorkspaceManagerTest {
         assertEquals(2, results.get(0).linesChanged());
     }
 
+    // --- Worktree operations ---
+    // Note: These tests use a mock that bypasses filesystem checks
+
+    @Test
+    void addWorktreeCreatesWorktreeWithNewBranch() {
+        manager.setExitCode(0);
+        manager.setMockDirectoryExists(true);
+        var result = manager.addWorktree(Path.of("/tmp/mission-ws"), "DIR-001", "main");
+
+        assertTrue(result.success(), "Result should be success: " + result.error());
+        assertNotNull(result.worktreePath());
+        assertTrue(result.worktreePath().toString().contains("worktree-DIR-001"));
+
+        var commands = manager.getExecutedCommands();
+        assertTrue(commands.stream().anyMatch(c -> 
+                c.contains("worktree") && c.contains("add") && c.contains("worldmind/DIR-001")),
+                "Should add worktree: " + commands);
+    }
+
+    @Test
+    void addWorktreeFallsBackToExistingBranch() {
+        // First worktree add fails (branch exists), second succeeds
+        manager.setExitCodeSequence(List.of(1, 0));
+        manager.setMockDirectoryExists(true);
+        var result = manager.addWorktree(Path.of("/tmp/mission-ws"), "DIR-001", "main");
+
+        assertTrue(result.success(), "Result should be success: " + result.error());
+        
+        var commands = manager.getExecutedCommands();
+        assertEquals(2, commands.size());
+        assertTrue(commands.get(0).contains("-b"), "First attempt should try creating branch");
+        assertFalse(commands.get(1).contains("-b"), "Second attempt should not use -b");
+    }
+
+    @Test
+    void addWorktreeReturnsFailureOnError() {
+        manager.setExitCode(1);
+        manager.setMockDirectoryExists(true);
+        var result = manager.addWorktree(Path.of("/tmp/mission-ws"), "DIR-001", "main");
+
+        assertFalse(result.success());
+        assertNull(result.worktreePath());
+        assertNotNull(result.error());
+    }
+
+    @Test
+    void addWorktreeReturnsFailureForNullWorkspace() {
+        var result = manager.addWorktree(null, "DIR-001", "main");
+
+        assertFalse(result.success());
+        assertTrue(result.error().contains("does not exist"));
+    }
+
+    @Test
+    void removeWorktreeExecutesGitWorktreeRemove() {
+        manager.setExitCode(0);
+        manager.setMockDirectoryExists(true);
+        boolean success = manager.removeWorktree(Path.of("/tmp/mission-ws"), "DIR-001");
+
+        assertTrue(success);
+        var commands = manager.getExecutedCommands();
+        assertTrue(commands.stream().anyMatch(c -> 
+                c.contains("worktree") && c.contains("remove") && c.contains("worktree-DIR-001")),
+                "Should remove worktree: " + commands);
+    }
+
+    @Test
+    void removeWorktreeHandlesFailureGracefully() {
+        manager.setExitCodeSequence(List.of(1, 0));  // remove fails, prune succeeds
+        manager.setMockDirectoryExists(true);
+        boolean success = manager.removeWorktree(Path.of("/tmp/mission-ws"), "DIR-001");
+
+        assertTrue(success);
+        var commands = manager.getExecutedCommands();
+        assertTrue(commands.stream().anyMatch(c -> c.contains("worktree") && c.contains("prune")),
+                "Should prune after failed remove: " + commands);
+    }
+
+    @Test
+    void listWorktreesParsesPorcelainOutput() {
+        manager.setMockDirectoryExists(true);
+        manager.setGitOutput(
+                "worktree /tmp/mission-ws\n" +
+                "HEAD abc123\n" +
+                "branch refs/heads/main\n" +
+                "\n" +
+                "worktree /tmp/worktree-DIR-001\n" +
+                "HEAD def456\n" +
+                "branch refs/heads/worldmind/DIR-001\n" +
+                "\n" +
+                "worktree /tmp/worktree-DIR-002\n" +
+                "HEAD ghi789\n" +
+                "branch refs/heads/worldmind/DIR-002\n"
+        );
+
+        var worktrees = manager.listWorktrees(Path.of("/tmp/mission-ws"));
+
+        assertEquals(2, worktrees.size());
+        assertTrue(worktrees.contains("worktree-DIR-001"));
+        assertTrue(worktrees.contains("worktree-DIR-002"));
+    }
+
+    @Test
+    void listWorktreesReturnsEmptyForNullWorkspace() {
+        var worktrees = manager.listWorktrees(null);
+        assertTrue(worktrees.isEmpty());
+    }
+
+    @Test
+    void commitAndPushWorktreeStagesAndPushes() {
+        manager.setExitCodeSequence(List.of(
+                0,  // git add -A
+                1,  // git diff --cached --quiet (1 = there ARE changes)
+                0,  // git commit
+                0   // git push
+        ));
+        manager.setMockDirectoryExists(true);
+
+        boolean success = manager.commitAndPushWorktree(Path.of("/tmp/worktree-DIR-001"), "DIR-001");
+
+        assertTrue(success);
+        var commands = manager.getExecutedCommands();
+        assertTrue(commands.stream().anyMatch(c -> c.contains("add") && c.contains("-A")));
+        assertTrue(commands.stream().anyMatch(c -> c.contains("commit")));
+        assertTrue(commands.stream().anyMatch(c -> c.contains("push") && c.contains("worldmind/DIR-001")));
+    }
+
+    @Test
+    void commitAndPushWorktreeSkipsCommitWhenNoChanges() {
+        manager.setExitCodeSequence(List.of(
+                0,  // git add -A
+                0   // git diff --cached --quiet (0 = NO changes)
+        ));
+        manager.setMockDirectoryExists(true);
+
+        boolean success = manager.commitAndPushWorktree(Path.of("/tmp/worktree-DIR-001"), "DIR-001");
+
+        assertTrue(success);
+        var commands = manager.getExecutedCommands();
+        assertFalse(commands.stream().anyMatch(c -> c.contains("commit")),
+                "Should not commit when no changes: " + commands);
+    }
+
+    @Test
+    void cleanupMissionWorkspaceRemovesAllWorktrees() {
+        manager.setExitCode(0);
+        manager.setMockDirectoryExists(true);
+        manager.setGitOutput(
+                "worktree /tmp/mission-ws\n" +
+                "HEAD abc123\n" +
+                "\n" +
+                "worktree /tmp/worktree-DIR-001\n" +
+                "HEAD def456\n"
+        );
+
+        manager.cleanupMissionWorkspace(Path.of("/tmp/mission-ws"));
+
+        var commands = manager.getExecutedCommands();
+        assertTrue(commands.stream().anyMatch(c -> c.contains("worktree") && c.contains("list")),
+                "Should list worktrees: " + commands);
+        assertTrue(commands.stream().anyMatch(c -> c.contains("worktree") && c.contains("prune")),
+                "Should prune worktrees: " + commands);
+    }
+
     // --- Test subclass that intercepts git commands ---
 
     /**
@@ -307,6 +492,7 @@ class GitWorkspaceManagerTest {
         private int exitCodeIndex = 0;
         private String gitOutput = "";
         private boolean throwOnGit = false;
+        private boolean mockDirectoryExists = false;
         private final List<String> executedCommands = new java.util.ArrayList<>();
 
         TestableGitWorkspaceManager(String gitRemoteUrl) {
@@ -330,6 +516,10 @@ class GitWorkspaceManagerTest {
 
         void setThrowOnGit(boolean throwOnGit) {
             this.throwOnGit = throwOnGit;
+        }
+
+        void setMockDirectoryExists(boolean exists) {
+            this.mockDirectoryExists = exists;
         }
 
         List<String> getExecutedCommands() {
@@ -363,6 +553,108 @@ class GitWorkspaceManagerTest {
                 throw new RuntimeException("Simulated git failure: " + command);
             }
             return gitOutput;
+        }
+
+        @Override
+        public WorktreeResult addWorktree(Path missionWorkspace, String directiveId, String baseBranch) {
+            if (missionWorkspace == null || (!mockDirectoryExists && !java.nio.file.Files.isDirectory(missionWorkspace))) {
+                return WorktreeResult.failure("Mission workspace does not exist: " + missionWorkspace);
+            }
+
+            String branchName = getBranchName(directiveId);
+            Path worktreePath = missionWorkspace.resolveSibling("worktree-" + directiveId);
+
+            int exitCodeVal = runGit(missionWorkspace, "worktree", "add", 
+                    worktreePath.toString(), "-b", branchName, baseBranch);
+
+            if (exitCodeVal != 0) {
+                exitCodeVal = runGit(missionWorkspace, "worktree", "add", 
+                        worktreePath.toString(), branchName);
+                
+                if (exitCodeVal != 0) {
+                    return WorktreeResult.failure("Failed to create worktree for " + directiveId + " (exit code " + exitCodeVal + ")");
+                }
+            }
+
+            return WorktreeResult.success(worktreePath);
+        }
+
+        @Override
+        public boolean removeWorktree(Path missionWorkspace, String directiveId) {
+            if (missionWorkspace == null || (!mockDirectoryExists && !java.nio.file.Files.isDirectory(missionWorkspace))) {
+                return false;
+            }
+
+            Path worktreePath = missionWorkspace.resolveSibling("worktree-" + directiveId);
+            int exitCodeVal = runGit(missionWorkspace, "worktree", "remove", "--force", worktreePath.toString());
+
+            if (exitCodeVal != 0) {
+                runGit(missionWorkspace, "worktree", "prune");
+            }
+
+            return true;
+        }
+
+        @Override
+        public List<String> listWorktrees(Path missionWorkspace) {
+            if (missionWorkspace == null || (!mockDirectoryExists && !java.nio.file.Files.isDirectory(missionWorkspace))) {
+                return List.of();
+            }
+
+            String output = runGitOutput(missionWorkspace, "worktree", "list", "--porcelain");
+            List<String> worktrees = new java.util.ArrayList<>();
+
+            for (String line : output.split("\n")) {
+                if (line.startsWith("worktree ")) {
+                    String path = line.substring("worktree ".length()).trim();
+                    Path worktreePath = Path.of(path);
+                    String dirName = worktreePath.getFileName().toString();
+                    if (dirName.startsWith("worktree-")) {
+                        worktrees.add(dirName);
+                    }
+                }
+            }
+
+            return worktrees;
+        }
+
+        @Override
+        public boolean commitAndPushWorktree(Path worktreePath, String directiveId) {
+            if (worktreePath == null || (!mockDirectoryExists && !java.nio.file.Files.isDirectory(worktreePath))) {
+                return false;
+            }
+
+            String branchName = getBranchName(directiveId);
+
+            runGit(worktreePath, "add", "-A");
+
+            int diffExit = runGit(worktreePath, "diff", "--cached", "--quiet");
+            if (diffExit == 0) {
+                return true;
+            }
+
+            int commitExit = runGit(worktreePath, "commit", "-m", "Directive " + directiveId);
+            if (commitExit != 0) {
+                return false;
+            }
+
+            int pushExit = runGit(worktreePath, "push", "-u", "origin", branchName, "--force");
+            return pushExit == 0;
+        }
+
+        @Override
+        public void cleanupMissionWorkspace(Path missionWorkspace) {
+            if (missionWorkspace == null) {
+                return;
+            }
+
+            List<String> worktrees = listWorktrees(missionWorkspace);
+            for (String worktreeName : worktrees) {
+                Path worktreePath = missionWorkspace.resolveSibling(worktreeName);
+                runGit(missionWorkspace, "worktree", "remove", "--force", worktreePath.toString());
+            }
+
+            runGit(missionWorkspace, "worktree", "prune");
         }
     }
 }
