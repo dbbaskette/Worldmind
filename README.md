@@ -17,7 +17,8 @@
   <a href="#getting-started">Getting Started</a> •
   <a href="#architecture">Architecture</a> •
   <a href="#usage">Usage</a> •
-  <a href="docs/deployment/cloudfoundry.md">Cloud Foundry Guide</a>
+  <a href="docs/deployment/cloudfoundry.md">Cloud Foundry Guide</a> •
+  <a href="docs/architecture/git-worktrees.md">Parallel Execution</a>
 </p>
 
 ## About
@@ -321,6 +322,21 @@ Worldmind supports Cloud Foundry deployment using CF tasks and git-based workspa
 On CF, centurions share work through git branches instead of Docker volumes. The orchestrator creates a mission branch, centurions clone and push changes, and results are merged on completion.
 
 See [docs/deployment/cloudfoundry.md](docs/deployment/cloudfoundry.md) for the full deployment guide.
+
+## Parallel Execution
+
+Worldmind supports parallel directive execution using git worktrees for isolation. This enables multiple centurions to work on independent tasks simultaneously without merge conflicts.
+
+**Key features:**
+- **Git worktrees** -- Each directive gets an isolated working directory
+- **File overlap detection** -- Conflicting directives are automatically serialized
+- **Automatic merge retry** -- Handles race conditions with rebase-first strategy
+- **Observability** -- Prometheus metrics for monitoring parallel execution
+
+**Documentation:**
+- [Architecture: Git Worktrees](docs/architecture/git-worktrees.md) -- How worktrees enable parallel execution
+- [Troubleshooting: Merge Conflicts](docs/troubleshooting/merge-conflicts.md) -- Diagnosing and resolving issues
+- [Configuration: Parallel Execution](docs/configuration/parallel-execution.md) -- Tuning parameters and settings
 
 ## Project Structure
 
