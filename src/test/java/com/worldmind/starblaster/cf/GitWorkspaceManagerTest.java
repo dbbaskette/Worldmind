@@ -262,12 +262,13 @@ class GitWorkspaceManagerTest {
     @Test
     void mergeDirectiveBranchesHandlesRebaseConflict() {
         // Simulate conflict during rebase - the new flow uses rebase instead of direct merge
-        // When rebase fails, it aborts and skips that directive
+        // When rebase fails, it aborts and retries, then skips that directive if still failing
         manager.setExitCodeSequence(List.of(
                 0,  // clone
                 0,  // config user.name
                 0,  // config user.email
                 0,  // checkout main
+                // DIR-001 attempt 1
                 0,  // fetch origin main
                 0,  // checkout main
                 0,  // reset --hard origin/main
@@ -275,7 +276,18 @@ class GitWorkspaceManagerTest {
                 0,  // checkout -B temp-DIR-001
                 1,  // rebase main (conflict!)
                 0,  // rebase --abort
-                0,  // fetch origin main (for DIR-002)
+                0,  // checkout main
+                // DIR-001 attempt 2 (retry)
+                0,  // fetch origin main
+                0,  // checkout main
+                0,  // reset --hard origin/main
+                0,  // fetch DIR-001
+                0,  // checkout -B temp-DIR-001
+                1,  // rebase main (conflict again!)
+                0,  // rebase --abort
+                0,  // checkout main
+                // DIR-002
+                0,  // fetch origin main
                 0,  // checkout main
                 0,  // reset --hard origin/main
                 0,  // fetch DIR-002
@@ -290,8 +302,51 @@ class GitWorkspaceManagerTest {
         manager.mergeDirectiveBranches(List.of("DIR-001", "DIR-002"), "ghp_token", null);
 
         var commands = manager.getExecutedCommands();
+        // Should have multiple rebase attempts for DIR-001
+        long rebaseAbortCount = commands.stream()
+                .filter(c -> c.contains("rebase") && c.contains("--abort"))
+                .count();
+        assertTrue(rebaseAbortCount >= 2, 
+                "Should have at least 2 rebase --abort (retries): " + commands);
+    }
+
+    @Test
+    void mergeDirectiveBranchesSucceedsOnRetry() {
+        // Simulate conflict on first attempt, success on retry
+        manager.setExitCodeSequence(List.of(
+                0,  // clone
+                0,  // config user.name
+                0,  // config user.email
+                0,  // checkout main
+                // DIR-001 attempt 1
+                0,  // fetch origin main
+                0,  // checkout main
+                0,  // reset --hard origin/main
+                0,  // fetch DIR-001
+                0,  // checkout -B temp-DIR-001
+                1,  // rebase main (conflict!)
+                0,  // rebase --abort
+                0,  // checkout main
+                // DIR-001 attempt 2 (retry succeeds)
+                0,  // fetch origin main
+                0,  // checkout main
+                0,  // reset --hard origin/main
+                0,  // fetch DIR-001
+                0,  // checkout -B temp-DIR-001
+                0,  // rebase main (success!)
+                0,  // checkout main
+                0,  // merge temp-DIR-001
+                0,  // push main
+                0   // delete DIR-001
+        ));
+        manager.mergeDirectiveBranches(List.of("DIR-001"), "ghp_token", null);
+
+        var commands = manager.getExecutedCommands();
+        // Should have one rebase abort (first attempt) and one successful merge
         assertTrue(commands.stream().anyMatch(c -> c.contains("rebase") && c.contains("--abort")),
-                "Should abort conflicting rebase: " + commands);
+                "Should abort first rebase: " + commands);
+        assertTrue(commands.stream().anyMatch(c -> c.contains("merge") && c.contains("temp-DIR-001")),
+                "Should eventually merge after retry: " + commands);
     }
 
     // --- parseDiffStat directly ---
