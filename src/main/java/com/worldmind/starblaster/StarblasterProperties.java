@@ -20,6 +20,7 @@ public class StarblasterProperties {
     public String getImage() { return starblaster.image; }
     public String getImageRegistry() { return starblaster.imageRegistry; }
     public String getImagePrefix() { return starblaster.imagePrefix; }
+    public boolean isWorktreesEnabled() { return starblaster.worktreesEnabled; }
 
     // -- Goose accessors (delegate to nested) --
 
@@ -63,6 +64,7 @@ public class StarblasterProperties {
         private String imageRegistry = "ghcr.io/dbbaskette";
         private String imagePrefix = "starblaster";
         private String image = "ghcr.io/dbbaskette/centurion-forge:latest";
+        private boolean worktreesEnabled = false;
 
         public String getProvider() { return provider; }
         public void setProvider(String provider) { this.provider = provider; }
@@ -82,6 +84,8 @@ public class StarblasterProperties {
         public void setImagePrefix(String imagePrefix) { this.imagePrefix = imagePrefix; }
         public String getImage() { return image; }
         public void setImage(String image) { this.image = image; }
+        public boolean isWorktreesEnabled() { return worktreesEnabled; }
+        public void setWorktreesEnabled(boolean worktreesEnabled) { this.worktreesEnabled = worktreesEnabled; }
     }
 
     public static class Goose {
