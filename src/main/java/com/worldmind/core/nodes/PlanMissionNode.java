@@ -56,34 +56,60 @@ public class PlanMissionNode {
             3. Each directive should be a single, focused task with a clear deliverable.
             4. Order directives logically: PULSE (research) -> FORGE/PRISM (implement).
             5. Leave the dependencies list empty — the system assigns them automatically.
-            6. Choose execution strategy based on task dependencies:
-               - "sequential" for tasks where each step depends on prior work (safer, no conflicts)
-               - "parallel" for independent subtasks that don't touch the same files (faster)
             
-            FILE OWNERSHIP (CRITICAL for parallel execution):
-            7. For each FORGE/PRISM directive, specify "targetFiles" — the files it will create or modify.
-               Example: ["src/game.js", "src/styles.css", "public/index.html"]
-            8. Directives with overlapping targetFiles CANNOT run in parallel — they will conflict.
-               The system uses targetFiles to detect conflicts and serialize conflicting directives.
-            9. Deployment config files (manifest.yml, Staticfile, Dockerfile, package.json) should
-               typically be in ONE directive's targetFiles — usually the LAST directive.
-            10. If you assign the same file to multiple directives, add to earlier directives'
-                inputContext: "DO NOT create [filename] - that is handled by a later directive."
+            EXECUTION STRATEGY RULES:
+            6. DEFAULT TO "sequential" — it is safer and avoids merge conflicts.
+            7. For NEW PROJECTS (no existing files), ALWAYS use "sequential".
+               New projects have no established file boundaries, so parallel execution
+               frequently causes merge conflicts (e.g., multiple directives creating index.html).
+            8. Only use "parallel" when ALL of these conditions are met:
+               - Working on an EXISTING codebase with established file structure
+               - Each directive touches COMPLETELY DIFFERENT files with NO overlap
+               - Files are in separate directories or clearly independent domains
+            9. When in doubt, use "sequential" — it's slower but reliable.
+            
+            FILE OWNERSHIP (MANDATORY for all FORGE/PRISM directives):
+            10. For each FORGE/PRISM directive, you MUST specify "targetFiles" — the files 
+                it will create or modify. This is NOT optional.
+                Example: ["src/game.js", "src/styles.css", "public/index.html"]
+            11. NEVER assign the same file to multiple directives. Each file should appear
+                in exactly ONE directive's targetFiles. This is the #1 cause of merge conflicts.
+                BAD:  Directive 1 targets ["index.html"], Directive 2 targets ["index.html", "styles.css"]
+                GOOD: Directive 1 targets ["index.html"], Directive 2 targets ["styles.css"]
+            12. Deployment/config files (manifest.yml, Staticfile, Dockerfile, package.json)
+                should be in ONE directive's targetFiles — typically the LAST directive.
+            13. If one directive needs a file that another creates, list it as a dependency,
+                NOT in its own targetFiles. The system will serialize them automatically.
+            
+            VIOLATION EXAMPLES (DO NOT DO THIS):
+            ❌ Two FORGE directives both list "index.html" in targetFiles → MERGE CONFLICT
+            ❌ "parallel" execution for a new game project with shared HTML/CSS/JS → MERGE CONFLICT
+            ❌ FORGE directive with empty targetFiles → Cannot detect conflicts
+            
+            CORRECT EXAMPLES:
+            ✅ Sequential plan for new project: each directive creates distinct files
+            ✅ Parallel plan where DIR-001 targets backend/, DIR-002 targets frontend/
+            ✅ Every FORGE/PRISM has explicit targetFiles with no overlap
 
-            Example plan for "Add a /health endpoint":
+            Example plan for "Add a /health endpoint" (existing project):
+            executionStrategy: "sequential"
             - PULSE: Analyze existing controller patterns and endpoint conventions
             - FORGE: Create HealthController with GET /health returning status JSON
               targetFiles: ["src/main/java/com/example/HealthController.java"]
 
-            Example plan for "Build a snake game with CF deployment":
+            Example plan for "Build a snake game with CF deployment" (NEW project):
+            executionStrategy: "sequential"   ← ALWAYS sequential for new projects
             - FORGE: Create HTML/CSS/JS files for the snake game
               targetFiles: ["public/index.html", "public/styles.css", "public/game.js"]
-              inputContext: "DO NOT create manifest.yml or Staticfile"
             - FORGE: Create Cloud Foundry manifest.yml and Staticfile for deployment
               targetFiles: ["manifest.yml", "Staticfile"]
-              inputContext: "Use 'default-route: true' instead of hardcoded routes."
             
-            The second directive owns the deployment config, so the first is told not to create it.
+            Example plan for independent subsystems in EXISTING codebase (rare):
+            executionStrategy: "parallel"   ← Only when files are truly independent
+            - FORGE: Add user preference storage to backend
+              targetFiles: ["backend/services/PreferencesService.java", "backend/api/PreferencesController.java"]
+            - FORGE: Add preference UI components to frontend
+              targetFiles: ["frontend/components/PreferencesPanel.tsx", "frontend/styles/preferences.css"]
 
             Respond with valid JSON matching the schema provided.
             """;
