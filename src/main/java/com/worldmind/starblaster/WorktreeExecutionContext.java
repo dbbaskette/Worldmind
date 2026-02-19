@@ -1,5 +1,6 @@
 package com.worldmind.starblaster;
 
+import com.worldmind.core.metrics.WorldmindMetrics;
 import com.worldmind.starblaster.cf.GitWorkspaceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,6 +31,7 @@ public class WorktreeExecutionContext {
     private static final Logger log = LoggerFactory.getLogger(WorktreeExecutionContext.class);
 
     private final GitWorkspaceManager gitWorkspaceManager;
+    private final WorldmindMetrics metrics;
 
     /** Maps missionId to the mission workspace path (the main clone). */
     private final ConcurrentHashMap<String, Path> missionWorkspaces = new ConcurrentHashMap<>();
@@ -38,7 +40,12 @@ public class WorktreeExecutionContext {
     private final ConcurrentHashMap<String, Path> directiveWorktrees = new ConcurrentHashMap<>();
 
     public WorktreeExecutionContext(GitWorkspaceManager gitWorkspaceManager) {
+        this(gitWorkspaceManager, null);
+    }
+
+    public WorktreeExecutionContext(GitWorkspaceManager gitWorkspaceManager, WorldmindMetrics metrics) {
         this.gitWorkspaceManager = gitWorkspaceManager;
+        this.metrics = metrics;
     }
 
     /**
@@ -80,6 +87,7 @@ public class WorktreeExecutionContext {
         Path workspace = missionWorkspaces.get(missionId);
         if (workspace == null) {
             log.error("Cannot acquire worktree: mission workspace {} not found", missionId);
+            recordWorktreeMetric("acquire", false);
             return null;
         }
 
@@ -94,10 +102,13 @@ public class WorktreeExecutionContext {
         if (result.success()) {
             directiveWorktrees.put(directiveId, result.worktreePath());
             log.info("Acquired worktree for {} at {}", directiveId, result.worktreePath());
+            recordWorktreeMetric("acquire", true);
+            recordActiveWorktreesMetric();
             return result.worktreePath();
         }
 
         log.error("Failed to acquire worktree for {}: {}", directiveId, result.error());
+        recordWorktreeMetric("acquire", false);
         return null;
     }
 
@@ -139,12 +150,14 @@ public class WorktreeExecutionContext {
         if (workspace == null) {
             log.warn("Cannot release worktree: mission workspace {} not found", missionId);
             directiveWorktrees.remove(directiveId);
+            recordWorktreeMetric("release", false);
             return;
         }
 
         Path worktree = directiveWorktrees.remove(directiveId);
         if (worktree != null) {
-            gitWorkspaceManager.removeWorktree(workspace, directiveId);
+            boolean removed = gitWorkspaceManager.removeWorktree(workspace, directiveId);
+            recordWorktreeMetric("release", removed);
             log.info("Released worktree for {}", directiveId);
         }
     }
@@ -174,6 +187,7 @@ public class WorktreeExecutionContext {
         });
 
         gitWorkspaceManager.cleanupMissionWorkspace(workspace);
+        recordWorktreeMetric("cleanup", true);
         log.info("Cleaned up mission workspace for {}", missionId);
     }
 
@@ -190,5 +204,17 @@ public class WorktreeExecutionContext {
      */
     public int getActiveMissionCount() {
         return missionWorkspaces.size();
+    }
+
+    private void recordWorktreeMetric(String operation, boolean success) {
+        if (metrics != null) {
+            metrics.recordWorktreeOperation(operation, success);
+        }
+    }
+
+    private void recordActiveWorktreesMetric() {
+        if (metrics != null) {
+            metrics.recordActiveWorktrees(directiveWorktrees.size());
+        }
     }
 }

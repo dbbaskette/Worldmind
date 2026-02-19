@@ -1,5 +1,7 @@
 package com.worldmind.core.nodes;
 
+import com.worldmind.core.metrics.WorldmindMetrics;
+import com.worldmind.core.model.ExecutionStrategy;
 import com.worldmind.core.model.MissionStatus;
 import com.worldmind.core.scheduler.DirectiveScheduler;
 import com.worldmind.core.state.WorldmindState;
@@ -24,20 +26,24 @@ public class ScheduleWaveNode {
     private final DirectiveScheduler scheduler;
     private final int maxParallel;
     private final int waveCooldownSeconds;
+    private final WorldmindMetrics metrics;
 
     @Autowired
-    public ScheduleWaveNode(DirectiveScheduler scheduler, StarblasterProperties properties) {
-        this(scheduler, properties.getMaxParallel(), properties.getWaveCooldownSeconds());
+    public ScheduleWaveNode(DirectiveScheduler scheduler, StarblasterProperties properties, 
+                           WorldmindMetrics metrics) {
+        this(scheduler, properties.getMaxParallel(), properties.getWaveCooldownSeconds(), metrics);
     }
 
     ScheduleWaveNode(DirectiveScheduler scheduler, int maxParallel) {
-        this(scheduler, maxParallel, 0);
+        this(scheduler, maxParallel, 0, null);
     }
 
-    ScheduleWaveNode(DirectiveScheduler scheduler, int maxParallel, int waveCooldownSeconds) {
+    ScheduleWaveNode(DirectiveScheduler scheduler, int maxParallel, int waveCooldownSeconds, 
+                    WorldmindMetrics metrics) {
         this.scheduler = scheduler;
         this.maxParallel = maxParallel;
         this.waveCooldownSeconds = waveCooldownSeconds;
+        this.metrics = metrics;
     }
 
     public Map<String, Object> apply(WorldmindState state) {
@@ -69,6 +75,12 @@ public class ScheduleWaveNode {
             log.info("Wave {} — no eligible directives, all done", nextWaveCount);
         } else {
             log.info("Wave {} — scheduling {} directives: {}", nextWaveCount, waveIds.size(), waveIds);
+            
+            // Record wave execution metrics
+            if (metrics != null) {
+                String strategyName = strategy == ExecutionStrategy.PARALLEL ? "parallel" : "sequential";
+                metrics.recordWaveExecution(waveIds.size(), strategyName);
+            }
         }
 
         return Map.of(

@@ -4,7 +4,9 @@ import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
 import com.github.dockerjava.core.DockerClientImpl;
 import com.github.dockerjava.zerodep.ZerodepDockerHttpClient;
+import com.worldmind.core.metrics.WorldmindMetrics;
 import com.worldmind.starblaster.cf.GitWorkspaceManager;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -42,7 +44,8 @@ public class StarblasterConfig {
      * preventing file conflicts during parallel execution.
      */
     @Bean
-    public WorktreeExecutionContext worktreeExecutionContext(GitWorkspaceManager gitWorkspaceManager) {
-        return new WorktreeExecutionContext(gitWorkspaceManager);
+    public WorktreeExecutionContext worktreeExecutionContext(GitWorkspaceManager gitWorkspaceManager,
+                                                              @Autowired(required = false) WorldmindMetrics metrics) {
+        return new WorktreeExecutionContext(gitWorkspaceManager, metrics);
     }
 }
