@@ -459,7 +459,14 @@ public class GitWorkspaceManager {
     }
 
     /**
+     * Maximum number of retry attempts for merge conflicts.
+     * Each retry fetches the latest main and attempts rebase again.
+     */
+    private static final int MERGE_RETRY_COUNT = 2;
+
+    /**
      * Fetches, rebases, and merges a single directive branch into main.
+     * Includes automatic retry with fresh main fetch on conflict.
      *
      * @param tempDir      working directory with cloned repo on main branch
      * @param directiveId  the directive ID to merge
@@ -471,50 +478,78 @@ public class GitWorkspaceManager {
                                        List<String> mergedIds, List<String> conflictedIds) {
         String branch = getBranchName(directiveId);
 
-        // Always fetch latest main first - critical for sequential merge ordering
-        // This ensures we're rebasing onto the actual current main (with prior merges)
-        runGit(tempDir, "fetch", "origin", "main");
-        runGit(tempDir, "checkout", "main");
-        runGit(tempDir, "reset", "--hard", "origin/main");
-
-        int fetchExit = runGit(tempDir, "fetch", "origin",
-                "refs/heads/" + branch + ":refs/remotes/origin/" + branch);
-        if (fetchExit != 0) {
-            log.warn("Merge: branch {} not found on remote, skipping", branch);
-            return false;
-        }
-
-        int checkoutExit = runGit(tempDir, "checkout", "-B", "temp-" + directiveId, "origin/" + branch);
-        if (checkoutExit != 0) {
-            log.warn("Merge: could not checkout branch {} for rebase, skipping", branch);
-            return false;
-        }
-
-        // Rebase onto the freshly-fetched main
-        int rebaseExit = runGit(tempDir, "rebase", "main");
-        if (rebaseExit != 0) {
-            String conflictFiles = runGitOutput(tempDir, "diff", "--name-only", "--diff-filter=U");
-            log.error("Merge: rebase conflict on {} — conflicting files: {} " +
-                    "(directive will be retried with updated main)", 
-                    branch, conflictFiles.isBlank() ? "(unknown)" : conflictFiles.replace("\n", ", "));
-            runGit(tempDir, "rebase", "--abort");
+        // Try merge with retry on conflict
+        for (int attempt = 1; attempt <= MERGE_RETRY_COUNT; attempt++) {
+            // Always fetch latest main first - critical for sequential merge ordering
+            // This ensures we're rebasing onto the actual current main (with prior merges)
+            runGit(tempDir, "fetch", "origin", "main");
             runGit(tempDir, "checkout", "main");
-            conflictedIds.add(directiveId);
-            return false;
-        }
+            runGit(tempDir, "reset", "--hard", "origin/main");
 
-        runGit(tempDir, "checkout", "main");
-        int mergeExit = runGit(tempDir, "merge", "temp-" + directiveId,
-                "--no-ff", "-m", "merge directive " + directiveId);
-        if (mergeExit != 0) {
-            log.error("Merge: merge conflict on branch {} after rebase, aborting", branch);
-            runGit(tempDir, "merge", "--abort");
-            conflictedIds.add(directiveId);
-            return false;
-        }
+            int fetchExit = runGit(tempDir, "fetch", "origin",
+                    "refs/heads/" + branch + ":refs/remotes/origin/" + branch);
+            if (fetchExit != 0) {
+                log.warn("Merge: branch {} not found on remote, skipping", branch);
+                return false;
+            }
 
-        mergedIds.add(directiveId);
-        return true;
+            int checkoutExit = runGit(tempDir, "checkout", "-B", "temp-" + directiveId, "origin/" + branch);
+            if (checkoutExit != 0) {
+                log.warn("Merge: could not checkout branch {} for rebase, skipping", branch);
+                return false;
+            }
+
+            // Rebase onto the freshly-fetched main
+            int rebaseExit = runGit(tempDir, "rebase", "main");
+            if (rebaseExit != 0) {
+                String conflictFiles = runGitOutput(tempDir, "diff", "--name-only", "--diff-filter=U");
+                runGit(tempDir, "rebase", "--abort");
+                runGit(tempDir, "checkout", "main");
+                
+                if (attempt < MERGE_RETRY_COUNT) {
+                    log.warn("Merge: rebase conflict on {} (attempt {}/{}) — conflicting files: {} " +
+                            "— retrying with fresh main fetch",
+                            branch, attempt, MERGE_RETRY_COUNT,
+                            conflictFiles.isBlank() ? "(unknown)" : conflictFiles.replace("\n", ", "));
+                    // Brief pause before retry to allow any concurrent merges to complete
+                    try { Thread.sleep(500); } catch (InterruptedException ignored) {}
+                    continue;
+                }
+                
+                log.error("Merge: rebase conflict on {} after {} attempts — conflicting files: {} " +
+                        "(directive will be retried with updated main)",
+                        branch, MERGE_RETRY_COUNT,
+                        conflictFiles.isBlank() ? "(unknown)" : conflictFiles.replace("\n", ", "));
+                conflictedIds.add(directiveId);
+                return false;
+            }
+
+            runGit(tempDir, "checkout", "main");
+            int mergeExit = runGit(tempDir, "merge", "temp-" + directiveId,
+                    "--no-ff", "-m", "merge directive " + directiveId);
+            if (mergeExit != 0) {
+                runGit(tempDir, "merge", "--abort");
+                
+                if (attempt < MERGE_RETRY_COUNT) {
+                    log.warn("Merge: merge conflict on {} after rebase (attempt {}/{}) — retrying with fresh main",
+                            branch, attempt, MERGE_RETRY_COUNT);
+                    try { Thread.sleep(500); } catch (InterruptedException ignored) {}
+                    continue;
+                }
+                
+                log.error("Merge: merge conflict on branch {} after {} attempts, aborting", branch, MERGE_RETRY_COUNT);
+                conflictedIds.add(directiveId);
+                return false;
+            }
+
+            mergedIds.add(directiveId);
+            if (attempt > 1) {
+                log.info("Merge: successfully merged {} on retry attempt {}", directiveId, attempt);
+            }
+            return true;
+        }
+        
+        return false;
     }
 
     /**
