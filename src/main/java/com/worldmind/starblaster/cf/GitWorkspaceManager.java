@@ -551,6 +551,229 @@ public class GitWorkspaceManager {
         }
     }
 
+    // ══════════════════════════════════════════════════════════════════════════
+    // GIT WORKTREE OPERATIONS
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Result of a worktree operation.
+     */
+    public record WorktreeResult(boolean success, Path worktreePath, String error) {
+        public static WorktreeResult success(Path path) {
+            return new WorktreeResult(true, path, null);
+        }
+        public static WorktreeResult failure(String error) {
+            return new WorktreeResult(false, null, error);
+        }
+    }
+
+    /**
+     * Creates a mission workspace with a full clone for worktree operations.
+     * This workspace serves as the shared .git directory for all directive worktrees.
+     *
+     * @param missionId unique mission identifier
+     * @param gitUrl    authenticated git URL for cloning
+     * @return path to the created mission workspace, or null on failure
+     */
+    public Path createMissionWorkspace(String missionId, String gitUrl) {
+        try {
+            Path workspace = java.nio.file.Files.createTempDirectory("worldmind-ws-" + missionId + "-");
+            log.info("Creating mission workspace for {} at {}", missionId, workspace);
+
+            int cloneExit = runGit(workspace.getParent(), "clone", gitUrl, workspace.getFileName().toString());
+            if (cloneExit != 0) {
+                log.error("Failed to clone repository for mission workspace {}", missionId);
+                deleteDirectory(workspace);
+                return null;
+            }
+
+            runGit(workspace, "config", "user.name", "Worldmind");
+            runGit(workspace, "config", "user.email", "worldmind@worldmind.local");
+
+            log.info("Mission workspace created: {}", workspace);
+            return workspace;
+        } catch (IOException e) {
+            log.error("Failed to create mission workspace for {}: {}", missionId, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Adds a worktree for a directive, branching from the specified base branch.
+     * The worktree is created as a sibling directory to the mission workspace.
+     *
+     * @param missionWorkspace path to the mission workspace (main clone)
+     * @param directiveId      directive identifier (used for branch and directory name)
+     * @param baseBranch       branch to base the worktree on (typically "main")
+     * @return result containing the worktree path on success, or error on failure
+     */
+    public WorktreeResult addWorktree(Path missionWorkspace, String directiveId, String baseBranch) {
+        if (missionWorkspace == null || !java.nio.file.Files.isDirectory(missionWorkspace)) {
+            return WorktreeResult.failure("Mission workspace does not exist: " + missionWorkspace);
+        }
+
+        String branchName = getBranchName(directiveId);
+        Path worktreePath = missionWorkspace.resolveSibling("worktree-" + directiveId);
+
+        log.info("Adding worktree for {} at {} (branch: {})", directiveId, worktreePath, branchName);
+
+        // Create worktree with new branch from base
+        int exitCode = runGit(missionWorkspace, "worktree", "add", 
+                worktreePath.toString(), "-b", branchName, baseBranch);
+
+        if (exitCode != 0) {
+            // Branch may already exist from a previous attempt - try without -b
+            log.info("Branch {} may already exist, trying to checkout existing branch", branchName);
+            exitCode = runGit(missionWorkspace, "worktree", "add", 
+                    worktreePath.toString(), branchName);
+            
+            if (exitCode != 0) {
+                String error = "Failed to create worktree for " + directiveId + " (exit code " + exitCode + ")";
+                log.error(error);
+                return WorktreeResult.failure(error);
+            }
+        }
+
+        log.info("Worktree created for {} at {}", directiveId, worktreePath);
+        return WorktreeResult.success(worktreePath);
+    }
+
+    /**
+     * Removes a worktree for a directive.
+     * The branch is preserved for subsequent merge operations.
+     *
+     * @param missionWorkspace path to the mission workspace
+     * @param directiveId      directive identifier
+     * @return true if removal succeeded (or worktree didn't exist), false on error
+     */
+    public boolean removeWorktree(Path missionWorkspace, String directiveId) {
+        if (missionWorkspace == null || !java.nio.file.Files.isDirectory(missionWorkspace)) {
+            log.warn("Cannot remove worktree: mission workspace does not exist");
+            return false;
+        }
+
+        Path worktreePath = missionWorkspace.resolveSibling("worktree-" + directiveId);
+        log.info("Removing worktree for {} at {}", directiveId, worktreePath);
+
+        // Use --force in case there are uncommitted changes
+        int exitCode = runGit(missionWorkspace, "worktree", "remove", "--force", worktreePath.toString());
+
+        if (exitCode != 0) {
+            log.warn("git worktree remove failed for {}, attempting manual cleanup", directiveId);
+            // Manual cleanup as fallback
+            deleteDirectory(worktreePath);
+            // Prune to clean up worktree references
+            runGit(missionWorkspace, "worktree", "prune");
+        }
+
+        return true;
+    }
+
+    /**
+     * Lists all worktrees in a mission workspace.
+     *
+     * @param missionWorkspace path to the mission workspace
+     * @return list of worktree directory names (e.g., ["worktree-DIR-001", "worktree-DIR-002"])
+     */
+    public List<String> listWorktrees(Path missionWorkspace) {
+        if (missionWorkspace == null || !java.nio.file.Files.isDirectory(missionWorkspace)) {
+            return List.of();
+        }
+
+        String output = runGitOutput(missionWorkspace, "worktree", "list", "--porcelain");
+        List<String> worktrees = new ArrayList<>();
+
+        for (String line : output.split("\n")) {
+            if (line.startsWith("worktree ")) {
+                String path = line.substring("worktree ".length()).trim();
+                Path worktreePath = Path.of(path);
+                String dirName = worktreePath.getFileName().toString();
+                if (dirName.startsWith("worktree-")) {
+                    worktrees.add(dirName);
+                }
+            }
+        }
+
+        return worktrees;
+    }
+
+    /**
+     * Commits and pushes changes from a worktree.
+     *
+     * @param worktreePath path to the worktree
+     * @param directiveId  directive identifier (used in commit message)
+     * @return true if commit and push succeeded, false otherwise
+     */
+    public boolean commitAndPushWorktree(Path worktreePath, String directiveId) {
+        if (worktreePath == null || !java.nio.file.Files.isDirectory(worktreePath)) {
+            log.error("Cannot commit: worktree does not exist at {}", worktreePath);
+            return false;
+        }
+
+        String branchName = getBranchName(directiveId);
+        log.info("Committing and pushing worktree {} (branch: {})", worktreePath, branchName);
+
+        // Stage all changes
+        runGit(worktreePath, "add", "-A");
+
+        // Check if there are changes to commit
+        int diffExit = runGit(worktreePath, "diff", "--cached", "--quiet");
+        if (diffExit == 0) {
+            log.info("No changes to commit in worktree {}", directiveId);
+            return true;
+        }
+
+        // Commit changes
+        int commitExit = runGit(worktreePath, "commit", "-m", "Directive " + directiveId);
+        if (commitExit != 0) {
+            log.error("Failed to commit changes in worktree {}", directiveId);
+            return false;
+        }
+
+        // Push to remote
+        int pushExit = runGit(worktreePath, "push", "-u", "origin", branchName, "--force");
+        if (pushExit != 0) {
+            log.error("Failed to push worktree {} to origin", directiveId);
+            return false;
+        }
+
+        log.info("Successfully committed and pushed worktree {}", directiveId);
+        return true;
+    }
+
+    /**
+     * Cleans up the entire mission workspace and all its worktrees.
+     *
+     * @param missionWorkspace path to the mission workspace
+     */
+    public void cleanupMissionWorkspace(Path missionWorkspace) {
+        if (missionWorkspace == null) {
+            return;
+        }
+
+        log.info("Cleaning up mission workspace at {}", missionWorkspace);
+
+        // List and remove all worktrees first
+        List<String> worktrees = listWorktrees(missionWorkspace);
+        for (String worktreeName : worktrees) {
+            Path worktreePath = missionWorkspace.resolveSibling(worktreeName);
+            log.debug("Removing worktree: {}", worktreePath);
+            runGit(missionWorkspace, "worktree", "remove", "--force", worktreePath.toString());
+            deleteDirectory(worktreePath);
+        }
+
+        // Prune any stale worktree references
+        runGit(missionWorkspace, "worktree", "prune");
+
+        // Delete the main workspace directory
+        deleteDirectory(missionWorkspace);
+        log.info("Mission workspace cleanup complete");
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // UTILITY METHODS
+    // ══════════════════════════════════════════════════════════════════════════
+
     /**
      * Strips GitHub browser-URL suffixes (e.g. /tree/main, /blob/...) so the URL
      * is a valid git remote for cloning.
