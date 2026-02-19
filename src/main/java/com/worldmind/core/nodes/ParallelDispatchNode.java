@@ -8,6 +8,7 @@ import com.worldmind.core.model.*;
 import com.worldmind.core.state.WorldmindState;
 import com.worldmind.starblaster.StarblasterBridge;
 import com.worldmind.starblaster.StarblasterProperties;
+import com.worldmind.starblaster.WorktreeExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +23,9 @@ import java.util.concurrent.*;
  * Dispatches all directives in the current wave concurrently using virtual threads.
  * Bounded by a semaphore at maxParallel. Collects per-directive results into
  * {@code waveDispatchResults} and appends starblaster infos and errors.
+ *
+ * <p>Optionally integrates with {@link WorktreeExecutionContext} for worktree-based
+ * parallel execution, providing each directive with an isolated working directory.
  */
 @Component
 public class ParallelDispatchNode {
@@ -32,22 +36,28 @@ public class ParallelDispatchNode {
     private final int maxParallel;
     private final EventBus eventBus;
     private final WorldmindMetrics metrics;
+    private final WorktreeExecutionContext worktreeContext;
+    private final boolean worktreesEnabled;
 
     @Autowired
     public ParallelDispatchNode(StarblasterBridge bridge, StarblasterProperties properties,
-                                EventBus eventBus, WorldmindMetrics metrics) {
-        this(bridge, properties.getMaxParallel(), eventBus, metrics);
+                                EventBus eventBus, WorldmindMetrics metrics,
+                                @Autowired(required = false) WorktreeExecutionContext worktreeContext) {
+        this(bridge, properties.getMaxParallel(), eventBus, metrics, worktreeContext, properties.isWorktreesEnabled());
     }
 
     ParallelDispatchNode(StarblasterBridge bridge, int maxParallel) {
-        this(bridge, maxParallel, new EventBus(), null);
+        this(bridge, maxParallel, new EventBus(), null, null, false);
     }
 
-    ParallelDispatchNode(StarblasterBridge bridge, int maxParallel, EventBus eventBus, WorldmindMetrics metrics) {
+    ParallelDispatchNode(StarblasterBridge bridge, int maxParallel, EventBus eventBus, WorldmindMetrics metrics,
+                        WorktreeExecutionContext worktreeContext, boolean worktreesEnabled) {
         this.bridge = bridge;
         this.maxParallel = maxParallel;
         this.eventBus = eventBus;
         this.metrics = metrics;
+        this.worktreeContext = worktreeContext;
+        this.worktreesEnabled = worktreesEnabled && worktreeContext != null;
     }
 
     public Map<String, Object> apply(WorldmindState state) {
@@ -61,6 +71,7 @@ public class ParallelDispatchNode {
         String projectPath = (userPath != null && !userPath.isBlank())
                 ? userPath
                 : (projectContext != null ? projectContext.rootPath() : ".");
+        String missionId = state.missionId();
 
         if (waveIds.isEmpty()) {
             return Map.of(
@@ -68,6 +79,19 @@ public class ParallelDispatchNode {
                     "starblasters", List.of(),
                     "status", MissionStatus.EXECUTING.name()
             );
+        }
+
+        // Initialize mission workspace if worktrees are enabled and this is the first wave
+        if (worktreesEnabled && state.waveCount() == 1) {
+            String gitUrl = state.gitRemoteUrl();
+            if (gitUrl != null && !gitUrl.isBlank()) {
+                Path workspace = worktreeContext.createMissionWorkspace(missionId, gitUrl);
+                if (workspace != null) {
+                    log.info("Created mission workspace for {} at {}", missionId, workspace);
+                } else {
+                    log.warn("Failed to create mission workspace — falling back to standard execution");
+                }
+            }
         }
 
         // Build a lookup map for directive IDs
@@ -90,8 +114,23 @@ public class ParallelDispatchNode {
                 var directiveToDispatch = applyRetryContext(directive, retryContext);
 
                 futures.add(CompletableFuture.supplyAsync(() -> {
-                    MdcContext.setDirective(state.missionId(), directiveToDispatch.id(),
+                    MdcContext.setDirective(missionId, directiveToDispatch.id(),
                             directiveToDispatch.centurion());
+                    
+                    // Acquire worktree for this directive if enabled
+                    Path effectiveProjectPath = Path.of(projectPath);
+                    if (worktreesEnabled) {
+                        Path worktreePath = worktreeContext.acquireWorktree(missionId, directiveToDispatch.id(), "main");
+                        if (worktreePath != null) {
+                            effectiveProjectPath = worktreePath;
+                            log.info("Using worktree {} for directive {}", worktreePath, directiveToDispatch.id());
+                        } else {
+                            log.warn("Could not acquire worktree for {} — using shared project path", directiveToDispatch.id());
+                        }
+                    }
+                    
+                    final Path finalProjectPath = effectiveProjectPath;
+                    
                     try {
                         semaphore.acquire();
                         try {
@@ -100,15 +139,23 @@ public class ParallelDispatchNode {
                                     directiveToDispatch.description());
 
                             eventBus.publish(new WorldmindEvent("directive.started",
-                                    state.missionId(), directiveToDispatch.id(),
+                                    missionId, directiveToDispatch.id(),
                                     Map.of("centurion", directiveToDispatch.centurion(),
                                            "description", directiveToDispatch.description()),
                                     Instant.now()));
 
                             long startMs = System.currentTimeMillis();
                             var result = bridge.executeDirective(
-                                    directiveToDispatch, projectContext, Path.of(projectPath), state.gitRemoteUrl(), state.runtimeTag(), state.reasoningLevel());
+                                    directiveToDispatch, projectContext, finalProjectPath, state.gitRemoteUrl(), state.runtimeTag(), state.reasoningLevel());
                             long elapsedMs = System.currentTimeMillis() - startMs;
+                            
+                            // Commit and push worktree changes if enabled and directive succeeded
+                            if (worktreesEnabled && result.directive().status() != DirectiveStatus.FAILED) {
+                                boolean pushed = worktreeContext.commitAndPush(directiveToDispatch.id());
+                                if (pushed) {
+                                    log.info("Committed and pushed changes for directive {}", directiveToDispatch.id());
+                                }
+                            }
                             if (metrics != null) {
                                 metrics.recordDirectiveExecution(directiveToDispatch.centurion(), elapsedMs);
                             }
@@ -116,14 +163,14 @@ public class ParallelDispatchNode {
                             eventBus.publish(new WorldmindEvent(
                                     result.directive().status() == DirectiveStatus.FAILED
                                             ? "directive.progress" : "directive.fulfilled",
-                                    state.missionId(), directive.id(),
+                                    missionId, directive.id(),
                                     Map.of("status", result.directive().status().name(),
                                            "centurion", directiveToDispatch.centurion()),
                                     Instant.now()));
 
                             if (result.starblasterInfo() != null) {
                                 eventBus.publish(new WorldmindEvent("starblaster.opened",
-                                        state.missionId(), directive.id(),
+                                        missionId, directive.id(),
                                         Map.of("containerId", result.starblasterInfo().containerId(),
                                                "centurion", directiveToDispatch.centurion()),
                                         Instant.now()));
