@@ -37,8 +37,8 @@ public class DirectiveScheduler {
                                          ExecutionStrategy strategy, int maxParallel) {
         int limit = strategy == ExecutionStrategy.SEQUENTIAL ? 1 : maxParallel;
 
-        log.debug("computeNextWave: {} directives, {} completed {}, strategy={}, limit={}",
-                directives.size(), completedIds.size(), completedIds, strategy, limit);
+        log.info("computeNextWave: {} directives, {} completed, strategy={}, maxParallel={}",
+                directives.size(), completedIds.size(), strategy, limit);
 
         // Build a lookup: centurion type → completed directive IDs of that type.
         // This lets us resolve dependencies expressed as centurion names (e.g. "PULSE")
@@ -77,8 +77,23 @@ public class DirectiveScheduler {
             wave.add(directive.id());
             
             // Claim this directive's target files
-            if (directive.targetFiles() != null) {
+            if (directive.targetFiles() != null && !directive.targetFiles().isEmpty()) {
                 claimedFiles.addAll(directive.targetFiles());
+                log.debug("  {} claims files: {}", directive.id(), directive.targetFiles());
+            }
+        }
+
+        // Log summary of file overlap deferrals for parallel execution
+        if (strategy == ExecutionStrategy.PARALLEL && !wave.isEmpty()) {
+            List<String> deferred = directives.stream()
+                    .filter(d -> !completedIds.contains(d.id()))
+                    .filter(d -> !wave.contains(d.id()))
+                    .filter(d -> allDependenciesSatisfied(d, completedIds, completedTypes))
+                    .map(Directive::id)
+                    .toList();
+            if (!deferred.isEmpty()) {
+                log.info("File overlap: {} directive(s) deferred to next wave due to file conflicts: {}", 
+                        deferred.size(), deferred);
             }
         }
 
