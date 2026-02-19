@@ -1,11 +1,17 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useMissionList } from './hooks/useMissionList'
 import { MissionForm } from './components/MissionForm'
 import { MissionList } from './components/MissionList'
 import { MissionDetail } from './components/MissionDetail'
 import { SettingsPanel } from './components/SettingsPanel'
+import { LoginScreen } from './components/LoginScreen'
+import { apiClient } from './api/client'
 
 function App() {
+  const [authChecked, setAuthChecked] = useState(false)
+  const [authenticated, setAuthenticated] = useState(false)
+  const [username, setUsername] = useState<string | null>(null)
+
   const {
     missions,
     selectedMissionId,
@@ -17,8 +23,49 @@ function App() {
 
   const [showSettings, setShowSettings] = useState(false)
 
+  useEffect(() => {
+    apiClient.getAuthStatus()
+      .then(status => {
+        setAuthenticated(status.authenticated)
+        setUsername(status.username || null)
+        if (!status.authEnabled) {
+          setAuthenticated(true)
+        }
+      })
+      .catch(() => {
+        setAuthenticated(false)
+      })
+      .finally(() => setAuthChecked(true))
+  }, [])
+
+  const handleLogin = (user: string) => {
+    setAuthenticated(true)
+    setUsername(user)
+  }
+
+  const handleLogout = async () => {
+    await apiClient.logout()
+    setAuthenticated(false)
+    setUsername(null)
+  }
+
   const handleSubmit = async (request: string, mode: string, projectPath?: string, gitRemoteUrl?: string, reasoningLevel?: string, executionStrategy?: string, createCfDeployment?: boolean) => {
     await submitMission(request, mode, projectPath, gitRemoteUrl, reasoningLevel, executionStrategy, createCfDeployment)
+  }
+
+  if (!authChecked) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-wm-bg">
+        <div className="flex items-center gap-3 text-wm_text-muted">
+          <span className="w-4 h-4 border-2 border-wm_text-muted/30 border-t-wm_text-muted rounded-full animate-spin" />
+          <span className="text-sm">Loading...</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (!authenticated) {
+    return <LoginScreen onLogin={handleLogin} />
   }
 
   return (
@@ -30,6 +77,8 @@ function App() {
         error={submitError}
         showSettings={showSettings}
         onToggleSettings={() => setShowSettings(s => !s)}
+        username={username}
+        onLogout={handleLogout}
       />
 
       {/* Main */}

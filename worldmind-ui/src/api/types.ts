@@ -152,3 +152,42 @@ export interface McpToolInfo {
   name: string
   description: string
 }
+
+export interface AuthStatusResponse {
+  authenticated: boolean
+  username?: string
+  authEnabled: boolean
+}
+
+export interface LlmProvidersResponse {
+  providers: LlmProvider[]
+  currentProvider: string
+  currentModel: string
+}
+
+export interface LlmProvider {
+  id: string
+  name: string
+  available: boolean
+  models: LlmModel[]
+}
+
+export interface LlmModel {
+  id: string
+  name: string
+  provider: string
+  tier: string
+  inputPricePer1M: number
+  outputPricePer1M: number
+  contextWindow: number
+  description: string
+  priceDisplay: string
+}
+
+export interface LlmCurrentResponse {
+  provider: string
+  model: string
+  modelName?: string
+  tier?: string
+  priceDisplay?: string
+}

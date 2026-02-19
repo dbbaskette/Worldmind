@@ -7,6 +7,8 @@ interface MissionFormProps {
   error: string | null
   showSettings?: boolean
   onToggleSettings?: () => void
+  username?: string | null
+  onLogout?: () => void
 }
 
 const REASONING_LEVELS = [
@@ -21,7 +23,7 @@ const EXECUTION_STRATEGIES = [
   { value: 'PARALLEL', label: 'Parallel', description: 'Multiple directives at once — faster, auto-detects conflicts' },
 ]
 
-export function MissionForm({ onSubmit, submitting, error, showSettings, onToggleSettings }: MissionFormProps) {
+export function MissionForm({ onSubmit, submitting, error, showSettings, onToggleSettings, username, onLogout }: MissionFormProps) {
   const [request, setRequest] = useState('')
   const [mode, setMode] = useState('APPROVE_PLAN')
   const [projectPath, setProjectPath] = useState('')
@@ -127,6 +129,26 @@ export function MissionForm({ onSubmit, submitting, error, showSettings, onToggl
               'Launch'
             )}
           </button>
+
+          {/* User menu */}
+          {username && onLogout && (
+            <>
+              <div className="w-px h-8 bg-wm-border shrink-0" />
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-xs text-wm_text-muted">{username}</span>
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  className="p-1.5 rounded text-wm_text-muted hover:text-wm_text-secondary hover:bg-wm-bg transition-colors"
+                  title="Sign out"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                  </svg>
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Expandable options */}

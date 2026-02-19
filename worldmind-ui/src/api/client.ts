@@ -1,4 +1,4 @@
-import { MissionResponse, DirectiveResponse, TimelineEntry, McpSettingsResponse } from './types'
+import { MissionResponse, DirectiveResponse, TimelineEntry, McpSettingsResponse, AuthStatusResponse, LlmProvidersResponse, LlmCurrentResponse } from './types'
 
 const API_BASE = '/api/v1'
 
@@ -149,6 +149,57 @@ class ApiClient {
       throw new Error(error.error || 'Failed to retry mission')
     }
 
+    return response.json()
+  }
+
+  async getAuthStatus(): Promise<AuthStatusResponse> {
+    const response = await fetch(`${API_BASE}/auth/status`)
+    if (!response.ok) {
+      throw new Error('Failed to check auth status')
+    }
+    return response.json()
+  }
+
+  async login(username: string, password: string): Promise<{ authenticated: boolean; username?: string; error?: string }> {
+    const response = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    })
+
+    return response.json()
+  }
+
+  async logout(): Promise<void> {
+    await fetch(`${API_BASE}/auth/logout`, { method: 'POST' })
+  }
+
+  async getLlmProviders(): Promise<LlmProvidersResponse> {
+    const response = await fetch(`${API_BASE}/llm/providers`)
+    if (!response.ok) {
+      throw new Error('Failed to fetch LLM providers')
+    }
+    return response.json()
+  }
+
+  async selectLlmModel(provider: string, model: string): Promise<LlmCurrentResponse> {
+    const response = await fetch(`${API_BASE}/llm/select`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider, model })
+    })
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || 'Failed to select model')
+    }
+    return response.json()
+  }
+
+  async getCurrentLlm(): Promise<LlmCurrentResponse> {
+    const response = await fetch(`${API_BASE}/llm/current`)
+    if (!response.ok) {
+      throw new Error('Failed to fetch current LLM')
+    }
     return response.json()
   }
 }

@@ -58,6 +58,16 @@ management:
         worldmind: true
 
 worldmind:
+  auth:
+    enabled: ${WORLDMIND_AUTH_ENABLED:true}
+    username: ${WORLDMIND_AUTH_USERNAME:admin}
+    password: ${WORLDMIND_AUTH_PASSWORD:worldmind}
+  llm:
+    provider: ${WORLDMIND_LLM_PROVIDER:}
+    model: ${WORLDMIND_LLM_MODEL:}
+    anthropic-api-key: ${ANTHROPIC_API_KEY:}
+    openai-api-key: ${OPENAI_API_KEY:}
+    google-api-key: ${GOOGLE_API_KEY:}
   goose:
     provider: ${GOOSE_PROVIDER:}
     model: ${GOOSE_MODEL:qwen2.5-coder-32b}
