@@ -245,7 +245,7 @@ public class PlanMissionNode {
                 "Valid manifest.yml created that can be used with 'cf push'",
                 coderRefactorerIds,
                 TaskStatus.PENDING, 0, 3,
-                FailureStrategy.SKIP, List.of("manifest.yml", "Staticfile"), List.of(), null
+                FailureStrategy.RETRY, List.of("manifest.yml", "Staticfile"), List.of(), null
         );
 
         var result = new ArrayList<>(tasks);
