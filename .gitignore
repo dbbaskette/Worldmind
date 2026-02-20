@@ -47,5 +47,8 @@ spring-shell.log
 hs_err_pid*
 replay_pid*
 
+# CF CLI binary (downloaded separately for air-gapped builds)
+docker/agent-deployer/cf
+
 # Utility scripts
 clean-repo.sh
