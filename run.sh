@@ -106,6 +106,7 @@ agent-tester-app: ${AGENT_TESTER_APP:-agent-tester}
 agent-reviewer-app: ${AGENT_REVIEWER_APP:-agent-reviewer}
 agent-researcher-app: ${AGENT_RESEARCHER_APP:-agent-researcher}
 agent-refactorer-app: ${AGENT_REFACTORER_APP:-agent-refactorer}
+agent-deployer-app: ${AGENT_DEPLOYER_APP:-agent-deployer}
 cf-username: ${CF_USERNAME}
 cf-password: ${CF_PASSWORD}
 git-token: ${GIT_TOKEN:-${CF_DOCKER_PASSWORD:-}}
@@ -126,6 +127,7 @@ nexus-mcp-token-tester: ${NEXUS_MCP_TOKEN_TESTER:-}
 nexus-mcp-token-reviewer: ${NEXUS_MCP_TOKEN_REVIEWER:-}
 nexus-mcp-token-researcher: ${NEXUS_MCP_TOKEN_RESEARCHER:-}
 nexus-mcp-token-refactorer: ${NEXUS_MCP_TOKEN_REFACTORER:-}
+nexus-mcp-token-deployer: ${NEXUS_MCP_TOKEN_DEPLOYER:-}
 EOVARS
 
   echo "Building JAR..."
@@ -136,7 +138,8 @@ EOVARS
   echo "Cleaning stale env vars..."
   for old_var in worldmind.cf.agent-apps.coder worldmind.cf.agent-apps.tester \
                  worldmind.cf.agent-apps.reviewer worldmind.cf.agent-apps.researcher \
-                 worldmind.cf.agent-apps.refactorer worldmind.cf.api-url worldmind.cf.org \
+                 worldmind.cf.agent-apps.refactorer worldmind.cf.agent-apps.deployer \
+                 worldmind.cf.api-url worldmind.cf.org \
                  worldmind.cf.space worldmind.sandbox.provider \
                  worldmind.sandbox.image-registry; do
     cf unset-env worldmind "$old_var" 2>/dev/null || true
@@ -150,7 +153,8 @@ EOVARS
                "${AGENT_TESTER_APP:-agent-tester}" \
                "${AGENT_REVIEWER_APP:-agent-reviewer}" \
                "${AGENT_RESEARCHER_APP:-agent-researcher}" \
-               "${AGENT_REFACTORER_APP:-agent-refactorer}"; do
+               "${AGENT_REFACTORER_APP:-agent-refactorer}" \
+               "${AGENT_DEPLOYER_APP:-agent-deployer}"; do
       cf unbind-service "$app" worldmind-model 2>/dev/null || true
     done
   fi

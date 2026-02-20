@@ -130,8 +130,11 @@ public class CloudFoundrySandboxProvider implements SandboxProvider {
 
         // Export all env vars into the CF task shell so entrypoint.sh can read
         // GOOSE_PROVIDER, GOOSE_MODEL, provider API keys, and MCP server configs.
+        // Note: CF credentials for the DEPLOYER agent are set via manifest.yml on the
+        // deployer app directly — CF tasks inherit the app's env vars, so no command-line
+        // injection is needed (which would expose credentials in `cf tasks` output and audit logs).
         var envExports = request.envVars().entrySet().stream()
-                .map(e -> "export %s='%s'".formatted(e.getKey(), e.getValue().replace("'", "\\'")))
+                .map(e -> "export %s='%s'".formatted(e.getKey(), e.getValue().replace("'", "'\\''")))
                 .collect(Collectors.joining(" && "));
 
         // Determine branch setup and post-Goose git commands based on agent type.

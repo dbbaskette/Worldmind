@@ -44,6 +44,7 @@ public class CloudFoundryProperties {
         agentApps.putIfAbsent("reviewer", "agent-reviewer");
         agentApps.putIfAbsent("researcher", "agent-researcher");
         agentApps.putIfAbsent("refactorer", "agent-refactorer");
+        agentApps.putIfAbsent("deployer", "agent-deployer");
     }
 
     /** Task timeout in seconds (default 20 minutes) */
