@@ -185,6 +185,10 @@ public class MissionController {
                 Optional<Checkpoint> latest = checkpointSaver.get(config);
                 if (latest.isPresent()) {
                     var checkpointState = new WorldmindState(latest.get().getState());
+                    log.info("Checkpoint for {} — tasks={}, waveTaskIds={}, nodeId={}",
+                            id, checkpointState.tasks().size(), 
+                            checkpointState.waveTaskIds(),
+                            latest.get().getNodeId());
                     if (!checkpointState.tasks().isEmpty()) {
                         state = checkpointState;
                         missionStates.put(id, state);
@@ -689,6 +693,11 @@ public class MissionController {
         // Build a set of currently-dispatched task IDs so we can show them as EXECUTING
         var activeWaveIds = new HashSet<>(state.waveTaskIds());
         var completedIds = new HashSet<>(state.completedTaskIds());
+        
+        if (state.status() == MissionStatus.EXECUTING) {
+            log.info("toResponse for {} — waveTaskIds={}, completedIds={}, missionStatus={}",
+                    state.missionId(), activeWaveIds, completedIds, state.status());
+        }
 
         List<MissionResponse.TaskResponse> tasks = state.tasks().stream()
                 .map(d -> toTaskResponse(d, state, activeWaveIds, completedIds))

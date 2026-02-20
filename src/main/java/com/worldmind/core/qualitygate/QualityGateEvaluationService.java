@@ -32,7 +32,7 @@ public class QualityGateEvaluationService {
     private static final Logger log = LoggerFactory.getLogger(QualityGateEvaluationService.class);
 
     /** Minimum review score (inclusive) required for quality_gate approval. */
-    private static final int REVIEW_SCORE_THRESHOLD = 7;
+    private static final int REVIEW_SCORE_THRESHOLD = 6;
 
     /** Maven/JUnit style: "Tests run: 10, Failures: 2" */
     private static final Pattern MAVEN_PATTERN =

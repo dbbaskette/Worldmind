@@ -53,7 +53,11 @@ public class PlanMissionNode {
             2. Start with a single RESEARCHER task to gather context, then follow with
                CODER/REFACTORER tasks that do the actual implementation work.
                Skip RESEARCHER only for trivial changes (typo fixes, config tweaks).
-            3. Each task should be a single, focused task with a clear deliverable.
+            3. SPLIT INTO SMALL, FOCUSED TASKS. Each CODER task should do ONE thing:
+               - ONE model class, ONE repository, ONE service, ONE controller — not all at once.
+               - A task touching more than 3-4 files is TOO BIG. Split it.
+               - Smaller tasks succeed more often and are easier to retry on failure.
+               - Example: "Create TodoItem model" is better than "Create model, repository, and service".
             4. Order tasks logically: RESEARCHER (research) -> CODER/REFACTORER (implement).
             5. Leave the dependencies list empty — the system assigns them automatically.
             
@@ -97,19 +101,31 @@ public class PlanMissionNode {
             - CODER: Create HealthController with GET /health returning status JSON
               targetFiles: ["src/main/java/com/example/HealthController.java"]
 
-            Example plan for "Build a snake game with CF deployment" (NEW project):
+            Example plan for "Build a To-Do app with Spring Boot" (NEW project):
             executionStrategy: "sequential"   ← ALWAYS sequential for new projects
-            - CODER: Create HTML/CSS/JS files for the snake game
-              targetFiles: ["public/index.html", "public/styles.css", "public/game.js"]
-            - CODER: Create Cloud Foundry manifest.yml and Staticfile for deployment
-              targetFiles: ["manifest.yml", "Staticfile"]
+            - CODER: Create the Spring Boot project structure with pom.xml and application.properties
+              targetFiles: ["pom.xml", "src/main/resources/application.properties", "src/main/java/com/example/TodoApplication.java"]
+            - CODER: Create the TodoItem model class
+              targetFiles: ["src/main/java/com/example/model/TodoItem.java"]
+            - CODER: Create the TodoRepository interface
+              targetFiles: ["src/main/java/com/example/repository/TodoRepository.java"]
+            - CODER: Create the TodoService with business logic
+              targetFiles: ["src/main/java/com/example/service/TodoService.java"]
+            - CODER: Create the TodoController REST endpoints
+              targetFiles: ["src/main/java/com/example/controller/TodoController.java"]
+            - CODER: Create Cloud Foundry manifest.yml for deployment
+              targetFiles: ["manifest.yml"]
+
+            BAD example (tasks too large):
+            - CODER: Create model, repository, service, and controller  ← TOO BIG, split into 4 tasks
+              targetFiles: ["Model.java", "Repository.java", "Service.java", "Controller.java"]
             
             Example plan for independent subsystems in EXISTING codebase (rare):
             executionStrategy: "parallel"   ← Only when files are truly independent
             - CODER: Add user preference storage to backend
-              targetFiles: ["backend/services/PreferencesService.java", "backend/api/PreferencesController.java"]
+              targetFiles: ["backend/services/PreferencesService.java"]
             - CODER: Add preference UI components to frontend
-              targetFiles: ["frontend/components/PreferencesPanel.tsx", "frontend/styles/preferences.css"]
+              targetFiles: ["frontend/components/PreferencesPanel.tsx"]
 
             Respond with valid JSON matching the schema provided.
             """;

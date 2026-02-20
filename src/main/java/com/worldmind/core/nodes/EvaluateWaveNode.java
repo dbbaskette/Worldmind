@@ -110,19 +110,29 @@ public class EvaluateWaveNode {
                 // CODER task that failed at dispatch — apply failure strategy directly
                 if (dispatchResult.status() == TaskStatus.FAILED) {
                     log.info("CODER task {} failed at dispatch — applying failure strategy", id);
+                    String dispatchFailureReason = "CODER task failed during execution";
                     FailureStrategy action = task.onFailure() != null ? task.onFailure() : FailureStrategy.RETRY;
                     if (action == FailureStrategy.RETRY && task.iteration() >= task.maxIterations()) {
                         action = FailureStrategy.ESCALATE;
                     }
-                    var outcome = applyFailureStrategy(id, task, action,
-                            "CODER task failed during execution");
+                    var outcome = applyFailureStrategy(id, task, action, dispatchFailureReason);
                     completedIds.addAll(outcome.completedIds);
                     if (!outcome.completedIds.isEmpty()) {
                         updatedTasks.add(withResult(task, dispatchResult, TaskStatus.SKIPPED));
                     } else if (outcome.missionFailed) {
                         updatedTasks.add(withResult(task, dispatchResult, TaskStatus.FAILED));
+                    } else if (outcome.retryContext != null) {
+                        int nextIteration = task.iteration() + 1;
+                        String enhancedContext = enrichFailureContext(task.inputContext(), dispatchFailureReason);
+                        updatedTasks.add(new Task(
+                                task.id(), task.agent(), task.description(),
+                                enhancedContext, task.successCriteria(), task.dependencies(),
+                                TaskStatus.PENDING, nextIteration, task.maxIterations(),
+                                task.onFailure(), task.targetFiles(), List.of(), null));
+                        log.info("Reset {} to PENDING (iteration {}/{}) with failure context for dispatch retry",
+                                id, nextIteration, task.maxIterations());
+                        retryContext = outcome.retryContext;
                     }
-                    if (outcome.retryContext != null) retryContext = outcome.retryContext;
                     if (outcome.missionFailed) missionStatus = MissionStatus.FAILED;
                     errors.addAll(outcome.errors);
                     continue;
@@ -159,8 +169,20 @@ public class EvaluateWaveNode {
                         updatedTasks.add(withResult(task, dispatchResult, TaskStatus.SKIPPED));
                     } else if (outcome.missionFailed) {
                         updatedTasks.add(withResult(task, dispatchResult, TaskStatus.FAILED));
+                    } else if (outcome.retryContext != null) {
+                        // Enrich task context with the failure details so the agent
+                        // understands what went wrong and can correct on retry.
+                        int nextIteration = task.iteration() + 1;
+                        String enhancedContext = enrichFailureContext(task.inputContext(), failureReason);
+                        updatedTasks.add(new Task(
+                                task.id(), task.agent(), task.description(),
+                                enhancedContext, task.successCriteria(), task.dependencies(),
+                                TaskStatus.PENDING, nextIteration, task.maxIterations(),
+                                task.onFailure(), task.targetFiles(), List.of(), null));
+                        log.info("Reset {} to PENDING (iteration {}/{}) with failure context for no-code retry",
+                                id, nextIteration, task.maxIterations());
+                        retryContext = outcome.retryContext;
                     }
-                    if (outcome.retryContext != null) retryContext = outcome.retryContext;
                     if (outcome.missionFailed) missionStatus = MissionStatus.FAILED;
                     errors.addAll(outcome.errors);
                     continue;
@@ -444,6 +466,20 @@ public class EvaluateWaveNode {
     }
 
     /**
+     * Appends failure details to task context so the agent understands what went wrong.
+     * Used when a task fails before reaching the quality gate (e.g., no code files produced).
+     */
+    private String enrichFailureContext(String baseContext, String failureReason) {
+        var sb = new StringBuilder(baseContext != null ? baseContext : "");
+        sb.append("\n\n## PREVIOUS ATTEMPT FAILED\n\n");
+        sb.append("Your previous attempt failed. You MUST address the following:\n\n");
+        sb.append(failureReason).append("\n\n");
+        sb.append("**CRITICAL**: You must create or modify actual source code files. ");
+        sb.append("Do not just analyze or discuss — write the code.\n");
+        return sb.toString();
+    }
+
+    /**
      * Appends reviewer review details to retry context so CODER knows what to fix.
      */
     private String enrichRetryContext(String baseContext, ReviewFeedback feedback) {
@@ -486,7 +522,7 @@ public class EvaluateWaveNode {
                 "Review code for task " + coderTask.id(),
                 InstructionBuilder.buildReviewerInstruction(
                         coderTask, null, fileChanges, null),
-                "Code review complete with score >= 7", List.of(), TaskStatus.PENDING,
+                "Code review complete with score >= 6", List.of(), TaskStatus.PENDING,
                 0, 1, FailureStrategy.SKIP, List.of(), List.of(), null
         );
     }
