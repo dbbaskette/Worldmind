@@ -61,6 +61,8 @@ export interface DirectiveResponse {
   on_failure: string | null
   review_score: number | null
   review_summary: string | null
+  review_issues: string[] | null
+  review_suggestions: string[] | null
 }
 
 export interface FileRecord {

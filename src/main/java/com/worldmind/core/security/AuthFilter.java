@@ -28,7 +28,8 @@ public class AuthFilter implements Filter {
             "/assets/",
             "/favicon.ico",
             "/logo.png",
-            "/index.html"
+            "/index.html",
+            "/api/internal/"
     );
 
     private final AuthProperties authProperties;

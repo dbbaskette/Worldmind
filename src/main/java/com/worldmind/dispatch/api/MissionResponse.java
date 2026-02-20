@@ -38,6 +38,8 @@ public record MissionResponse(
         @JsonProperty("files_affected") List<FileRecord> filesAffected,
         @JsonProperty("on_failure") String onFailure,
         @JsonProperty("review_score") Integer reviewScore,
-        @JsonProperty("review_summary") String reviewSummary
+        @JsonProperty("review_summary") String reviewSummary,
+        @JsonProperty("review_issues") List<String> reviewIssues,
+        @JsonProperty("review_suggestions") List<String> reviewSuggestions
     ) {}
 }

@@ -75,7 +75,9 @@ MODEL="${GOOSE_MODEL:-${VCAP_MODEL:-}}"
 export GOOSE_PROVIDER="$PROVIDER"
 export GOOSE_MODEL="$MODEL"
 export GOOSE_MODE=auto
-export GOOSE_CONTEXT_STRATEGY=summarize
+# Disable summarization to avoid secondary model calls (gpt-4o-mini).
+# Trade-off: may hit context limits on very long tasks.
+export GOOSE_CONTEXT_STRATEGY=none
 export GOOSE_MAX_TURNS=50
 
 # Resolve API key: direct key (GOOSE_PROVIDER__API_KEY) > VCAP binding key

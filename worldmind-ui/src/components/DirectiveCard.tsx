@@ -280,7 +280,72 @@ export function DirectiveCard({ directive, events, onRetry, index, total }: Dire
             )}
           </div>
         )}
+
+        {/* Review feedback details - shown when score is low or expanded */}
+        {(directive.review_issues?.length || directive.review_suggestions?.length) && (
+          <ReviewFeedbackPanel
+            issues={directive.review_issues}
+            suggestions={directive.review_suggestions}
+            score={directive.review_score}
+          />
+        )}
       </div>
+    </div>
+  )
+}
+
+function ReviewFeedbackPanel({ 
+  issues, 
+  suggestions, 
+  score 
+}: { 
+  issues: string[] | null
+  suggestions: string[] | null
+  score: number | null
+}) {
+  const [expanded, setExpanded] = useState(score != null && score < 7)
+  
+  if (!issues?.length && !suggestions?.length) return null
+  
+  return (
+    <div className="mt-2 border-t border-wm-border pt-2">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="text-[10px] font-mono text-amber-400/70 hover:text-amber-400 transition-colors flex items-center gap-1"
+      >
+        {expanded ? '\u25BE' : '\u25B8'} Review Details
+        {issues?.length ? <span className="text-red-400/70">({issues.length} issues)</span> : null}
+      </button>
+      
+      {expanded && (
+        <div className="mt-2 space-y-2 animate-fade-in">
+          {issues && issues.length > 0 && (
+            <div>
+              <div className="text-[10px] font-semibold text-red-400 mb-1">Issues:</div>
+              <ul className="space-y-0.5">
+                {issues.map((issue, idx) => (
+                  <li key={idx} className="text-[10px] text-wm_text-secondary pl-2 border-l-2 border-red-500/30">
+                    {issue}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          
+          {suggestions && suggestions.length > 0 && (
+            <div>
+              <div className="text-[10px] font-semibold text-blue-400 mb-1">Suggestions:</div>
+              <ul className="space-y-0.5">
+                {suggestions.map((suggestion, idx) => (
+                  <li key={idx} className="text-[10px] text-wm_text-secondary pl-2 border-l-2 border-blue-500/30">
+                    {suggestion}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

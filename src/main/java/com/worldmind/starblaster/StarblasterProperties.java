@@ -90,9 +90,9 @@ public class StarblasterProperties {
 
     public static class Goose {
         private String provider = "";
-        private String model = "qwen2.5-coder-32b";
+        private String model = "";
         private String serviceName = "";
-        private String lmStudioUrl = "http://host.docker.internal:1234/v1";
+        private String lmStudioUrl = "";
 
         public String getProvider() { return provider; }
         public void setProvider(String provider) { this.provider = provider; }

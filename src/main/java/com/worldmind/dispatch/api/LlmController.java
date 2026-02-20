@@ -200,19 +200,42 @@ public class LlmController {
         }
         try {
             String serviceName = starblasterProperties.getGooseServiceName();
+            if (serviceName == null || serviceName.isBlank()) {
+                return null;
+            }
+            
             JsonNode root = new ObjectMapper().readTree(vcapServices);
             var labels = root.fields();
             while (labels.hasNext()) {
                 var label = labels.next();
+                String labelKey = label.getKey().toLowerCase();
+                
+                // Skip non-LLM services (databases, caches, etc.)
+                if (labelKey.contains("postgres") || labelKey.contains("mysql") || 
+                    labelKey.contains("redis") || labelKey.contains("rabbit") ||
+                    labelKey.contains("mongo") || labelKey.contains("sql")) {
+                    continue;
+                }
+                
                 for (JsonNode svc : label.getValue()) {
                     String name = svc.has("name") ? svc.get("name").asText() : "";
-                    if (serviceName != null && !serviceName.isBlank() && !name.equals(serviceName)) {
+                    if (!name.equals(serviceName)) {
                         continue;
                     }
 
                     Map<String, String> resolved = new LinkedHashMap<>();
                     JsonNode creds = svc.get("credentials");
                     if (creds != null) {
+                        // Only consider it a valid LLM service if it has LLM-specific credentials
+                        boolean hasLlmCredentials = creds.has("model_provider") || 
+                                                    creds.has("model_name") || 
+                                                    creds.has("model") ||
+                                                    creds.has("api_key") ||
+                                                    creds.has("api_base");
+                        if (!hasLlmCredentials) {
+                            continue;
+                        }
+                        
                         if (creds.has("model_provider")) {
                             resolved.put("provider", creds.get("model_provider").asText());
                         }

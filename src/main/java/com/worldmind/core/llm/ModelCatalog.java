@@ -70,6 +70,15 @@ public class ModelCatalog {
                     "Fast and affordable"
             ),
             new ModelInfo(
+                    "gpt-5-nano",
+                    "GPT-5 Nano",
+                    "openai",
+                    "fast",
+                    0.05, 0.40,
+                    400000,
+                    "Fastest, most cost-efficient GPT-5"
+            ),
+            new ModelInfo(
                     "o1",
                     "o1",
                     "openai",

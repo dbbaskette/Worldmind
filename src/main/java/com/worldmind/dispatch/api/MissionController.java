@@ -684,10 +684,14 @@ public class MissionController {
         // Find review feedback for this directive
         Integer reviewScore = null;
         String reviewSummary = null;
+        List<String> reviewIssues = null;
+        List<String> reviewSuggestions = null;
         for (ReviewFeedback rf : state.reviewFeedback()) {
             if (d.id().equals(rf.directiveId())) {
                 reviewScore = rf.score();
                 reviewSummary = rf.summary();
+                reviewIssues = rf.issues();
+                reviewSuggestions = rf.suggestions();
                 break;
             }
         }
@@ -716,7 +720,9 @@ public class MissionController {
                 d.filesAffected(),
                 d.onFailure() != null ? d.onFailure().name() : null,
                 reviewScore,
-                reviewSummary
+                reviewSummary,
+                reviewIssues,
+                reviewSuggestions
         );
     }
 
