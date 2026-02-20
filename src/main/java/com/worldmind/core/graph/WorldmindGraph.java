@@ -75,6 +75,7 @@ public class WorldmindGraph {
                 .addConditionalEdges(START,
                         edge_async(this::routeFromStart),
                         Map.of("classify_request", "classify_request",
+                                "plan_mission", "plan_mission",
                                 "generate_spec", "generate_spec",
                                 "schedule_wave", "schedule_wave"))
                 .addEdge("classify_request", "upload_context")
@@ -118,6 +119,12 @@ public class WorldmindGraph {
      */
     String routeFromStart(WorldmindState state) {
         MissionStatus status = state.status();
+        
+        // If user provided a PRD document, skip directly to planning
+        if (status == MissionStatus.PLANNING) {
+            log.info("PRD document provided — skipping to plan_mission");
+            return "plan_mission";
+        }
         if (status == MissionStatus.SPECIFYING) {
             log.info("Resuming from SPECIFYING status — skipping to generate_spec");
             return "generate_spec";

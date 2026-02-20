@@ -246,9 +246,18 @@ public class EvaluateWaveNode {
                         updatedTasks.add(withResult(task, dispatchResult, TaskStatus.SKIPPED));
                     } else if (outcome.missionFailed) {
                         updatedTasks.add(withResult(task, dispatchResult, TaskStatus.FAILED));
-                    }
-                    if (outcome.retryContext != null) {
-                        retryContext = enrichRetryContext(outcome.retryContext, reviewFeedback);
+                    } else if (outcome.retryContext != null) {
+                        // RETRY case: reset task to PENDING with incremented iteration
+                        int nextIteration = task.iteration() + 1;
+                        String enhancedContext = enrichRetryContext(task.inputContext(), reviewFeedback);
+                        updatedTasks.add(new Task(
+                                task.id(), task.agent(), task.description(),
+                                enhancedContext, task.successCriteria(), task.dependencies(),
+                                TaskStatus.PENDING, nextIteration, task.maxIterations(),
+                                task.onFailure(), task.targetFiles(), List.of(), null));
+                        log.info("Reset {} to PENDING (iteration {}/{}) for quality gate retry",
+                                id, nextIteration, task.maxIterations());
+                        retryContext = outcome.retryContext;
                     }
                     if (outcome.missionFailed) missionStatus = MissionStatus.FAILED;
                     errors.addAll(outcome.errors);

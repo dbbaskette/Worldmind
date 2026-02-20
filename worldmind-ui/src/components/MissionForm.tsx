@@ -81,16 +81,63 @@ export function MissionForm({ onSubmit, submitting, error, showSettings, onToggl
 
           <div className="w-px h-8 bg-wm-border shrink-0" />
 
-          {/* Input */}
-          <div className="flex-1">
+          {/* Input + PRD Upload */}
+          <div className="flex-1 flex items-center gap-2">
+            {/* Hidden file input */}
             <input
-              type="text"
-              value={request}
-              onChange={(e) => setRequest(e.target.value)}
-              placeholder="Describe your mission..."
-              className="w-full bg-wm-bg border border-wm-border rounded-lg px-4 py-2 text-sm text-wm_text-primary placeholder:text-wm_text-dim focus:outline-none focus:border-agent-reviewer/50 focus:ring-1 focus:ring-agent-reviewer/20 transition-all"
+              ref={fileInputRef}
+              type="file"
+              accept=".md,.markdown,.txt"
+              onChange={handleFileUpload}
               disabled={submitting}
+              className="hidden"
+              id="prdFileInput"
             />
+            
+            {/* Show either text input or PRD file indicator */}
+            {prdFileName ? (
+              <div className="flex-1 flex items-center gap-2 bg-wm-bg border border-agent-coder/30 rounded-lg px-4 py-2">
+                <svg className="w-4 h-4 text-agent-coder shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                </svg>
+                <span className="text-sm text-agent-coder font-mono truncate">{prdFileName}</span>
+                <span className="text-[10px] text-wm_text-muted shrink-0">({Math.round(prdDocument.length / 1024)}KB)</span>
+                <button
+                  type="button"
+                  onClick={clearPrdDocument}
+                  className="p-1 text-wm_text-muted hover:text-red-400 transition-colors shrink-0"
+                  title="Remove PRD and type mission instead"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ) : (
+              <input
+                type="text"
+                value={request}
+                onChange={(e) => setRequest(e.target.value)}
+                placeholder="Describe your mission..."
+                className="flex-1 bg-wm-bg border border-wm-border rounded-lg px-4 py-2 text-sm text-wm_text-primary placeholder:text-wm_text-dim focus:outline-none focus:border-agent-reviewer/50 focus:ring-1 focus:ring-agent-reviewer/20 transition-all"
+                disabled={submitting}
+              />
+            )}
+            
+            {/* Upload PRD button - only show when no PRD is uploaded */}
+            {!prdFileName && (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={submitting}
+                className="p-2 rounded-lg border bg-wm-bg border-wm-border text-wm_text-muted hover:text-wm_text-secondary hover:border-wm_text-muted/50 transition-colors shrink-0"
+                title="Upload PRD document (replaces mission description)"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                </svg>
+              </button>
+            )}
           </div>
 
           {/* Mode selector */}
@@ -234,51 +281,6 @@ export function MissionForm({ onSubmit, submitting, error, showSettings, onToggl
               <p className="text-[10px] text-wm_text-muted mt-1">
                 {EXECUTION_STRATEGIES.find(s => s.value === executionStrategy)?.description}
               </p>
-            </div>
-
-            {/* PRD Document Upload */}
-            <div>
-              <label className="block text-[10px] font-mono uppercase tracking-wider text-wm_text-muted mb-1.5">
-                PRD Document (Optional)
-              </label>
-              <div className="flex items-center gap-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".md,.markdown,.txt"
-                  onChange={handleFileUpload}
-                  disabled={submitting}
-                  className="hidden"
-                  id="prdFileInput"
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={submitting}
-                  className="px-3 py-1.5 bg-wm-bg border border-wm-border rounded text-xs text-wm_text-secondary hover:border-wm_text-muted/50 transition-colors"
-                >
-                  {prdFileName ? 'Change File' : 'Upload PRD'}
-                </button>
-                {prdFileName && (
-                  <>
-                    <span className="text-xs text-agent-coder font-mono">{prdFileName}</span>
-                    <span className="text-[10px] text-wm_text-muted">({Math.round(prdDocument.length / 1024)}KB)</span>
-                    <button
-                      type="button"
-                      onClick={clearPrdDocument}
-                      className="p-1 text-wm_text-muted hover:text-red-400 transition-colors"
-                      title="Remove PRD"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </>
-                )}
-                {!prdFileName && (
-                  <span className="text-[10px] text-wm_text-muted">Upload a markdown PRD to skip Q&A and use detailed specs directly</span>
-                )}
-              </div>
             </div>
 
             {/* CF Deployment Checkbox */}

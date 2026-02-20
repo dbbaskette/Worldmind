@@ -112,6 +112,8 @@ public class AgentDispatcher {
                 ? TaskStatus.VERIFYING 
                 : TaskStatus.PASSED;
 
+        // Note: iteration is NOT incremented here — EvaluateWaveNode handles iteration
+        // tracking to avoid double-counting across retries and quality gate cycles.
         var updatedTask = new Task(
             task.id(),
             task.agent(),
@@ -120,7 +122,7 @@ public class AgentDispatcher {
             task.successCriteria(),
             task.dependencies(),
             success ? successStatus : TaskStatus.FAILED,
-            task.iteration() + 1,
+            task.iteration(),
             task.maxIterations(),
             task.onFailure(),
             task.targetFiles(),

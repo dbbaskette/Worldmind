@@ -218,4 +218,5 @@ fi
 # Pass --with-builtin developer as belt-and-suspenders alongside config.yaml.
 # Config.yaml (map format) should load extensions, but CLI flag ensures developer loads.
 # The instruction file is passed as $1 — use -i/--instructions flag (not positional arg).
-exec goose run --no-session --with-builtin developer -i "$@"
+# Pass --provider and --model to override any hardcoded internal model choices (e.g. gpt-4o-mini).
+exec goose run --no-session --with-builtin developer --provider "$GOOSE_PROVIDER" --model "$GOOSE_MODEL" -i "$@"
