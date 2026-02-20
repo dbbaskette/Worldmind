@@ -277,12 +277,24 @@ public class EvaluateWaveNode {
                         log.warn("Wave merge had {} conflicts: {} — will retry on updated main", 
                                 mergeResult.conflictedIds().size(), mergeResult.conflictedIds());
                         
-                        // Determine which tasks merged successfully (for conflict context)
-                        String mergedContext = mergeResult.mergedIds().isEmpty() 
-                                ? "" 
-                                : " The following tasks have already merged: " + 
-                                  String.join(", ", mergeResult.mergedIds()) + 
-                                  ". Check main branch for their changes before creating your files.";
+                        // Build detailed context about which files were affected by merged tasks.
+                        // This helps the retrying agent know exactly what files exist in main now.
+                        var mergedFilesContext = new StringBuilder();
+                        if (!mergeResult.mergedIds().isEmpty()) {
+                            mergedFilesContext.append("\n\nFILES ALREADY IN MAIN from merged tasks:\n");
+                            for (String mergedId : mergeResult.mergedIds()) {
+                                Task mergedTask = taskMap.get(mergedId);
+                                if (mergedTask != null && mergedTask.filesAffected() != null && !mergedTask.filesAffected().isEmpty()) {
+                                    mergedFilesContext.append("- ").append(mergedId).append(": ");
+                                    mergedFilesContext.append(mergedTask.filesAffected().stream()
+                                            .map(f -> f.path())
+                                            .collect(java.util.stream.Collectors.joining(", ")));
+                                    mergedFilesContext.append("\n");
+                                }
+                            }
+                            mergedFilesContext.append("\nDO NOT recreate these files from scratch. ");
+                            mergedFilesContext.append("Read them from the filesystem and extend/modify as needed.");
+                        }
                         
                         // Mark conflicted tasks for retry so they get re-scheduled
                         // They'll run again in the next wave, now with access to the merged changes
@@ -311,20 +323,27 @@ public class EvaluateWaveNode {
                                     retryingIds.add(conflictedId);  // Add to retry list (excludes from completed)
                                     completedIds.remove(conflictedId);  // Don't add to completed this wave
                                     
-                                    // Enhance input context with merge conflict information
+                                    // Update targetFiles based on what the task actually modified (not just planned).
+                                    // This helps the scheduler detect file overlaps more accurately on retry.
+                                    List<String> actualTargets = (d.filesAffected() != null && !d.filesAffected().isEmpty())
+                                            ? d.filesAffected().stream().map(f -> f.path()).toList()
+                                            : d.targetFiles();
+                                    
+                                    // Enhance input context with merge conflict information and file list
                                     String enhancedContext = d.inputContext();
                                     if (enhancedContext == null) enhancedContext = "";
-                                    enhancedContext = "MERGE CONFLICT RETRY: Your previous branch had " +
-                                            "conflicts with main. Start fresh from the current main branch." +
-                                            mergedContext + "\n\n" + enhancedContext;
+                                    enhancedContext = "MERGE CONFLICT RETRY: Your previous branch conflicted with main.\n" +
+                                            "You are starting fresh from the CURRENT main branch (your old branch was deleted).\n" +
+                                            "Review existing files before creating new ones to avoid duplicating work." +
+                                            mergedFilesContext + "\n\n" + enhancedContext;
                                     
                                     updatedTasks.set(i, new Task(
                                             d.id(), d.agent(), d.description(),
                                             enhancedContext, d.successCriteria(), d.dependencies(),
                                             TaskStatus.PENDING, nextIteration, d.maxIterations(),
-                                            d.onFailure(), d.targetFiles(), List.of(), null));
-                                    log.info("Reset {} to PENDING (iteration {}) for retry on updated main", 
-                                            conflictedId, nextIteration);
+                                            d.onFailure(), actualTargets, List.of(), null));
+                                    log.info("Reset {} to PENDING (iteration {}) for retry on updated main (target files: {})", 
+                                            conflictedId, nextIteration, actualTargets);
                                     break;
                                 }
                             }

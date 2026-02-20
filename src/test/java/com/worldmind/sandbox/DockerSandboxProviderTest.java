@@ -51,7 +51,7 @@ class DockerSandboxProviderTest {
             "coder", "TASK-001", Path.of("/tmp/project"),
             "Create hello.py", Map.of("GOOSE_PROVIDER", "openai"),
             4096, 2,
-            "", "java"
+            "", "java", 0
         );
 
         String containerId = provider.openSandbox(request);
@@ -71,7 +71,7 @@ class DockerSandboxProviderTest {
             "reviewer", "TASK-002", Path.of("/tmp/project"),
             "Review code", Map.of(),
             2048, 1,
-            "", "python"
+            "", "python", 0
         );
 
         provider.openSandbox(request);
@@ -95,7 +95,7 @@ class DockerSandboxProviderTest {
             "coder", "TASK-003", Path.of("/tmp/project"),
             "Build feature", Map.of(),
             4096, 2,
-            "", "node"
+            "", "node", 0
         );
 
         provider.openSandbox(request);
@@ -112,7 +112,7 @@ class DockerSandboxProviderTest {
             "coder", "TASK-001", Path.of("/tmp/project"),
             "Create hello.py", Map.of(),
             4096, 2,
-            "", "base"
+            "", "base", 0
         );
 
         provider.openSandbox(request);
@@ -133,7 +133,7 @@ class DockerSandboxProviderTest {
             "coder", "TASK-003", Path.of("/tmp/project"),
             "Build feature", envVars,
             4096, 2,
-            "", "base"
+            "", "base", 0
         );
 
         provider.openSandbox(request);
@@ -155,7 +155,7 @@ class DockerSandboxProviderTest {
             "coder", "TASK-004", Path.of("/tmp/project"),
             "Create a REST API", Map.of(),
             4096, 2,
-            "", "base"
+            "", "base", 0
         );
 
         provider.openSandbox(request);
@@ -172,7 +172,7 @@ class DockerSandboxProviderTest {
             "coder", "TASK-005", Path.of("/tmp/project"),
             "Build feature", Map.of(),
             4096, 2,
-            "", "base"
+            "", "base", 0
         );
 
         provider.openSandbox(request);
@@ -189,7 +189,7 @@ class DockerSandboxProviderTest {
             "coder", "TASK-006", Path.of("/tmp/project"),
             "Build feature", Map.of(),
             4096, 2,
-            "", "base"
+            "", "base", 0
         );
 
         provider.openSandbox(request);

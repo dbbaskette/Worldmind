@@ -14,6 +14,7 @@ import java.util.Map;
  * @param envVars        environment variables to inject (GOOSE_PROVIDER, GOOSE_MODEL, etc.)
  * @param memoryLimitMb  memory limit in MB
  * @param cpuCount       CPU count limit
+ * @param iteration      current iteration (0 = first attempt, 1+ = retry)
  */
 public record AgentRequest(
     String agentType,
@@ -24,5 +25,6 @@ public record AgentRequest(
     int memoryLimitMb,
     int cpuCount,
     String gitRemoteUrl,
-    String runtimeTag
+    String runtimeTag,
+    int iteration
 ) implements Serializable {}

@@ -68,7 +68,7 @@ class CloudFoundrySandboxProviderTest {
         assertTrue(call.command.contains("curl"), "Should contain curl: " + call.command);
         assertTrue(call.command.contains("goose run --debug --no-session --with-builtin developer"), "Should contain goose run with developer builtin: " + call.command);
         // Instruction file must be passed via -i/--instructions flag
-        assertTrue(call.command.contains("-i .worldmind/tasks/TASK-001.md"), "Should pass instruction via -i flag: " + call.command);
+        assertTrue(call.command.contains("-i .worldmind-TASK-001/instruction.md"), "Should pass instruction via -i flag: " + call.command);
         // Verify instruction file is non-empty before running Goose
         assertTrue(call.command.contains("! -s"), "Should check instruction file is non-empty: " + call.command);
         assertTrue(call.command.contains("git push"), "Should contain git push: " + call.command);
@@ -88,7 +88,7 @@ class CloudFoundrySandboxProviderTest {
                         "MCP_SERVER_NEXUS_URL", "https://nexus.example.com/mcp",
                         "MCP_SERVER_NEXUS_TOKEN", "test-token"
                 ),
-                4096, 2, "", "base"
+                4096, 2, "", "base", 0
         );
 
         provider.openSandbox(request);
@@ -130,7 +130,7 @@ class CloudFoundrySandboxProviderTest {
         var request = new AgentRequest(
                 "coder", "TASK-002", Path.of("/tmp/project"),
                 "Build something", Map.of(), 8192, 4,
-                "", "base"
+                "", "base", 0
         );
 
         provider.openSandbox(request);
@@ -144,7 +144,7 @@ class CloudFoundrySandboxProviderTest {
         var request = new AgentRequest(
                 "coder", "TASK-003", Path.of("/tmp/project"),
                 "Build something", Map.of(), 0, 2,
-                "", "base"
+                "", "base", 0
         );
 
         provider.openSandbox(request);
@@ -168,7 +168,7 @@ class CloudFoundrySandboxProviderTest {
         var request = new AgentRequest(
                 "CODER", "TASK-005", Path.of("/tmp/project"),
                 "Build something", Map.of(), 4096, 2,
-                "", "base"
+                "", "base", 0
         );
 
         var sandboxId = provider.openSandbox(request);
@@ -397,10 +397,38 @@ class CloudFoundrySandboxProviderTest {
         provider.openSandbox(request);
 
         var call = stubApiClient.createTaskCalls.get(0);
-        assertTrue(call.command.contains("git checkout -B worldmind/TASK-001"),
-                "CODER should create branch: " + call.command);
+        // All CODER tasks (first attempt or retry) always start fresh from main
+        // This prevents stale branches from causing merge conflicts
+        assertTrue(call.command.contains("git push origin --delete worldmind/TASK-001"),
+                "CODER should delete any existing remote branch: " + call.command);
+        assertTrue(call.command.contains("git branch -D worldmind/TASK-001"),
+                "CODER should delete any existing local branch: " + call.command);
+        assertTrue(call.command.contains("git checkout -b worldmind/TASK-001"),
+                "CODER should create fresh branch from main: " + call.command);
         assertTrue(call.command.contains("git push -uf origin worldmind/TASK-001"),
                 "CODER should push branch: " + call.command);
+    }
+
+    @Test
+    void coderRetryForcesFreshBranch() {
+        // Retry (iteration > 0) should delete the old branch and create fresh from main
+        var request = new AgentRequest(
+                "coder", "TASK-RETRY", Path.of("/tmp/project"),
+                "Fix the issues", Map.of("GOOSE_PROVIDER", "anthropic"),
+                4096, 2,
+                "", "base", 1  // iteration = 1 means retry
+        );
+
+        provider.openSandbox(request);
+
+        var call = stubApiClient.createTaskCalls.get(0);
+        // Retry should delete old branch and create fresh
+        assertTrue(call.command.contains("git push origin --delete worldmind/TASK-RETRY"),
+                "Retry should delete old branch: " + call.command);
+        assertTrue(call.command.contains("git branch -D worldmind/TASK-RETRY"),
+                "Retry should delete local branch: " + call.command);
+        assertTrue(call.command.contains("git checkout -b worldmind/TASK-RETRY"),
+                "Retry should create fresh branch: " + call.command);
     }
 
     // --- detectChanges tests ---
@@ -448,7 +476,7 @@ class CloudFoundrySandboxProviderTest {
                 agentType, taskId, Path.of("/tmp/project"),
                 "Build the feature", Map.of("GOOSE_PROVIDER", "anthropic"),
                 4096, 2,
-                "", "base"
+                "", "base", 0
         );
     }
 

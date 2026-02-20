@@ -84,7 +84,8 @@ public class AgentDispatcher {
             instruction,
             Map.of(),
             gitRemoteUrl,
-            runtimeTag
+            runtimeTag,
+            task.iteration()
         );
 
         Instant completedAt = Instant.now();

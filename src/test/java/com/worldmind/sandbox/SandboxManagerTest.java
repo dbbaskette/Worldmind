@@ -42,7 +42,7 @@ class SandboxManagerTest {
         var result = manager.executeTask(
             "coder", "TASK-001", Path.of("/tmp/test"),
             "Create file", Map.of(),
-            "", "base"
+            "", "base", 0
         );
 
         verify(provider).openSandbox(any());
@@ -61,7 +61,7 @@ class SandboxManagerTest {
         var result = manager.executeTask(
             "coder", "TASK-002", Path.of("/tmp/test"),
             "Bad instruction", Map.of(),
-            "", "base"
+            "", "base", 0
         );
 
         assertEquals(1, result.exitCode());
@@ -93,7 +93,7 @@ class SandboxManagerTest {
         var result = manager.executeTask(
             "coder", "TASK-003", Path.of("/tmp/test"),
             "Create file", Map.of(),
-            "", "base"
+            "", "base", 0
         );
 
         assertEquals(2, result.fileChanges().size());
@@ -111,7 +111,7 @@ class SandboxManagerTest {
         var result = manager.executeTask(
             "coder", "TASK-004", Path.of("/tmp/test"),
             "Create file", Map.of(),
-            "", "base"
+            "", "base", 0
         );
 
         // Provider returned null, so filesystem detection is used (no actual file changes in /tmp/test)

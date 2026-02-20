@@ -44,7 +44,7 @@ class CoderIntegrationTest {
                    "GOOSE_MODEL", "qwen2.5-coder-32b",
                    "OPENAI_HOST", "http://host.docker.internal:1234/v1",
                    "OPENAI_API_KEY", "not-needed"),
-            "", "python"
+            "", "python", 0
         );
 
         // Verify execution completed

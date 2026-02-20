@@ -36,12 +36,13 @@ class AgentDispatcherTest {
         var execResult = new SandboxManager.ExecutionResult(0, "done", "c-1", fileChanges, 5000L);
 
         when(manager.executeTask(
-            eq("CODER"), eq("TASK-001"), any(), anyString(), any(), any(), any()))
+            eq("CODER"), eq("TASK-001"), any(), anyString(), any(), any(), any(), anyInt()))
             .thenReturn(execResult);
 
         var result = bridge.executeTask(task, context, Path.of("/tmp/p"), "", "base");
 
-        assertEquals(TaskStatus.PASSED, result.task().status());
+        // CODER tasks return VERIFYING status (need quality gate evaluation)
+        assertEquals(TaskStatus.VERIFYING, result.task().status());
         assertEquals(5000L, result.task().elapsedMs());
         assertEquals(1, result.task().filesAffected().size());
         assertNotNull(result.sandboxInfo());
@@ -57,7 +58,7 @@ class AgentDispatcherTest {
         );
         var execResult = new SandboxManager.ExecutionResult(1, "error", "c-2", List.of(), 3000L);
 
-        when(manager.executeTask(any(), any(), any(), anyString(), any(), any(), any()))
+        when(manager.executeTask(any(), any(), any(), anyString(), any(), any(), any(), anyInt()))
             .thenReturn(execResult);
 
         var result = bridge.executeTask(task, null, Path.of("/tmp"), "", "base");
@@ -75,7 +76,7 @@ class AgentDispatcherTest {
         );
         var execResult = new SandboxManager.ExecutionResult(0, "ok", "c-3", List.of(), 1000L);
 
-        when(manager.executeTask(any(), any(), any(), anyString(), any(), any(), any()))
+        when(manager.executeTask(any(), any(), any(), anyString(), any(), any(), any(), anyInt()))
             .thenReturn(execResult);
 
         var result = bridge.executeTask(task, null, Path.of("/tmp"), "", "base");
@@ -93,7 +94,7 @@ class AgentDispatcherTest {
         );
         var execResult = new SandboxManager.ExecutionResult(0, "tests passed", "container-42", List.of(), 8000L);
 
-        when(manager.executeTask(any(), any(), any(), anyString(), any(), any(), any()))
+        when(manager.executeTask(any(), any(), any(), anyString(), any(), any(), any(), anyInt()))
             .thenReturn(execResult);
 
         var result = bridge.executeTask(task, null, Path.of("/tmp"), "", "base");
@@ -116,7 +117,7 @@ class AgentDispatcherTest {
         );
         var execResult = new SandboxManager.ExecutionResult(0, "feature built successfully", "c-5", List.of(), 2000L);
 
-        when(manager.executeTask(any(), any(), any(), anyString(), any(), any(), any()))
+        when(manager.executeTask(any(), any(), any(), anyString(), any(), any(), any(), anyInt()))
             .thenReturn(execResult);
 
         var result = bridge.executeTask(task, null, Path.of("/tmp"), "", "base");
@@ -134,7 +135,7 @@ class AgentDispatcherTest {
         );
         var execResult = new SandboxManager.ExecutionResult(1, "crashed", "c-6", List.of(), 500L);
 
-        when(manager.executeTask(any(), any(), any(), anyString(), any(), any(), any()))
+        when(manager.executeTask(any(), any(), any(), anyString(), any(), any(), any(), anyInt()))
             .thenReturn(execResult);
 
         var result = bridge.executeTask(task, null, Path.of("/tmp"), "", "base");

@@ -139,6 +139,7 @@ public class CloudFoundrySandboxProvider implements SandboxProvider {
         // TESTER/REVIEWER checkout the parent CODER branch to test/review its code.
         // RESEARCHER stays on the default branch (read-only research).
         boolean isImplementation = "coder".equals(type) || "refactorer".equals(type);
+        boolean isRetry = request.iteration() > 0;
         String parentBranch = deriveParentBranch(type, taskId);
 
         String branchSetup;
@@ -149,13 +150,35 @@ public class CloudFoundrySandboxProvider implements SandboxProvider {
                     + ") || echo 'WARN: parent branch " + parentBranch + " not found, staying on default'";
             postGooseGit = "";
         } else if (isImplementation) {
-            // CODER/REFACTORER: create or continue on existing branch.
-            // On retry, we want to preserve the previous iteration's code and fix it,
-            // not start fresh from main. So we:
-            // 1. Try to fetch the existing branch from remote
-            // 2. If it exists, checkout that branch (preserving previous work)
-            // 3. If it doesn't exist, create a new branch from main
-            branchSetup = "(git fetch origin " + branchName + " 2>/dev/null && git checkout " + branchName + ") || git checkout -b " + branchName;
+            // ALWAYS start fresh from main for CODER/REFACTORER tasks.
+            // 
+            // Why? Several scenarios cause stale branches that lead to merge conflicts:
+            // 1. RETRY: Previous branch was based on old main (before other tasks merged)
+            // 2. LEFTOVER: Branch exists from a previous mission that wasn't cleaned up
+            // 3. MODIFICATION: Running against existing code with old worldmind branches
+            // 4. CF RESTART: Task restarted but main has moved forward
+            //
+            // The safest approach is to ALWAYS delete any existing branch and start fresh
+            // from current main. This ensures:
+            // - Agent always sees the latest code (including other merged tasks)
+            // - No stale changes from previous attempts interfere
+            // - Clean git history without orphaned commits
+            //
+            // The instruction text contains all context the agent needs (including
+            // review feedback for retries), so losing the old branch content is fine.
+            if (isRetry) {
+                log.info("Task {} is retry (iteration {}): deleting old branch and starting fresh from main",
+                        taskId, request.iteration());
+            } else {
+                log.info("Task {} (iteration 0): ensuring fresh branch from current main", taskId);
+            }
+            
+            // Delete any existing branch (remote and local) then create fresh from main.
+            // The '|| true' ensures we continue even if branch doesn't exist.
+            branchSetup = "git push origin --delete " + branchName + " 2>/dev/null || true; "
+                    + "git branch -D " + branchName + " 2>/dev/null || true; "
+                    + "git checkout -b " + branchName;
+            
             // Use semicolons (not &&) so push always runs.
             // Each task has its own .worldmind-TASK-XXX/ directory so logs don't conflict.
             // git diff --cached --quiet exits 1 if there ARE staged changes, so || triggers the commit.

@@ -18,13 +18,15 @@ class SandboxProviderTest {
             4096,
             2,
             "",
-            "base"
+            "base",
+            0
         );
         assertEquals("coder", request.agentType());
         assertEquals("task-001", request.taskId());
         assertEquals(Path.of("/tmp/project"), request.projectPath());
         assertEquals(4096, request.memoryLimitMb());
         assertEquals(2, request.cpuCount());
+        assertEquals(0, request.iteration());
     }
 
     @Test
@@ -33,8 +35,19 @@ class SandboxProviderTest {
             "coder", "d-001", Path.of("/tmp"),
             "Build the feature",
             Map.of(), 2048, 1,
-            "", "base"
+            "", "base", 0
         );
         assertEquals("Build the feature", request.instructionText());
+    }
+
+    @Test
+    void sandboxRequestIterationIsPreserved() {
+        var request = new AgentRequest(
+            "coder", "d-002", Path.of("/tmp"),
+            "Retry task",
+            Map.of(), 2048, 1,
+            "", "base", 2
+        );
+        assertEquals(2, request.iteration());
     }
 }

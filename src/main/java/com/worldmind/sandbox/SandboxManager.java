@@ -69,6 +69,7 @@ public class SandboxManager {
      * @param projectPath    host path to the project directory
      * @param instructionText the instruction markdown for Goose
      * @param extraEnv       additional environment variables
+     * @param iteration      current iteration count (0 = first attempt, 1+ = retry)
      * @return execution result with exit code, output, file changes, and timing
      */
     public ExecutionResult executeTask(
@@ -78,7 +79,8 @@ public class SandboxManager {
             String instructionText,
             Map<String, String> extraEnv,
             String gitRemoteUrl,
-            String runtimeTag) {
+            String runtimeTag,
+            int iteration) {
 
         // When running inside Docker, use the shared workspace volume path
         // instead of the host project path for task files and snapshots
@@ -173,7 +175,8 @@ public class SandboxManager {
             instructionText, envVars,
             properties.getMemoryLimitMb(), properties.getCpuCount(),
             gitRemoteUrl,
-            runtimeTag != null ? runtimeTag : "base"
+            runtimeTag != null ? runtimeTag : "base",
+            iteration
         );
 
         // Write instruction file for Goose CLI (expects a markdown file path, not inline text).
