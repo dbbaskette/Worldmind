@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -110,6 +111,12 @@ public class GenerateClarifyingQuestionsNode {
         String userPrompt = buildUserPrompt(request, classification, projectContext);
         ClarifyingQuestions questions = llmService.structuredCall(SYSTEM_PROMPT, userPrompt, ClarifyingQuestions.class);
         
+        // If CF deployment is requested, inject service binding question
+        if (state.createCfDeployment()) {
+            questions = injectCfServiceBindingQuestion(questions);
+            log.info("Injected CF service binding question (createCfDeployment=true)");
+        }
+        
         log.info("Generated {} clarifying questions for request: {}", 
                 questions.questions() != null ? questions.questions().size() : 0,
                 request.substring(0, Math.min(50, request.length())));
@@ -127,6 +134,38 @@ public class GenerateClarifyingQuestionsNode {
                 "clarifyingQuestions", questions,
                 "status", MissionStatus.CLARIFYING.name()
         );
+    }
+
+    /**
+     * Injects a CF service binding question when CF deployment is requested.
+     * This allows users to specify what services (databases, message queues, etc.)
+     * should be bound to the deployed application.
+     */
+    private ClarifyingQuestions injectCfServiceBindingQuestion(ClarifyingQuestions original) {
+        var cfQuestion = new ClarifyingQuestions.Question(
+                "cf_service_bindings",
+                "Does your application need to bind to any Cloud Foundry services? If yes, please specify the service name(s) and type(s).",
+                "integration",
+                "Cloud Foundry apps often need databases, caches, or message queues. Specifying these now ensures the manifest.yml includes the correct service bindings.",
+                List.of(
+                        "No services needed",
+                        "PostgreSQL database (specify instance name)",
+                        "MySQL database (specify instance name)",
+                        "Redis cache (specify instance name)",
+                        "RabbitMQ (specify instance name)",
+                        "Other (please describe)"
+                ),
+                false,
+                "No services needed"
+        );
+        
+        List<ClarifyingQuestions.Question> allQuestions = new ArrayList<>();
+        if (original.questions() != null) {
+            allQuestions.addAll(original.questions());
+        }
+        allQuestions.add(cfQuestion);
+        
+        return new ClarifyingQuestions(allQuestions, original.summary());
     }
 
     private String buildUserPrompt(String request, Classification classification, ProjectContext projectContext) {

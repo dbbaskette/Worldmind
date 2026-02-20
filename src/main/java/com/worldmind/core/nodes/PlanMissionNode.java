@@ -146,7 +146,7 @@ public class PlanMissionNode {
         
         // If user requested CF deployment artifacts, append a final task
         if (state.createCfDeployment()) {
-            tasks = appendCfDeploymentTask(tasks);
+            tasks = appendCfDeploymentTask(tasks, state.clarifyingAnswers());
         }
 
         log.info("Mission plan: {} tasks — {}", tasks.size(),
@@ -214,13 +214,19 @@ public class PlanMissionNode {
      * Appends a final CODER task to create Cloud Foundry deployment artifacts.
      * This task depends on all other CODER/REFACTORER tasks so it runs last
      * and can inspect the actual code structure.
+     * 
+     * @param tasks existing tasks to append to
+     * @param clarifyingAnswers JSON string containing user's answers, may include service binding info
      */
-    private List<Task> appendCfDeploymentTask(List<Task> tasks) {
+    private List<Task> appendCfDeploymentTask(List<Task> tasks, String clarifyingAnswers) {
         // Find all CODER/REFACTORER task IDs as dependencies
         List<String> coderRefactorerIds = tasks.stream()
                 .filter(d -> "CODER".equalsIgnoreCase(d.agent()) || "REFACTORER".equalsIgnoreCase(d.agent()))
                 .map(Task::id)
                 .toList();
+
+        // Extract service binding info from clarifying answers if present
+        String serviceBindingInstruction = extractServiceBindingInstruction(clarifyingAnswers);
 
         String cfId = String.format("TASK-%03d", tasks.size() + 1);
         var cfTask = new Task(
@@ -237,11 +243,12 @@ public class PlanMissionNode {
                    - 'default-route: true' (NEVER hardcode routes)
                    - Appropriate memory and disk quotas
                    - The correct buildpack
+                   - Service bindings if specified below
                 4. For staticfile apps: Create a Staticfile with 'root: public' if files are in public/
                 5. Verify the manifest references valid paths that exist
                 
                 DO NOT create deployment artifacts if they already exist in the project.
-                """,
+                """ + serviceBindingInstruction,
                 "Valid manifest.yml created that can be used with 'cf push'",
                 coderRefactorerIds,
                 TaskStatus.PENDING, 0, 3,
@@ -252,6 +259,52 @@ public class PlanMissionNode {
         result.add(cfTask);
         log.info("Appended CF deployment task {} with dependencies on {}", cfId, coderRefactorerIds);
         return result;
+    }
+
+    /**
+     * Extracts service binding information from clarifying answers.
+     * Looks for the cf_service_bindings question ID in the answers.
+     */
+    private String extractServiceBindingInstruction(String clarifyingAnswers) {
+        if (clarifyingAnswers == null || clarifyingAnswers.isBlank()) {
+            return "";
+        }
+        
+        try {
+            // Parse the JSON answers looking for cf_service_bindings
+            var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            var answers = mapper.readTree(clarifyingAnswers);
+            
+            if (answers.has("cf_service_bindings")) {
+                String serviceAnswer = answers.get("cf_service_bindings").asText();
+                if (serviceAnswer != null && !serviceAnswer.isBlank() 
+                        && !serviceAnswer.equalsIgnoreCase("No services needed")) {
+                    log.info("CF service bindings requested: {}", serviceAnswer);
+                    return String.format("""
+                            
+                            ## SERVICE BINDINGS
+                            
+                            The user specified the following Cloud Foundry service bindings:
+                            %s
+                            
+                            Add these to manifest.yml under the 'services' key. Example:
+                            ```yaml
+                            applications:
+                            - name: my-app
+                              services:
+                              - my-postgres-db
+                              - my-redis-cache
+                            ```
+                            
+                            Use the EXACT service instance names provided by the user.
+                            """, serviceAnswer);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not parse clarifying answers for service bindings: {}", e.getMessage());
+        }
+        
+        return "";
     }
 
     private String buildUserPrompt(String request, Classification classification,
