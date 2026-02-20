@@ -32,11 +32,12 @@ class CloudFoundrySandboxProviderTest {
         cfProperties.setOrg("worldmind-org");
         cfProperties.setSpace("production");
         cfProperties.setGitRemoteUrl("https://github.com/example/project.git");
-        cfProperties.setAgentApps(Map.of(
+        cfProperties.setAgentApps(new java.util.HashMap<>(Map.of(
                 "coder", "agent-coder",
                 "reviewer", "agent-reviewer",
-                "tester", "agent-tester"
-        ));
+                "tester", "agent-tester",
+                "deployer", "agent-deployer"
+        )));
         cfProperties.setTaskMemoryMb(2048);
         cfProperties.setTaskDiskMb(4096);
         cfProperties.setTaskTimeoutSeconds(600);
@@ -292,6 +293,12 @@ class CloudFoundrySandboxProviderTest {
     }
 
     @Test
+    void getAppNameFromSandboxIdHandlesDeployer() {
+        var appName = provider.getAppNameFromSandboxId("sandbox-deployer-TASK-004");
+        assertEquals("agent-deployer", appName);
+    }
+
+    @Test
     void getAppNameFromSandboxIdHandlesTaskIdWithDashes() {
         var appName = provider.getAppNameFromSandboxId("sandbox-coder-abc-123-def");
         assertEquals("agent-coder", appName);
@@ -375,6 +382,58 @@ class CloudFoundrySandboxProviderTest {
                 "REVIEWER should fetch parent CODER branch: " + call.command);
         assertFalse(call.command.contains("git push"),
                 "REVIEWER should NOT push: " + call.command);
+    }
+
+    @Test
+    void deployerTaskStaysOnDefaultBranch() {
+        var request = makeRequest("deployer", "TASK-001");
+
+        provider.openSandbox(request);
+
+        var call = stubApiClient.createTaskCalls.get(0);
+        assertEquals("agent-deployer", call.appName);
+        assertFalse(call.command.contains("git checkout -B"),
+                "DEPLOYER should NOT create a branch: " + call.command);
+        assertFalse(call.command.contains("git push"),
+                "DEPLOYER should NOT push: " + call.command);
+    }
+
+    @Test
+    void deployerTaskIncludesCfCredentials() {
+        cfProperties.setCfUsername("cf-user");
+        cfProperties.setCfPassword("cf-pass");
+
+        var request = makeRequest("deployer", "TASK-001");
+
+        provider.openSandbox(request);
+
+        var call = stubApiClient.createTaskCalls.get(0);
+        assertTrue(call.command.contains("CF_API_URL"),
+                "DEPLOYER should export CF_API_URL: " + call.command);
+        assertTrue(call.command.contains("CF_USERNAME"),
+                "DEPLOYER should export CF_USERNAME: " + call.command);
+        assertTrue(call.command.contains("CF_PASSWORD"),
+                "DEPLOYER should export CF_PASSWORD: " + call.command);
+        assertTrue(call.command.contains("CF_ORG"),
+                "DEPLOYER should export CF_ORG: " + call.command);
+        assertTrue(call.command.contains("CF_SPACE"),
+                "DEPLOYER should export CF_SPACE: " + call.command);
+    }
+
+    @Test
+    void nonDeployerTaskDoesNotIncludeCfCredentials() {
+        cfProperties.setCfUsername("cf-user");
+        cfProperties.setCfPassword("cf-pass");
+
+        var request = makeRequest("coder", "TASK-001");
+
+        provider.openSandbox(request);
+
+        var call = stubApiClient.createTaskCalls.get(0);
+        assertFalse(call.command.contains("CF_USERNAME"),
+                "CODER should NOT export CF_USERNAME: " + call.command);
+        assertFalse(call.command.contains("CF_PASSWORD"),
+                "CODER should NOT export CF_PASSWORD: " + call.command);
     }
 
     @Test

@@ -25,6 +25,7 @@ applications:
       AGENT_REVIEWER_APP: ((agent-reviewer-app))
       AGENT_RESEARCHER_APP: ((agent-researcher-app))
       AGENT_REFACTORER_APP: ((agent-refactorer-app))
+      AGENT_DEPLOYER_APP: ((agent-deployer-app))
       GOOSE_PROVIDER: ((goose-provider))
       GOOSE_MODEL: ((goose-model))
       ANTHROPIC_API_KEY: ((anthropic-api-key))
@@ -42,6 +43,7 @@ applications:
       NEXUS_MCP_TOKEN_REVIEWER: ((nexus-mcp-token-reviewer))
       NEXUS_MCP_TOKEN_RESEARCHER: ((nexus-mcp-token-researcher))
       NEXUS_MCP_TOKEN_REFACTORER: ((nexus-mcp-token-refactorer))
+      NEXUS_MCP_TOKEN_DEPLOYER: ((nexus-mcp-token-deployer))
     services:
       - worldmind-postgres
 
@@ -119,3 +121,23 @@ applications:
       OPENAI_API_KEY: ((openai-api-key))
       GOOSE_PROVIDER: openai
       GOOSE_MODEL: gpt-5-nano
+
+  # --- Agent: Deployer (CF deployment) ---
+  - name: ((agent-deployer-app))
+    docker:
+      image: ((agent-image-registry))/agent-deployer:latest
+      username: ((docker-username))
+    memory: 2G
+    disk_quota: 4G
+    instances: 0
+    health-check-type: process
+    no-route: true
+    env:
+      OPENAI_API_KEY: ((openai-api-key))
+      GOOSE_PROVIDER: openai
+      GOOSE_MODEL: gpt-5-nano
+      CF_API_URL: ((cf-api-url))
+      CF_USERNAME: ((cf-username))
+      CF_PASSWORD: ((cf-password))
+      CF_ORG: ((cf-org))
+      CF_SPACE: ((cf-space))

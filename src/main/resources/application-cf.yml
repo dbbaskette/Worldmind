@@ -49,3 +49,4 @@ worldmind:
       reviewer: ${AGENT_REVIEWER_APP:agent-reviewer}
       researcher: ${AGENT_RESEARCHER_APP:agent-researcher}
       refactorer: ${AGENT_REFACTORER_APP:agent-refactorer}
+      deployer: ${AGENT_DEPLOYER_APP:agent-deployer}
