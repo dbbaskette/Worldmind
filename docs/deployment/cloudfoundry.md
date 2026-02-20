@@ -4,31 +4,31 @@
 
 | Component | Type | Runtime | Model | Database | Description |
 |-----------|------|---------|:-----:|:--------:|-------------|
-| **worldmind** | CF app (Java buildpack) | Long-running process, 1 instance | Yes | Yes | Spring Boot orchestrator — classifies requests, plans missions, dispatches centurions, evaluates results |
-| **centurion-forge** | CF app (Docker image) | 0 instances; runs as CF tasks | Yes | No | Code generation — Goose agent writes implementation code |
-| **centurion-gauntlet** | CF app (Docker image) | 0 instances; runs as CF tasks | Yes | No | Test execution — Goose agent writes and runs tests |
-| **centurion-vigil** | CF app (Docker image) | 0 instances; runs as CF tasks | Yes | No | Code review — Goose agent reviews code for quality |
-| **centurion-pulse** | CF app (Docker image) | 0 instances; runs as CF tasks | Yes | No | Research — Goose agent performs read-only analysis |
-| **centurion-prism** | CF app (Docker image) | 0 instances; runs as CF tasks | Yes | No | Refactoring — Goose agent restructures existing code |
+| **worldmind** | CF app (Java buildpack) | Long-running process, 1 instance | Yes | Yes | Spring Boot orchestrator — classifies requests, plans missions, dispatches agents, evaluates results |
+| **agent-coder** | CF app (Docker image) | 0 instances; runs as CF tasks | Yes | No | Code generation — Goose agent writes implementation code |
+| **agent-tester** | CF app (Docker image) | 0 instances; runs as CF tasks | Yes | No | Test execution — Goose agent writes and runs tests |
+| **agent-reviewer** | CF app (Docker image) | 0 instances; runs as CF tasks | Yes | No | Code review — Goose agent reviews code for quality |
+| **agent-researcher** | CF app (Docker image) | 0 instances; runs as CF tasks | Yes | No | Research — Goose agent performs read-only analysis |
+| **agent-refactorer** | CF app (Docker image) | 0 instances; runs as CF tasks | Yes | No | Refactoring — Goose agent restructures existing code |
 | **worldmind-postgres** | CF service | Managed by marketplace tile | -- | -- | PostgreSQL for checkpoint state and mission persistence |
-| **worldmind-model** | CF service | Managed by marketplace tile | -- | -- | OpenAI-compatible LLM endpoint, bound to orchestrator + all centurions |
+| **worldmind-model** | CF service | Managed by marketplace tile | -- | -- | OpenAI-compatible LLM endpoint, bound to orchestrator + all agents |
 
-**How centurions run:** The orchestrator calls `cf run-task centurion-forge` (or gauntlet/vigil/pulse/prism) to launch a short-lived CF task on the Docker-based app. The task clones the mission git branch, runs Goose with the directive, commits results, and exits. The app itself has 0 long-running instances — it only exists as a task host.
+**How agents run:** The orchestrator calls `cf run-task agent-coder` (or tester/reviewer/researcher/refactorer) to launch a short-lived CF task on the Docker-based app. The task clones the mission git branch, runs Goose with the task, commits results, and exits. The app itself has 0 long-running instances — it only exists as a task host.
 
 **How the model is consumed:**
-- **Orchestrator** — Spring AI `ChatClient` for classify, plan, and seal evaluation nodes. Credentials are auto-mapped from the `worldmind-model` binding via `CfModelServiceProcessor` (java-cfenv).
-- **Centurions** — Goose CLI reads `VCAP_SERVICES` at container startup (`entrypoint.sh`) and configures itself with the `worldmind-model` binding credentials (API URL + key).
+- **Orchestrator** — Spring AI `ChatClient` for classify, plan, and quality_gate evaluation nodes. Credentials are auto-mapped from the `worldmind-model` binding via `CfModelServiceProcessor` (java-cfenv).
+- **Agents** — Goose CLI reads `VCAP_SERVICES` at container startup (`entrypoint.sh`) and configures itself with the `worldmind-model` binding credentials (API URL + key).
 
 ## Prerequisites
 
 - **CF CLI v8+** installed and authenticated (`cf login`)
 - **Java 21** and **Maven** installed locally (for building the orchestrator JAR)
-- **Docker images** for centurions pushed to a registry accessible by the CF foundation (configured via `CENTURION_IMAGE_REGISTRY` in `.env`):
-  - `{registry}/centurion-forge:latest`
-  - `{registry}/centurion-gauntlet:latest`
-  - `{registry}/centurion-vigil:latest`
-  - `{registry}/centurion-pulse:latest`
-  - `{registry}/centurion-prism:latest`
+- **Docker images** for agents pushed to a registry accessible by the CF foundation (configured via `AGENT_IMAGE_REGISTRY` in `.env`):
+  - `{registry}/agent-coder:latest`
+  - `{registry}/agent-tester:latest`
+  - `{registry}/agent-reviewer:latest`
+  - `{registry}/agent-researcher:latest`
+  - `{registry}/agent-refactorer:latest`
 - **GitHub PAT** with `read:packages` scope for pulling images from GHCR. Set `CF_DOCKER_PASSWORD` and `DOCKER_USERNAME` in your `.env` file.
 - CF foundation must have **Diego Docker support enabled**:
   ```bash
@@ -44,7 +44,7 @@ Two services are required:
 | Service Instance     | Purpose                                           |
 |----------------------|---------------------------------------------------|
 | `worldmind-postgres` | PostgreSQL database for checkpoints and state      |
-| `worldmind-model`    | OpenAI-compatible LLM (bound to orchestrator + centurions) |
+| `worldmind-model`    | OpenAI-compatible LLM (bound to orchestrator + agents) |
 
 Create them (adjust plan names to match your marketplace):
 
@@ -61,7 +61,7 @@ cf services
 
 ## 2. Git Remote Setup
 
-On Cloud Foundry, centurions share work through git branches rather than shared volumes. You need a git remote accessible by both the orchestrator and centurion containers.
+On Cloud Foundry, agents share work through git branches rather than shared volumes. You need a git remote accessible by both the orchestrator and agent containers.
 
 1. Create or identify a git repository for workspace coordination
 2. Add a deploy key with read/write access
@@ -78,8 +78,8 @@ cp .env.example .env
 The CF-specific variables:
 
 ```bash
-# --- Centurion Images ---
-CENTURION_IMAGE_REGISTRY=ghcr.io/dbbaskette
+# --- Agent Images ---
+AGENT_IMAGE_REGISTRY=ghcr.io/dbbaskette
 DOCKER_USERNAME=dbbaskette
 # CF CLI requires this exact variable name for Docker registry auth
 CF_DOCKER_PASSWORD=ghp_yourGitHubPAThere
@@ -88,9 +88,9 @@ CF_DOCKER_PASSWORD=ghp_yourGitHubPAThere
 CF_API_URL=https://api.sys.example.com
 CF_ORG=my-org
 CF_SPACE=my-space
-CENTURION_FORGE_APP=centurion-forge
-CENTURION_GAUNTLET_APP=centurion-gauntlet
-CENTURION_VIGIL_APP=centurion-vigil
+AGENT_CODER_APP=agent-coder
+AGENT_TESTER_APP=agent-tester
+AGENT_REVIEWER_APP=agent-reviewer
 ```
 
 When you run `./run.sh --cf`, it reads these from `.env`, generates a temporary vars file, and passes it to `cf push --vars-file`. No separate config file to manage.
@@ -114,11 +114,11 @@ The `manifest.yml` binds services as follows:
 | App | `worldmind-postgres` | `worldmind-model` |
 |-----|:--------------------:|:-----------------:|
 | worldmind (orchestrator) | Yes | Yes |
-| centurion-forge | -- | Yes |
-| centurion-gauntlet | -- | Yes |
-| centurion-vigil | -- | Yes |
-| centurion-pulse | -- | Yes |
-| centurion-prism | -- | Yes |
+| agent-coder | -- | Yes |
+| agent-tester | -- | Yes |
+| agent-reviewer | -- | Yes |
+| agent-researcher | -- | Yes |
+| agent-refactorer | -- | Yes |
 
 ### Orchestrator service binding (java-cfenv)
 
@@ -131,9 +131,9 @@ The orchestrator includes `java-cfenv-boot` which automatically parses `VCAP_SER
   - `spring.ai.openai.api-key` from the service API key
   - `spring.ai.openai.chat.options.model` from service metadata or `GOOSE_MODEL` env var
 
-### Centurion service binding (entrypoint.sh)
+### Agent service binding (entrypoint.sh)
 
-Centurion Docker containers parse `VCAP_SERVICES` at startup via `entrypoint.sh`. Two credential formats are supported:
+Agent Docker containers parse `VCAP_SERVICES` at startup via `entrypoint.sh`. Two credential formats are supported:
 
 | Format | Fields | Provider |
 |--------|--------|----------|
@@ -144,17 +144,17 @@ The entrypoint sets `OPENAI_HOST` + `OPENAI_API_KEY` (or `ANTHROPIC_API_KEY` / `
 
 ## 6. Architecture: Git-Based Workspace Pattern
 
-On Cloud Foundry, centurions cannot share a local filesystem the way Docker volumes allow on a single host. Instead, Worldmind uses a git-based workspace pattern:
+On Cloud Foundry, agents cannot share a local filesystem the way Docker volumes allow on a single host. Instead, Worldmind uses a git-based workspace pattern:
 
 1. **Branch creation** -- The orchestrator creates a mission branch (e.g., `worldmind/WMND-2026-0001`) and pushes it to the configured git remote.
 
-2. **Task execution** -- The orchestrator runs `cf run-task centurion-forge` with a command that clones the mission branch, executes the Goose directive, then commits and pushes results back to the same branch.
+2. **Task execution** -- The orchestrator runs `cf run-task agent-coder` with a command that clones the mission branch, executes the Goose task, then commits and pushes results back to the same branch.
 
-3. **Sequential visibility** -- When GAUNTLET or VIGIL centurions run after FORGE, they clone the same mission branch and see all prior changes. Each centurion commits its own results (test reports, review findings) back to the branch.
+3. **Sequential visibility** -- When TESTER or REVIEWER agents run after CODER, they clone the same mission branch and see all prior changes. Each agent commits its own results (test reports, review findings) back to the branch.
 
-4. **Merge and cleanup** -- After the mission completes successfully (Seal of Approval passes), the orchestrator merges the mission branch into the target branch and deletes the mission branch.
+4. **Merge and cleanup** -- After the mission completes successfully (QualityGate of Approval passes), the orchestrator merges the mission branch into the target branch and deletes the mission branch.
 
-This gives each centurion an isolated working copy while maintaining a shared, ordered view of changes through git history.
+This gives each agent an isolated working copy while maintaining a shared, ordered view of changes through git history.
 
 ## 7. Configuration Reference
 
@@ -165,27 +165,27 @@ This gives each centurion an isolated working copy while maintaining a shared, o
 | `CF_API_URL` | CF API endpoint (e.g., `https://api.sys.example.com`) | Yes |
 | `CF_ORG` | CF org name | Yes |
 | `CF_SPACE` | CF space name | Yes |
-| `CENTURION_IMAGE_REGISTRY` | Docker image registry prefix (e.g., `ghcr.io/dbbaskette`) | Yes |
+| `AGENT_IMAGE_REGISTRY` | Docker image registry prefix (e.g., `ghcr.io/dbbaskette`) | Yes |
 | `DOCKER_USERNAME` | Registry username (GitHub username for GHCR) | Yes |
 | `CF_DOCKER_PASSWORD` | GitHub PAT with `read:packages` scope (CF CLI convention) | Yes |
-| `CENTURION_FORGE_APP` | CF app name for Forge centurion | No (default: `centurion-forge`) |
-| `CENTURION_GAUNTLET_APP` | CF app name for Gauntlet centurion | No (default: `centurion-gauntlet`) |
-| `CENTURION_VIGIL_APP` | CF app name for Vigil centurion | No (default: `centurion-vigil`) |
-| `CENTURION_PULSE_APP` | CF app name for Pulse centurion | No (default: `centurion-pulse`) |
-| `CENTURION_PRISM_APP` | CF app name for Prism centurion | No (default: `centurion-prism`) |
+| `AGENT_CODER_APP` | CF app name for Coder agent | No (default: `agent-coder`) |
+| `AGENT_TESTER_APP` | CF app name for Tester agent | No (default: `agent-tester`) |
+| `AGENT_REVIEWER_APP` | CF app name for Reviewer agent | No (default: `agent-reviewer`) |
+| `AGENT_RESEARCHER_APP` | CF app name for Researcher agent | No (default: `agent-researcher`) |
+| `AGENT_REFACTORER_APP` | CF app name for Refactorer agent | No (default: `agent-refactorer`) |
 
 ### Application properties
 
 | Property                                  | Env Var Override       | Description                                 | Default          |
 |-------------------------------------------|------------------------|---------------------------------------------|------------------|
-| `worldmind.starblaster.provider`          | `STARBLASTER_PROVIDER` | Provider type                               | `docker`         |
-| `worldmind.starblaster.image-registry`    | `CENTURION_IMAGE_REGISTRY` | Docker image registry for centurions    | `ghcr.io/dbbaskette` |
-| `worldmind.starblaster.max-parallel`      | --                     | Max concurrent centurion tasks              | `3` (CF profile) |
-| `worldmind.starblaster.wave-cooldown-seconds` | --                | Delay between waves                         | `30` (CF profile)|
+| `worldmind.sandbox.provider`          | `SANDBOX_PROVIDER` | Provider type                               | `docker`         |
+| `worldmind.sandbox.image-registry`    | `AGENT_IMAGE_REGISTRY` | Docker image registry for agents    | `ghcr.io/dbbaskette` |
+| `worldmind.sandbox.max-parallel`      | --                     | Max concurrent agent tasks              | `3` (CF profile) |
+| `worldmind.sandbox.wave-cooldown-seconds` | --                | Delay between waves                         | `30` (CF profile)|
 | `worldmind.cf.api-url`                    | --                     | CF API endpoint                             | --               |
 | `worldmind.cf.org`                        | --                     | CF org name                                 | --               |
 | `worldmind.cf.space`                      | --                     | CF space name                               | --               |
-| `worldmind.cf.centurion-apps.*`           | --                     | Centurion role to CF app name mapping       | --               |
+| `worldmind.cf.agent-apps.*`           | --                     | Agent role to CF app name mapping       | --               |
 | `worldmind.cf.task-timeout-seconds`       | --                     | CF task timeout                             | `600`            |
 | `worldmind.cf.task-memory-mb`             | --                     | CF task memory limit                        | `2048`           |
 | `worldmind.cf.task-disk-mb`              | --                     | CF task disk limit                          | `4096`           |
@@ -195,7 +195,7 @@ This gives each centurion an isolated working copy while maintaining a shared, o
 
 ## 8. API Usage with `git_remote_url`
 
-On CF, each mission must specify `git_remote_url` — the project repository that centurions will clone, branch, and push to:
+On CF, each mission must specify `git_remote_url` — the project repository that agents will clone, branch, and push to:
 
 ```bash
 curl -X POST https://worldmind.apps.example.com/api/v1/missions \
@@ -215,15 +215,15 @@ The React dashboard also includes a "Git Remote URL" field in the mission submis
 ### Check task status
 
 ```bash
-cf tasks centurion-forge
-cf tasks centurion-gauntlet
-cf tasks centurion-vigil
+cf tasks agent-coder
+cf tasks agent-tester
+cf tasks agent-reviewer
 ```
 
 ### View task logs
 
 ```bash
-cf logs centurion-forge --recent
+cf logs agent-coder --recent
 cf logs worldmind --recent
 ```
 
@@ -241,17 +241,17 @@ cf feature-flag diego_docker
 cf env worldmind
 ```
 
-**LLM service not bound** -- Ensure `worldmind-model` is bound to both the orchestrator and the centurion that failed:
+**LLM service not bound** -- Ensure `worldmind-model` is bound to both the orchestrator and the agent that failed:
 
 ```bash
 cf services
-cf env centurion-forge
+cf env agent-coder
 ```
 
 **Task timeout** -- CF tasks have a default timeout. For long-running missions, increase it:
 
 ```bash
-cf run-task centurion-forge --command "..." --timeout 600
+cf run-task agent-coder --command "..." --timeout 600
 ```
 
 **java-cfenv not detecting services** -- Verify `VCAP_SERVICES` is populated:

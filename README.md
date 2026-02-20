@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img src="https://github.com/dbbaskette/Worldmind/actions/workflows/centurion-images.yml/badge.svg" alt="Build Status">
+  <img src="https://github.com/dbbaskette/Worldmind/actions/workflows/agent-images.yml/badge.svg" alt="Build Status">
   <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License">
   <img src="https://img.shields.io/badge/Java-21-orange.svg" alt="Java">
   <img src="https://img.shields.io/badge/Spring%20Boot-3.4-green.svg" alt="Spring Boot">
@@ -29,22 +29,22 @@ Worldmind uses a hybrid architecture pairing [LangGraph4j](https://github.com/bs
 
 The LLM layer supports multiple providers -- Anthropic Claude, OpenAI-compatible endpoints (LM Studio, Ollama), and Google Gemini -- configurable per deployment via Spring AI.
 
-The project uses Xandarian Worldmind / Nova Corps nomenclature from Marvel Comics throughout its architecture.
+The project name and a few infrastructure concepts (Nova Force) are inspired by Marvel's Xandarian Worldmind, but all code-facing names use descriptive terms (Agent, Sandbox, Task, QualityGate).
 
 ## Key Features
 
 - **Natural language missions** -- Submit development requests in plain English via CLI, REST API, or web dashboard
 - **Intelligent classification** -- Automatically categorizes requests by complexity and determines execution strategy
-- **Project-aware planning** -- Scans your codebase to generate context-aware directives with success criteria
-- **Specialized agents (Centurions)** -- Purpose-built workers for code generation, review, testing, research, and refactoring
-- **Sandboxed execution (Starblasters)** -- Each agent runs in an isolated Docker container with constrained permissions and runtime-specific toolchains
+- **Project-aware planning** -- Scans your codebase to generate context-aware tasks with success criteria
+- **Specialized agents (Agents)** -- Purpose-built workers for code generation, review, testing, research, and refactoring
+- **Sandboxed execution (Sandboxes)** -- Each agent runs in an isolated Docker container with constrained permissions and runtime-specific toolchains
 - **Runtime resolution** -- Automatically selects language-specific Docker images (Java, Python, Node) based on request classification, with base-image fallback
-- **Wave-based parallelism** -- Dependency-aware scheduling dispatches independent directives concurrently
+- **Wave-based parallelism** -- Dependency-aware scheduling dispatches independent tasks concurrently
 - **Crash-resilient state** -- PostgreSQL-backed checkpointing enables recovery and time-travel debugging
 - **Flexible interaction modes** -- Full auto, approve-plan, or step-by-step execution
 - **Real-time dashboard** -- React web UI with SSE-powered live updates, plan approval, and event logs
 - **REST API** -- Full mission lifecycle via HTTP with SSE event streaming
-- **Security hardening** -- JWT authentication, command allowlists per centurion type, path restrictions
+- **Security hardening** -- JWT authentication, command allowlists per agent type, path restrictions
 - **Observability** -- Structured JSON logging, Prometheus metrics, component health checks
 - **Cloud Foundry ready** -- Deploy with `./run.sh --cf` using git-based workspaces, java-cfenv service auto-binding, and CF task provider
 
@@ -64,17 +64,17 @@ flowchart TB
         Plan[Plan Mission]
         Approve{Approval Gate}
         Schedule[Schedule Waves]
-        Execute[Dispatch Centurions]
+        Execute[Dispatch Agents]
         Converge[Converge Results]
-        Review[Evaluate Seal]
+        Review[Evaluate QualityGate]
     end
 
-    subgraph Starblasters["Starblasters (Docker / CF Tasks)"]
-        Forge["Forge (Code Gen)"]
-        Vigil["Vigil (Review)"]
-        Gauntlet["Gauntlet (Test)"]
-        Pulse["Pulse (Research)"]
-        Prism["Prism (Refactor)"]
+    subgraph Sandboxes["Sandboxes (Docker / CF Tasks)"]
+        Coder["Coder (Code Gen)"]
+        Reviewer["Reviewer (Review)"]
+        Tester["Tester (Test)"]
+        Researcher["Researcher (Research)"]
+        Refactorer["Refactorer (Refactor)"]
     end
 
     subgraph NovaForce["Nova Force (MCP Servers)"]
@@ -91,8 +91,8 @@ flowchart TB
     Classify --> Upload --> Plan --> Approve
     Approve -->|Approved| Schedule
     Schedule --> Execute
-    Execute --> Forge & Vigil & Gauntlet & Pulse & Prism
-    Forge & Vigil & Gauntlet & Pulse & Prism --> Terrain & Chronicle & Spark
+    Execute --> Coder & Reviewer & Tester & Researcher & Refactorer
+    Coder & Reviewer & Tester & Researcher & Refactorer --> Terrain & Chronicle & Spark
     Execute --> Converge --> Review
     Review -->|More waves| Schedule
     Core -.->|Checkpoint| DB
@@ -173,7 +173,7 @@ flowchart TB
 # Approve plan first -- review the plan before execution begins
 ./run.sh mission --mode APPROVE_PLAN "Refactor the payment service to use the strategy pattern"
 
-# Step by step -- approve each directive individually
+# Step by step -- approve each task individually
 ./run.sh mission --mode STEP_BY_STEP "Migrate the database schema to support multi-tenancy"
 ```
 
@@ -186,23 +186,23 @@ flowchart TB
 Navigate to `http://localhost:8080` in your browser.
 
 **Features:**
-- **Real-time monitoring** -- Live directive status updates via SSE
+- **Real-time monitoring** -- Live task status updates via SSE
 - **Plan approval** -- Review and approve/cancel plans before execution
-- **Directive details** -- View files affected, iterations, elapsed time
+- **Task details** -- View files affected, iterations, elapsed time
 - **Event log** -- Color-coded event stream with timestamps
 - **Mission timeline** -- Checkpoint history and state transitions
 
-### Centurion Types
+### Agent Types
 
-Worldmind uses five specialized Centurion agents, each with distinct capabilities:
+Worldmind uses five specialized agents, each with distinct capabilities:
 
-| Centurion | Role | Permissions |
+| Agent | Role | Permissions |
 |-----------|------|-------------|
-| **Forge** | Code generation and implementation | Read/write `src/`, `lib/`, `app/` |
-| **Gauntlet** | Test writing and execution | Read/write `test/`, `tests/`, `spec/` |
-| **Vigil** | Code review and quality assessment | Read-only |
-| **Pulse** | Research and context gathering | Read-only |
-| **Prism** | Refactoring with behavioral equivalence | Read/write `src/`, `lib/`, `app/` |
+| **Coder** | Code generation and implementation | Read/write `src/`, `lib/`, `app/` |
+| **Tester** | Test writing and execution | Read/write `test/`, `tests/`, `spec/` |
+| **Reviewer** | Code review and quality assessment | Read-only |
+| **Researcher** | Research and context gathering | Read-only |
+| **Refactorer** | Refactoring with behavioral equivalence | Read/write `src/`, `lib/`, `app/` |
 
 ### Other Commands
 
@@ -230,9 +230,9 @@ Worldmind uses five specialized Centurion agents, each with distinct capabilitie
 | `GOOSE_MODEL` | Model for Goose worker agents | `qwen2.5-coder-32b` | No |
 | `GOOSE_PROVIDER` | LLM provider (`openai`, `anthropic`) | `openai` | No |
 | `LM_STUDIO_URL` | OpenAI-compatible endpoint URL | `http://host.docker.internal:1234/v1` | No |
-| `CENTURION_IMAGE_REGISTRY` | Docker image registry for centurions | `ghcr.io/dbbaskette` | No |
-| `STARBLASTER_IMAGE_PREFIX` | Image name prefix for starblaster images | `starblaster` | No |
-| `STARBLASTER_PROVIDER` | Container provider (`docker`, `cloudfoundry`) | `docker` | No |
+| `AGENT_IMAGE_REGISTRY` | Docker image registry for agents | `ghcr.io/dbbaskette` | No |
+| `SANDBOX_IMAGE_PREFIX` | Image name prefix for sandbox images | `sandbox` | No |
+| `SANDBOX_PROVIDER` | Container provider (`docker`, `cloudfoundry`) | `docker` | No |
 | `WORLDMIND_PROFILE` | Spring profile | `local` | No |
 | `WORLDMIND_PORT` | Server port | `8080` | No |
 
@@ -244,15 +244,15 @@ All endpoints are under `/api/v1`.
 |--------|----------|-------------|
 | `POST` | `/missions` | Submit a new mission (async) |
 | `GET` | `/missions` | List all tracked missions |
-| `GET` | `/missions/{id}` | Get mission status and directives |
+| `GET` | `/missions/{id}` | Get mission status and tasks |
 | `GET` | `/missions/{id}/events` | SSE stream of real-time events |
 | `POST` | `/missions/{id}/approve` | Approve a planned mission |
 | `POST` | `/missions/{id}/edit` | Submit plan modifications |
 | `POST` | `/missions/{id}/cancel` | Cancel a running mission |
-| `POST` | `/missions/{id}/retry` | Retry failed directives |
+| `POST` | `/missions/{id}/retry` | Retry failed tasks |
 | `GET` | `/missions/{id}/timeline` | Checkpoint state history |
-| `GET` | `/missions/{id}/directives/{did}` | Detailed directive result |
-| `GET` | `/starblasters` | List active starblasters |
+| `GET` | `/missions/{id}/tasks/{did}` | Detailed task result |
+| `GET` | `/sandboxes` | List active sandboxes |
 | `GET` | `/health` | Component health status |
 | `GET` | `/settings` | Get current settings |
 | `PUT` | `/settings` | Update settings |
@@ -291,13 +291,13 @@ Docker images are located in `docker/`:
 
 ```
 docker/
-├── centurion-base/        # Shared base with Goose + entrypoint
-├── centurion-forge/       # Code generation
-├── centurion-gauntlet/    # Test execution
-├── centurion-vigil/       # Code review
-├── centurion-pulse/       # Research (read-only)
-├── centurion-prism/       # Refactoring
-└── starblasters/          # Runtime-tagged images
+├── agent-base/        # Shared base with Goose + entrypoint
+├── agent-coder/       # Code generation
+├── agent-tester/    # Test execution
+├── agent-reviewer/       # Code review
+├── agent-researcher/       # Research (read-only)
+├── agent-refactorer/       # Refactoring
+└── sandboxes/          # Runtime-tagged images
     ├── Dockerfile.base    # Base image (Goose + git + shell)
     ├── Dockerfile.java    # JDK 21 + Maven + Gradle
     ├── Dockerfile.python  # Python 3.12 + pip + uv
@@ -305,7 +305,7 @@ docker/
     └── build-all.sh       # Local build script
 ```
 
-**Runtime resolution:** Worldmind classifies each request to determine the target language and selects the matching tagged image (e.g., `starblaster:java`). If the tagged image isn't available, it falls back to `starblaster:base` where Goose installs the required toolchain at runtime.
+**Runtime resolution:** Worldmind classifies each request to determine the target language and selects the matching tagged image (e.g., `sandbox:java`). If the tagged image isn't available, it falls back to `sandbox:base` where Goose installs the required toolchain at runtime.
 
 ## Cloud Foundry Deployment
 
@@ -319,17 +319,17 @@ Worldmind supports Cloud Foundry deployment using CF tasks and git-based workspa
 - `worldmind-postgres` -- PostgreSQL (auto-bound via java-cfenv)
 - `worldmind-model` -- OpenAI-compatible LLM (auto-bound via CfModelServiceProcessor)
 
-On CF, centurions share work through git branches instead of Docker volumes. The orchestrator creates a mission branch, centurions clone and push changes, and results are merged on completion.
+On CF, agents share work through git branches instead of Docker volumes. The orchestrator creates a mission branch, agents clone and push changes, and results are merged on completion.
 
 See [docs/deployment/cloudfoundry.md](docs/deployment/cloudfoundry.md) for the full deployment guide.
 
 ## Parallel Execution
 
-Worldmind supports parallel directive execution using git worktrees for isolation. This enables multiple centurions to work on independent tasks simultaneously without merge conflicts.
+Worldmind supports parallel task execution using git worktrees for isolation. This enables multiple agents to work on independent tasks simultaneously without merge conflicts.
 
 **Key features:**
-- **Git worktrees** -- Each directive gets an isolated working directory
-- **File overlap detection** -- Conflicting directives are automatically serialized
+- **Git worktrees** -- Each task gets an isolated working directory
+- **File overlap detection** -- Conflicting tasks are automatically serialized
 - **Automatic merge retry** -- Handles race conditions with rebase-first strategy
 - **Observability** -- Prometheus metrics for monitoring parallel execution
 
@@ -352,20 +352,20 @@ src/main/java/com/worldmind/
 │   ├── logging/MdcContext.java            # SLF4J MDC context helper
 │   ├── metrics/WorldmindMetrics.java      # Micrometer/Prometheus metrics
 │   ├── model/                             # Domain records (16 records and enums)
-│   ├── nodes/                             # Graph nodes (classify, plan, dispatch, seal...)
+│   ├── nodes/                             # Graph nodes (classify, plan, dispatch, quality_gate...)
 │   ├── persistence/                       # JdbcCheckpointSaver + CheckpointQueryService
 │   ├── scanner/ProjectScanner.java        # Codebase analysis and context extraction
 │   ├── scheduler/                         # Wave scheduling + oscillation detection
-│   ├── seal/SealEvaluationService.java    # Quality gate (tests + review score)
+│   ├── qualitygate/QualityGateEvaluationService.java     # Quality gate (tests + review score)
 │   ├── security/                          # JWT auth, command allowlists, path restrictions
 │   └── state/WorldmindState.java          # LangGraph4j AgentState definition
 ├── dispatch/
 │   ├── api/                               # REST controllers + SSE streaming
 │   └── cli/                               # picocli commands (11 commands)
-└── starblaster/
-    ├── DockerStarblasterProvider.java     # Docker container lifecycle
-    ├── InstructionBuilder.java            # Centurion instruction templating
-    ├── StarblasterBridge.java             # Dispatch orchestration
+└── sandbox/
+    ├── DockerSandboxProvider.java     # Docker container lifecycle
+    ├── InstructionBuilder.java            # Agent instruction templating
+    ├── AgentDispatcher.java             # Dispatch orchestration
     └── cf/                                # Cloud Foundry task provider + java-cfenv
 
 worldmind-ui/                              # React 18 + TypeScript + Vite + Tailwind
@@ -383,8 +383,8 @@ worldmind-ui/                              # React 18 + TypeScript + Vite + Tail
 - [x] Planning pipeline (classify, upload context, plan)
 - [x] PostgreSQL checkpointing with time-travel debugging
 - [x] CLI with mission submission and management
-- [x] Centurions (Forge, Gauntlet, Vigil, Pulse, Prism) in Docker with Goose
-- [x] Build-test-fix loop with Seal of Approval quality gate
+- [x] Agents (Coder, Tester, Reviewer, Researcher, Refactorer) in Docker with Goose
+- [x] Build-test-fix loop with quality gate evaluation (tests + review score)
 - [x] Wave-based parallel fan-out with dependency-aware scheduling
 - [x] REST API with SSE streaming
 - [x] Security hardening (JWT auth, command allowlists, path restrictions)
@@ -392,9 +392,9 @@ worldmind-ui/                              # React 18 + TypeScript + Vite + Tail
 - [x] React web UI dashboard with real-time monitoring
 - [x] Cloud Foundry deployment with java-cfenv and git workspaces
 - [x] Multi-provider LLM support (Anthropic, OpenAI, Google Gemini)
-- [x] Runtime-tagged Starblaster images with automatic language detection and base fallback
+- [x] Runtime-tagged Sandbox images with automatic language detection and base fallback
 - [x] SSE heartbeat for CF gorouter keep-alive
-- [x] GitHub Actions CI for centurion image builds
+- [x] GitHub Actions CI for agent image builds
 - [ ] MCP server integration (Terrain, Chronicle, Spark)
 - [ ] Multi-project workspace support
 - [ ] GraalVM native image compilation

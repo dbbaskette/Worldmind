@@ -1,0 +1,135 @@
+package com.worldmind.sandbox;
+
+import com.worldmind.core.model.FileRecord;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
+import java.time.Instant;
+import java.util.Map;
+
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
+
+class SandboxManagerTest {
+
+    private SandboxProvider provider;
+    private SandboxProperties properties;
+    private SandboxManager manager;
+
+    @BeforeEach
+    void setUp() {
+        provider = mock(SandboxProvider.class);
+        properties = new SandboxProperties();
+        manager = new SandboxManager(provider, properties, null);
+    }
+
+    @Test
+    void executeTaskCallsProviderLifecycle() {
+        when(provider.openSandbox(any())).thenReturn("container-1");
+        when(provider.waitForCompletion("container-1", 300)).thenReturn(0);
+        when(provider.captureOutput("container-1")).thenReturn("done");
+
+        var result = manager.executeTask(
+            "coder", "TASK-001", Path.of("/tmp/test"),
+            "Create file", Map.of(),
+            "", "base"
+        );
+
+        verify(provider).openSandbox(any());
+        verify(provider).waitForCompletion("container-1", 300);
+        verify(provider).captureOutput("container-1");
+        verify(provider).teardownSandbox("container-1");
+        assertEquals(0, result.exitCode());
+    }
+
+    @Test
+    void executeTaskReportsFailureOnNonZeroExit() {
+        when(provider.openSandbox(any())).thenReturn("container-2");
+        when(provider.waitForCompletion("container-2", 300)).thenReturn(1);
+        when(provider.captureOutput("container-2")).thenReturn("error");
+
+        var result = manager.executeTask(
+            "coder", "TASK-002", Path.of("/tmp/test"),
+            "Bad instruction", Map.of(),
+            "", "base"
+        );
+
+        assertEquals(1, result.exitCode());
+        assertTrue(result.output().contains("error"));
+    }
+
+    @Test
+    void detectFileChangesFindsNewFiles(@TempDir Path tempDir) throws IOException {
+        var before = SandboxManager.snapshotFiles(tempDir);
+        Files.writeString(tempDir.resolve("hello.py"), "print('hello')");
+        var changes = SandboxManager.detectChanges(before, tempDir);
+
+        assertEquals(1, changes.size());
+        assertEquals("hello.py", changes.get(0).path());
+        assertEquals("created", changes.get(0).action());
+    }
+
+    @Test
+    void executeTaskUsesProviderDetectionWhenAvailable() {
+        var providerChanges = List.of(
+                new FileRecord("src/Foo.java", "modified", 10),
+                new FileRecord("src/Bar.java", "created", 25)
+        );
+        when(provider.openSandbox(any())).thenReturn("container-3");
+        when(provider.waitForCompletion("container-3", 300)).thenReturn(0);
+        when(provider.captureOutput("container-3")).thenReturn("done");
+        when(provider.detectChanges(anyString(), any(Path.class))).thenReturn(providerChanges);
+
+        var result = manager.executeTask(
+            "coder", "TASK-003", Path.of("/tmp/test"),
+            "Create file", Map.of(),
+            "", "base"
+        );
+
+        assertEquals(2, result.fileChanges().size());
+        assertEquals("src/Foo.java", result.fileChanges().get(0).path());
+        assertEquals("src/Bar.java", result.fileChanges().get(1).path());
+    }
+
+    @Test
+    void executeTaskFallsBackToFilesystemWhenProviderReturnsNull() {
+        when(provider.openSandbox(any())).thenReturn("container-4");
+        when(provider.waitForCompletion("container-4", 300)).thenReturn(0);
+        when(provider.captureOutput("container-4")).thenReturn("done");
+        when(provider.detectChanges(anyString(), any(Path.class))).thenReturn(null);
+
+        var result = manager.executeTask(
+            "coder", "TASK-004", Path.of("/tmp/test"),
+            "Create file", Map.of(),
+            "", "base"
+        );
+
+        // Provider returned null, so filesystem detection is used (no actual file changes in /tmp/test)
+        assertNotNull(result.fileChanges());
+    }
+
+    @Test
+    void detectFileChangesFindsModifiedFiles(@TempDir Path tempDir) throws IOException {
+        Path file = tempDir.resolve("existing.py");
+        Files.writeString(file, "old");
+        // Set last-modified to the past so the re-write produces a different timestamp
+        Files.setLastModifiedTime(file, FileTime.from(Instant.now().minusSeconds(60)));
+        var before = SandboxManager.snapshotFiles(tempDir);
+        Files.writeString(file, "new content");
+        var changes = SandboxManager.detectChanges(before, tempDir);
+
+        assertEquals(1, changes.size());
+        assertEquals("existing.py", changes.get(0).path());
+        assertEquals("modified", changes.get(0).action());
+    }
+}

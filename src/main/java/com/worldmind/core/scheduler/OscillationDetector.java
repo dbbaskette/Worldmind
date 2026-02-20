@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Detects oscillating failure patterns where a directive alternates
+ * Detects oscillating failure patterns where a task alternates
  * between two distinct errors across retries (A-B-A pattern).
  */
 @Service
@@ -19,12 +19,12 @@ public class OscillationDetector {
 
     private final ConcurrentHashMap<String, List<String>> errorHistory = new ConcurrentHashMap<>();
 
-    public void recordFailure(String directiveId, String errorMessage) {
-        errorHistory.computeIfAbsent(directiveId, k -> new ArrayList<>()).add(errorMessage);
+    public void recordFailure(String taskId, String errorMessage) {
+        errorHistory.computeIfAbsent(taskId, k -> new ArrayList<>()).add(errorMessage);
     }
 
-    public boolean isOscillating(String directiveId) {
-        var history = errorHistory.get(directiveId);
+    public boolean isOscillating(String taskId) {
+        var history = errorHistory.get(taskId);
         if (history == null || history.size() < 3) {
             return false;
         }
@@ -40,12 +40,12 @@ public class OscillationDetector {
         return false;
     }
 
-    public int failureCount(String directiveId) {
-        var history = errorHistory.get(directiveId);
+    public int failureCount(String taskId) {
+        var history = errorHistory.get(taskId);
         return history != null ? history.size() : 0;
     }
 
-    public void clearHistory(String directiveId) {
-        errorHistory.remove(directiveId);
+    public void clearHistory(String taskId) {
+        errorHistory.remove(taskId);
     }
 }

@@ -4,9 +4,9 @@ import com.worldmind.core.events.EventBus;
 import com.worldmind.core.metrics.WorldmindMetrics;
 import com.worldmind.core.model.*;
 import com.worldmind.core.scheduler.OscillationDetector;
-import com.worldmind.core.seal.SealEvaluationService;
+import com.worldmind.core.quality_gate.QualityGateEvaluationService;
 import com.worldmind.core.state.WorldmindState;
-import com.worldmind.starblaster.StarblasterBridge;
+import com.worldmind.sandbox.AgentDispatcher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,140 +21,140 @@ import static org.mockito.Mockito.*;
 
 class EvaluateWaveNodeTest {
 
-    private StarblasterBridge mockBridge;
-    private SealEvaluationService mockSealService;
+    private AgentDispatcher mockBridge;
+    private QualityGateEvaluationService mockQualityGateService;
     private EvaluateWaveNode node;
 
     @BeforeEach
     void setUp() {
-        mockBridge = mock(StarblasterBridge.class);
-        mockSealService = mock(SealEvaluationService.class);
-        node = new EvaluateWaveNode(mockBridge, mockSealService, new EventBus(), mock(WorldmindMetrics.class), new OscillationDetector(), null, null);
+        mockBridge = mock(AgentDispatcher.class);
+        mockQualityGateService = mock(QualityGateEvaluationService.class);
+        node = new EvaluateWaveNode(mockBridge, mockQualityGateService, new EventBus(), mock(WorldmindMetrics.class), new OscillationDetector(), null, null);
     }
 
-    private Directive forgeDirective(String id, int iteration, int maxIterations, FailureStrategy onFailure) {
-        return new Directive(id, "FORGE", "Do " + id, "", "Done", List.of(),
-                DirectiveStatus.PENDING, iteration, maxIterations, onFailure, List.of(), List.of(), null);
+    private Task coderTask(String id, int iteration, int maxIterations, FailureStrategy onFailure) {
+        return new Task(id, "CODER", "Do " + id, "", "Done", List.of(),
+                TaskStatus.PENDING, iteration, maxIterations, onFailure, List.of(), List.of(), null);
     }
 
-    private Directive nonForgeDirective(String id) {
-        return new Directive(id, "PULSE", "Research " + id, "", "Done", List.of(),
-                DirectiveStatus.PENDING, 0, 1, FailureStrategy.SKIP, List.of(), List.of(), null);
+    private Task nonCoderTask(String id) {
+        return new Task(id, "RESEARCHER", "Research " + id, "", "Done", List.of(),
+                TaskStatus.PENDING, 0, 1, FailureStrategy.SKIP, List.of(), List.of(), null);
     }
 
     private WaveDispatchResult passedResult(String id) {
-        return new WaveDispatchResult(id, DirectiveStatus.PASSED,
+        return new WaveDispatchResult(id, TaskStatus.PASSED,
                 List.of(new FileRecord("test.java", "created", 10)), "Success", 500L);
     }
 
     private WaveDispatchResult passedResultNoFiles(String id) {
-        return new WaveDispatchResult(id, DirectiveStatus.PASSED, List.of(), "Success", 500L);
+        return new WaveDispatchResult(id, TaskStatus.PASSED, List.of(), "Success", 500L);
     }
 
     private WaveDispatchResult failedResult(String id) {
-        return new WaveDispatchResult(id, DirectiveStatus.FAILED, List.of(), "Failed output", 300L);
+        return new WaveDispatchResult(id, TaskStatus.FAILED, List.of(), "Failed output", 300L);
     }
 
-    private StarblasterBridge.BridgeResult bridgeResult(String id, String centurion) {
-        var d = new Directive(id, centurion, "sub", "", "", List.of(),
-                DirectiveStatus.PASSED, 1, 1, FailureStrategy.SKIP, List.of(), List.of(), 100L);
-        return new StarblasterBridge.BridgeResult(d,
-                new StarblasterInfo("c-" + id, centurion, id, "completed", Instant.now(), Instant.now()),
+    private AgentDispatcher.BridgeResult bridgeResult(String id, String agent) {
+        var d = new Task(id, agent, "sub", "", "", List.of(),
+                TaskStatus.PASSED, 1, 1, FailureStrategy.SKIP, List.of(), List.of(), 100L);
+        return new AgentDispatcher.BridgeResult(d,
+                new SandboxInfo("c-" + id, agent, id, "completed", Instant.now(), Instant.now()),
                 "output");
     }
 
     @Test
-    @DisplayName("Single FORGE, seal granted -> completedIds updated")
+    @DisplayName("Single CODER, quality_gate granted -> completedIds updated")
     @SuppressWarnings("unchecked")
-    void singleForgeSealGranted() {
-        var d = forgeDirective("DIR-001", 0, 3, FailureStrategy.RETRY);
-        when(mockBridge.executeDirective(any(), any(), any(), any(), any())).thenReturn(bridgeResult("DIR-001", "GAUNTLET"));
-        when(mockSealService.parseTestOutput(anyString(), anyString(), anyLong()))
-                .thenReturn(new TestResult("DIR-001", true, 10, 0, "OK", 500L));
-        when(mockSealService.parseReviewOutput(anyString(), anyString()))
-                .thenReturn(new ReviewFeedback("DIR-001", true, "Good", List.of(), List.of(), 8));
-        when(mockSealService.evaluateSeal(any(), any(), any()))
-                .thenReturn(new SealDecision(true, null, "All good"));
+    void singleCoderQualityGateGranted() {
+        var d = coderTask("TASK-001", 0, 3, FailureStrategy.RETRY);
+        when(mockBridge.executeTask(any(), any(), any(), any(), any())).thenReturn(bridgeResult("TASK-001", "TESTER"));
+        when(mockQualityGateService.parseTestOutput(anyString(), anyString(), anyLong()))
+                .thenReturn(new TestResult("TASK-001", true, 10, 0, "OK", 500L));
+        when(mockQualityGateService.parseReviewOutput(anyString(), anyString()))
+                .thenReturn(new ReviewFeedback("TASK-001", true, "Good", List.of(), List.of(), 8));
+        when(mockQualityGateService.evaluateQualityGate(any(), any(), any()))
+                .thenReturn(new QualityGateDecision(true, null, "All good"));
 
         var state = new WorldmindState(Map.of(
-                "waveDirectiveIds", List.of("DIR-001"),
-                "directives", List.of(d),
-                "waveDispatchResults", List.of(passedResult("DIR-001"))
+                "waveTaskIds", List.of("TASK-001"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(passedResult("TASK-001"))
         ));
 
         var result = node.apply(state);
 
-        var completedIds = (List<String>) result.get("completedDirectiveIds");
-        assertTrue(completedIds.contains("DIR-001"));
+        var completedIds = (List<String>) result.get("completedTaskIds");
+        assertTrue(completedIds.contains("TASK-001"));
     }
 
     @Test
-    @DisplayName("Single FORGE, seal denied + RETRY -> NOT in completedIds, retryContext set")
+    @DisplayName("Single CODER, quality_gate denied + RETRY -> NOT in completedIds, retryContext set")
     @SuppressWarnings("unchecked")
-    void singleForgeSealDeniedRetry() {
-        var d = forgeDirective("DIR-001", 0, 3, FailureStrategy.RETRY);
-        when(mockBridge.executeDirective(any(), any(), any(), any(), any())).thenReturn(bridgeResult("DIR-001", "GAUNTLET"));
-        when(mockSealService.parseTestOutput(anyString(), anyString(), anyLong()))
-                .thenReturn(new TestResult("DIR-001", false, 10, 3, "FAIL", 500L));
-        when(mockSealService.parseReviewOutput(anyString(), anyString()))
-                .thenReturn(new ReviewFeedback("DIR-001", false, "Issues", List.of("bug"), List.of(), 4));
-        when(mockSealService.evaluateSeal(any(), any(), any()))
-                .thenReturn(new SealDecision(false, FailureStrategy.RETRY, "Tests failed"));
+    void singleCoderQualityGateDeniedRetry() {
+        var d = coderTask("TASK-001", 0, 3, FailureStrategy.RETRY);
+        when(mockBridge.executeTask(any(), any(), any(), any(), any())).thenReturn(bridgeResult("TASK-001", "TESTER"));
+        when(mockQualityGateService.parseTestOutput(anyString(), anyString(), anyLong()))
+                .thenReturn(new TestResult("TASK-001", false, 10, 3, "FAIL", 500L));
+        when(mockQualityGateService.parseReviewOutput(anyString(), anyString()))
+                .thenReturn(new ReviewFeedback("TASK-001", false, "Issues", List.of("bug"), List.of(), 4));
+        when(mockQualityGateService.evaluateQualityGate(any(), any(), any()))
+                .thenReturn(new QualityGateDecision(false, FailureStrategy.RETRY, "Tests failed"));
 
         var state = new WorldmindState(Map.of(
-                "waveDirectiveIds", List.of("DIR-001"),
-                "directives", List.of(d),
-                "waveDispatchResults", List.of(passedResult("DIR-001"))
+                "waveTaskIds", List.of("TASK-001"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(passedResult("TASK-001"))
         ));
 
         var result = node.apply(state);
 
-        var completedIds = (List<String>) result.get("completedDirectiveIds");
-        assertFalse(completedIds.contains("DIR-001"));
-        assertTrue(((String) result.get("retryContext")).contains("DIR-001"));
+        var completedIds = (List<String>) result.get("completedTaskIds");
+        assertFalse(completedIds.contains("TASK-001"));
+        assertTrue(((String) result.get("retryContext")).contains("TASK-001"));
     }
 
     @Test
-    @DisplayName("Single FORGE, seal denied + SKIP -> in completedIds")
+    @DisplayName("Single CODER, quality_gate denied + SKIP -> in completedIds")
     @SuppressWarnings("unchecked")
-    void singleForgeSealDeniedSkip() {
-        var d = forgeDirective("DIR-001", 0, 3, FailureStrategy.SKIP);
-        when(mockBridge.executeDirective(any(), any(), any(), any(), any())).thenReturn(bridgeResult("DIR-001", "GAUNTLET"));
-        when(mockSealService.parseTestOutput(anyString(), anyString(), anyLong()))
-                .thenReturn(new TestResult("DIR-001", false, 10, 3, "FAIL", 500L));
-        when(mockSealService.parseReviewOutput(anyString(), anyString()))
-                .thenReturn(new ReviewFeedback("DIR-001", false, "Issues", List.of("bug"), List.of(), 4));
-        when(mockSealService.evaluateSeal(any(), any(), any()))
-                .thenReturn(new SealDecision(false, FailureStrategy.SKIP, "Skipping"));
+    void singleCoderQualityGateDeniedSkip() {
+        var d = coderTask("TASK-001", 0, 3, FailureStrategy.SKIP);
+        when(mockBridge.executeTask(any(), any(), any(), any(), any())).thenReturn(bridgeResult("TASK-001", "TESTER"));
+        when(mockQualityGateService.parseTestOutput(anyString(), anyString(), anyLong()))
+                .thenReturn(new TestResult("TASK-001", false, 10, 3, "FAIL", 500L));
+        when(mockQualityGateService.parseReviewOutput(anyString(), anyString()))
+                .thenReturn(new ReviewFeedback("TASK-001", false, "Issues", List.of("bug"), List.of(), 4));
+        when(mockQualityGateService.evaluateQualityGate(any(), any(), any()))
+                .thenReturn(new QualityGateDecision(false, FailureStrategy.SKIP, "Skipping"));
 
         var state = new WorldmindState(Map.of(
-                "waveDirectiveIds", List.of("DIR-001"),
-                "directives", List.of(d),
-                "waveDispatchResults", List.of(passedResult("DIR-001"))
+                "waveTaskIds", List.of("TASK-001"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(passedResult("TASK-001"))
         ));
 
         var result = node.apply(state);
 
-        var completedIds = (List<String>) result.get("completedDirectiveIds");
-        assertTrue(completedIds.contains("DIR-001"));
+        var completedIds = (List<String>) result.get("completedTaskIds");
+        assertTrue(completedIds.contains("TASK-001"));
     }
 
     @Test
     @DisplayName("ESCALATE -> mission FAILED")
     void escalateMissionFailed() {
-        var d = forgeDirective("DIR-001", 3, 3, FailureStrategy.ESCALATE);
-        when(mockBridge.executeDirective(any(), any(), any(), any(), any())).thenReturn(bridgeResult("DIR-001", "GAUNTLET"));
-        when(mockSealService.parseTestOutput(anyString(), anyString(), anyLong()))
-                .thenReturn(new TestResult("DIR-001", false, 10, 5, "FAIL", 500L));
-        when(mockSealService.parseReviewOutput(anyString(), anyString()))
-                .thenReturn(new ReviewFeedback("DIR-001", false, "Bad", List.of("critical"), List.of(), 2));
-        when(mockSealService.evaluateSeal(any(), any(), any()))
-                .thenReturn(new SealDecision(false, FailureStrategy.ESCALATE, "Critical failure"));
+        var d = coderTask("TASK-001", 3, 3, FailureStrategy.ESCALATE);
+        when(mockBridge.executeTask(any(), any(), any(), any(), any())).thenReturn(bridgeResult("TASK-001", "TESTER"));
+        when(mockQualityGateService.parseTestOutput(anyString(), anyString(), anyLong()))
+                .thenReturn(new TestResult("TASK-001", false, 10, 5, "FAIL", 500L));
+        when(mockQualityGateService.parseReviewOutput(anyString(), anyString()))
+                .thenReturn(new ReviewFeedback("TASK-001", false, "Bad", List.of("critical"), List.of(), 2));
+        when(mockQualityGateService.evaluateQualityGate(any(), any(), any()))
+                .thenReturn(new QualityGateDecision(false, FailureStrategy.ESCALATE, "Critical failure"));
 
         var state = new WorldmindState(Map.of(
-                "waveDirectiveIds", List.of("DIR-001"),
-                "directives", List.of(d),
-                "waveDispatchResults", List.of(passedResult("DIR-001"))
+                "waveTaskIds", List.of("TASK-001"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(passedResult("TASK-001"))
         ));
 
         var result = node.apply(state);
@@ -163,144 +163,144 @@ class EvaluateWaveNodeTest {
     }
 
     @Test
-    @DisplayName("Non-FORGE directive -> auto-pass, added to completedIds")
+    @DisplayName("Non-CODER task -> auto-pass, added to completedIds")
     @SuppressWarnings("unchecked")
-    void nonForgeAutoPass() {
-        var d = nonForgeDirective("DIR-001");
+    void nonCoderAutoPass() {
+        var d = nonCoderTask("TASK-001");
 
         var state = new WorldmindState(Map.of(
-                "waveDirectiveIds", List.of("DIR-001"),
-                "directives", List.of(d),
-                "waveDispatchResults", List.of(passedResult("DIR-001"))
+                "waveTaskIds", List.of("TASK-001"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(passedResult("TASK-001"))
         ));
 
         var result = node.apply(state);
 
-        var completedIds = (List<String>) result.get("completedDirectiveIds");
-        assertTrue(completedIds.contains("DIR-001"));
-        // No bridge calls for non-FORGE (GAUNTLET/VIGIL not dispatched)
-        verify(mockBridge, never()).executeDirective(any(), any(), any(), any(), any());
+        var completedIds = (List<String>) result.get("completedTaskIds");
+        assertTrue(completedIds.contains("TASK-001"));
+        // No bridge calls for non-CODER (TESTER/REVIEWER not dispatched)
+        verify(mockBridge, never()).executeTask(any(), any(), any(), any(), any());
     }
 
     @Test
-    @DisplayName("Multiple directives in wave, mixed results")
+    @DisplayName("Multiple tasks in wave, mixed results")
     @SuppressWarnings("unchecked")
-    void multipleDirectivesMixedResults() {
-        var d1 = forgeDirective("DIR-001", 0, 3, FailureStrategy.RETRY);
-        var d2 = nonForgeDirective("DIR-002");
+    void multipleTasksMixedResults() {
+        var d1 = coderTask("TASK-001", 0, 3, FailureStrategy.RETRY);
+        var d2 = nonCoderTask("TASK-002");
 
-        when(mockBridge.executeDirective(any(), any(), any(), any(), any())).thenReturn(bridgeResult("DIR-001", "GAUNTLET"));
-        when(mockSealService.parseTestOutput(anyString(), anyString(), anyLong()))
-                .thenReturn(new TestResult("DIR-001", true, 5, 0, "OK", 200L));
-        when(mockSealService.parseReviewOutput(anyString(), anyString()))
-                .thenReturn(new ReviewFeedback("DIR-001", true, "Good", List.of(), List.of(), 9));
-        when(mockSealService.evaluateSeal(any(), any(), any()))
-                .thenReturn(new SealDecision(true, null, "Seal granted"));
+        when(mockBridge.executeTask(any(), any(), any(), any(), any())).thenReturn(bridgeResult("TASK-001", "TESTER"));
+        when(mockQualityGateService.parseTestOutput(anyString(), anyString(), anyLong()))
+                .thenReturn(new TestResult("TASK-001", true, 5, 0, "OK", 200L));
+        when(mockQualityGateService.parseReviewOutput(anyString(), anyString()))
+                .thenReturn(new ReviewFeedback("TASK-001", true, "Good", List.of(), List.of(), 9));
+        when(mockQualityGateService.evaluateQualityGate(any(), any(), any()))
+                .thenReturn(new QualityGateDecision(true, null, "QualityGate granted"));
 
         var state = new WorldmindState(Map.of(
-                "waveDirectiveIds", List.of("DIR-001", "DIR-002"),
-                "directives", List.of(d1, d2),
-                "waveDispatchResults", List.of(passedResult("DIR-001"), passedResult("DIR-002"))
+                "waveTaskIds", List.of("TASK-001", "TASK-002"),
+                "tasks", List.of(d1, d2),
+                "waveDispatchResults", List.of(passedResult("TASK-001"), passedResult("TASK-002"))
         ));
 
         var result = node.apply(state);
 
-        var completedIds = (List<String>) result.get("completedDirectiveIds");
-        assertTrue(completedIds.contains("DIR-001"));
-        assertTrue(completedIds.contains("DIR-002"));
+        var completedIds = (List<String>) result.get("completedTaskIds");
+        assertTrue(completedIds.contains("TASK-001"));
+        assertTrue(completedIds.contains("TASK-002"));
     }
 
     @Test
-    @DisplayName("FORGE that failed at dispatch -> apply failure strategy directly")
+    @DisplayName("CODER that failed at dispatch -> apply failure strategy directly")
     @SuppressWarnings("unchecked")
-    void forgeFailedAtDispatch() {
-        var d = forgeDirective("DIR-001", 0, 3, FailureStrategy.RETRY);
+    void coderFailedAtDispatch() {
+        var d = coderTask("TASK-001", 0, 3, FailureStrategy.RETRY);
 
         var state = new WorldmindState(Map.of(
-                "waveDirectiveIds", List.of("DIR-001"),
-                "directives", List.of(d),
-                "waveDispatchResults", List.of(failedResult("DIR-001"))
+                "waveTaskIds", List.of("TASK-001"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(failedResult("TASK-001"))
         ));
 
         var result = node.apply(state);
 
         // RETRY: should NOT be in completedIds, and retryContext should be set
-        var completedIds = (List<String>) result.get("completedDirectiveIds");
-        assertFalse(completedIds.contains("DIR-001"));
-        assertTrue(((String) result.get("retryContext")).contains("DIR-001"));
-        // No GAUNTLET/VIGIL dispatch for a failed directive
-        verify(mockBridge, never()).executeDirective(any(), any(), any(), any(), any());
+        var completedIds = (List<String>) result.get("completedTaskIds");
+        assertFalse(completedIds.contains("TASK-001"));
+        assertTrue(((String) result.get("retryContext")).contains("TASK-001"));
+        // No TESTER/REVIEWER dispatch for a failed task
+        verify(mockBridge, never()).executeTask(any(), any(), any(), any(), any());
     }
 
     @Test
-    @DisplayName("GAUNTLET infrastructure error handled gracefully")
+    @DisplayName("TESTER infrastructure error handled gracefully")
     @SuppressWarnings("unchecked")
-    void gauntletInfrastructureError() {
-        var d = forgeDirective("DIR-001", 0, 3, FailureStrategy.RETRY);
+    void testerInfrastructureError() {
+        var d = coderTask("TASK-001", 0, 3, FailureStrategy.RETRY);
 
-        // GAUNTLET throws, VIGIL succeeds
-        when(mockBridge.executeDirective(
-                argThat(dir -> dir != null && dir.id().contains("GAUNTLET")), any(), any(), any(), any()))
+        // TESTER throws, REVIEWER succeeds
+        when(mockBridge.executeTask(
+                argThat(dir -> dir != null && dir.id().contains("TESTER")), any(), any(), any(), any()))
                 .thenThrow(new RuntimeException("Docker down"));
-        when(mockBridge.executeDirective(
-                argThat(dir -> dir != null && dir.id().contains("VIGIL")), any(), any(), any(), any()))
-                .thenReturn(bridgeResult("DIR-001-VIGIL", "VIGIL"));
-        when(mockSealService.parseReviewOutput(anyString(), anyString()))
-                .thenReturn(new ReviewFeedback("DIR-001", true, "OK", List.of(), List.of(), 8));
-        when(mockSealService.evaluateSeal(any(), any(), any()))
-                .thenReturn(new SealDecision(false, FailureStrategy.RETRY, "Tests failed due to infra error"));
+        when(mockBridge.executeTask(
+                argThat(dir -> dir != null && dir.id().contains("REVIEWER")), any(), any(), any(), any()))
+                .thenReturn(bridgeResult("TASK-001-REVIEWER", "REVIEWER"));
+        when(mockQualityGateService.parseReviewOutput(anyString(), anyString()))
+                .thenReturn(new ReviewFeedback("TASK-001", true, "OK", List.of(), List.of(), 8));
+        when(mockQualityGateService.evaluateQualityGate(any(), any(), any()))
+                .thenReturn(new QualityGateDecision(false, FailureStrategy.RETRY, "Tests failed due to infra error"));
 
         var state = new WorldmindState(Map.of(
-                "waveDirectiveIds", List.of("DIR-001"),
-                "directives", List.of(d),
-                "waveDispatchResults", List.of(passedResult("DIR-001"))
+                "waveTaskIds", List.of("TASK-001"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(passedResult("TASK-001"))
         ));
 
         var result = node.apply(state);
 
         // Should still produce a result (not crash)
-        assertNotNull(result.get("completedDirectiveIds"));
+        assertNotNull(result.get("completedTaskIds"));
     }
 
     @Test
-    @DisplayName("FORGE with no file changes -> immediately ESCALATES to FAILED (no retry)")
-    void forgeNoFileChangesEscalatesImmediately() {
-        // Even on first iteration with RETRY strategy, empty FORGE should escalate
-        var d = forgeDirective("DIR-001", 0, 3, FailureStrategy.RETRY);
+    @DisplayName("CODER with no file changes -> immediately ESCALATES to FAILED (no retry)")
+    void coderNoFileChangesEscalatesImmediately() {
+        // Even on first iteration with RETRY strategy, empty CODER should escalate
+        var d = coderTask("TASK-001", 0, 3, FailureStrategy.RETRY);
 
         var state = new WorldmindState(Map.of(
-                "waveDirectiveIds", List.of("DIR-001"),
-                "directives", List.of(d),
-                "waveDispatchResults", List.of(passedResultNoFiles("DIR-001"))
+                "waveTaskIds", List.of("TASK-001"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(passedResultNoFiles("TASK-001"))
         ));
 
         var result = node.apply(state);
 
-        // Should immediately FAIL the mission — no point retrying when centurion wrote nothing
+        // Should immediately FAIL the mission — no point retrying when agent wrote nothing
         assertEquals(MissionStatus.FAILED.name(), result.get("status"));
-        // Should NOT run GAUNTLET/VIGIL on empty output
-        verify(mockBridge, never()).executeDirective(any(), any(), any(), any(), any());
+        // Should NOT run TESTER/REVIEWER on empty output
+        verify(mockBridge, never()).executeTask(any(), any(), any(), any(), any());
     }
 
     @Test
     @DisplayName("Retries exhausted -> escalation to FAILED")
     void retriesExhaustedEscalation() {
         // iteration >= maxIterations means retries are exhausted
-        var d = forgeDirective("DIR-001", 3, 3, FailureStrategy.RETRY);
+        var d = coderTask("TASK-001", 3, 3, FailureStrategy.RETRY);
 
-        when(mockBridge.executeDirective(any(), any(), any(), any(), any())).thenReturn(bridgeResult("DIR-001", "GAUNTLET"));
-        when(mockSealService.parseTestOutput(anyString(), anyString(), anyLong()))
-                .thenReturn(new TestResult("DIR-001", false, 10, 3, "FAIL", 500L));
-        when(mockSealService.parseReviewOutput(anyString(), anyString()))
-                .thenReturn(new ReviewFeedback("DIR-001", false, "Bad", List.of("bug"), List.of(), 3));
-        // SealEvaluationService should escalate when retries exhausted
-        when(mockSealService.evaluateSeal(any(), any(), any()))
-                .thenReturn(new SealDecision(false, FailureStrategy.ESCALATE, "Retries exhausted"));
+        when(mockBridge.executeTask(any(), any(), any(), any(), any())).thenReturn(bridgeResult("TASK-001", "TESTER"));
+        when(mockQualityGateService.parseTestOutput(anyString(), anyString(), anyLong()))
+                .thenReturn(new TestResult("TASK-001", false, 10, 3, "FAIL", 500L));
+        when(mockQualityGateService.parseReviewOutput(anyString(), anyString()))
+                .thenReturn(new ReviewFeedback("TASK-001", false, "Bad", List.of("bug"), List.of(), 3));
+        // QualityGateEvaluationService should escalate when retries exhausted
+        when(mockQualityGateService.evaluateQualityGate(any(), any(), any()))
+                .thenReturn(new QualityGateDecision(false, FailureStrategy.ESCALATE, "Retries exhausted"));
 
         var state = new WorldmindState(Map.of(
-                "waveDirectiveIds", List.of("DIR-001"),
-                "directives", List.of(d),
-                "waveDispatchResults", List.of(passedResult("DIR-001"))
+                "waveTaskIds", List.of("TASK-001"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(passedResult("TASK-001"))
         ));
 
         var result = node.apply(state);

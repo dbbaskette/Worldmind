@@ -1,6 +1,6 @@
 package com.worldmind.integration;
 
-import com.worldmind.starblaster.*;
+import com.worldmind.sandbox.*;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
 import com.github.dockerjava.core.DockerClientImpl;
 import com.github.dockerjava.zerodep.ZerodepDockerHttpClient;
@@ -15,15 +15,15 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * End-to-end integration test for Starblaster execution.
- * Requires Docker to be running and the centurion-forge image built.
+ * End-to-end integration test for Sandbox execution.
+ * Requires Docker to be running and the agent-coder image built.
  * Run with: mvn test -Dgroups=integration
  */
 @Tag("integration")
-class ForgeIntegrationTest {
+class CoderIntegrationTest {
 
     @Test
-    void starblasterExecutesGooseAndCreatesFile(@TempDir Path tempDir) throws Exception {
+    void sandboxExecutesGooseAndCreatesFile(@TempDir Path tempDir) throws Exception {
         // Setup Docker client
         var dockerConfig = DefaultDockerClientConfig.createDefaultConfigBuilder().build();
         var httpClient = new ZerodepDockerHttpClient.Builder()
@@ -32,13 +32,13 @@ class ForgeIntegrationTest {
                 .build();
         var dockerClient = DockerClientImpl.getInstance(dockerConfig, httpClient);
 
-        var provider = new DockerStarblasterProvider(dockerClient, "ghcr.io/dbbaskette", "starblaster");
-        var properties = new StarblasterProperties();
-        var manager = new StarblasterManager(provider, properties, null);
+        var provider = new DockerSandboxProvider(dockerClient, "ghcr.io/dbbaskette", "sandbox");
+        var properties = new SandboxProperties();
+        var manager = new SandboxManager(provider, properties, null);
 
         // Execute a simple file creation task
-        var result = manager.executeDirective(
-            "forge", "INT-001", tempDir,
+        var result = manager.executeTask(
+            "coder", "INT-001", tempDir,
             "Create a file named hello.py in the current directory with the content: print('Hello from Worldmind')",
             Map.of("GOOSE_PROVIDER", "openai",
                    "GOOSE_MODEL", "qwen2.5-coder-32b",

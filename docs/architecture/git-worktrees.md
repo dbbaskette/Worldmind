@@ -1,10 +1,10 @@
 # Git Worktrees Architecture
 
-This document explains how Worldmind uses git worktrees to enable parallel directive execution without merge conflicts.
+This document explains how Worldmind uses git worktrees to enable parallel task execution without merge conflicts.
 
 ## Overview
 
-When Worldmind executes multiple directives in parallel, each directive may modify files in the same repository. Without isolation, concurrent file modifications would cause conflicts and race conditions. Git worktrees solve this by giving each directive its own isolated working directory while sharing the same git history.
+When Worldmind executes multiple tasks in parallel, each task may modify files in the same repository. Without isolation, concurrent file modifications would cause conflicts and race conditions. Git worktrees solve this by giving each task its own isolated working directory while sharing the same git history.
 
 ### Why Worktrees?
 
@@ -27,13 +27,13 @@ When a mission starts, Worldmind creates a mission workspace that serves as the 
 └── mission-{missionId}/
     ├── .git/                    # Shared git directory
     ├── worktrees/
-    │   ├── directive-abc/       # Isolated working directory
+    │   ├── task-abc/       # Isolated working directory
     │   │   ├── src/
     │   │   └── ...
-    │   ├── directive-def/       # Another isolated directory
+    │   ├── task-def/       # Another isolated directory
     │   │   ├── src/
     │   │   └── ...
-    │   └── directive-ghi/
+    │   └── task-ghi/
     │       ├── src/
     │       └── ...
     └── main/                    # Main worktree (bare clone target)
@@ -46,7 +46,7 @@ flowchart TB
     subgraph Core["Orchestration Layer"]
         PDN[ParallelDispatchNode]
         SWN[ScheduleWaveNode]
-        DS[DirectiveScheduler]
+        DS[TaskScheduler]
     end
 
     subgraph Worktree["Worktree Layer"]
@@ -62,12 +62,12 @@ flowchart TB
     end
 
     PDN -->|1. Create mission workspace| WEC
-    PDN -->|2. Acquire worktree per directive| WEC
+    PDN -->|2. Acquire worktree per task| WEC
     WEC -->|Delegates| GWM
     GWM --> Clone & Worktree & Branch
     
     DS -->|Detects file overlap| SWN
-    SWN -->|Defers conflicting directives| PDN
+    SWN -->|Defers conflicting tasks| PDN
     
     PDN -->|3. Commit and push| WEC
     WEC -->|Merges to main| GWM
@@ -76,9 +76,9 @@ flowchart TB
 
 | Component | Responsibility |
 |-----------|----------------|
-| `DirectiveScheduler` | Detects file overlap between directives, defers conflicting ones |
+| `TaskScheduler` | Detects file overlap between tasks, defers conflicting ones |
 | `ScheduleWaveNode` | Computes next wave respecting file conflicts |
-| `ParallelDispatchNode` | Dispatches directives in parallel using worktrees |
+| `ParallelDispatchNode` | Dispatches tasks in parallel using worktrees |
 | `WorktreeExecutionContext` | Manages worktree lifecycle (create, acquire, release, cleanup) |
 | `GitWorkspaceManager` | Low-level git operations (clone, worktree, merge) |
 
@@ -97,36 +97,36 @@ if (worktreesEnabled && state.waveCount() == 1) {
 
 This clones the repository to create the shared `.git` directory.
 
-### 2. Directive Execution
+### 2. Task Execution
 
-For each directive in a wave:
+For each task in a wave:
 
 ```java
-// ParallelDispatchNode - per directive
-Path worktreePath = worktreeContext.acquireWorktree(missionId, directiveId, "main");
+// ParallelDispatchNode - per task
+Path worktreePath = worktreeContext.acquireWorktree(missionId, taskId, "main");
 // worktreePath is now an isolated directory with its own branch
 ```
 
-The directive executes with `worktreePath` as its project path. All file modifications happen in this isolated directory.
+The task executes with `worktreePath` as its project path. All file modifications happen in this isolated directory.
 
 ### 3. Commit and Push
 
-After successful directive completion:
+After successful task completion:
 
 ```java
-worktreeContext.commitAndPush(directiveId);
-// Creates commit on directive-specific branch and pushes to remote
+worktreeContext.commitAndPush(taskId);
+// Creates commit on task-specific branch and pushes to remote
 ```
 
 ### 4. Wave Completion and Merge
 
-After all directives in a wave complete, branches are merged back to `main`:
+After all tasks in a wave complete, branches are merged back to `main`:
 
 ```java
 // Merge flow
 git checkout main
 git fetch origin
-git rebase origin/directive-abc
+git rebase origin/task-abc
 git push origin main
 ```
 
@@ -154,7 +154,7 @@ flowchart TD
     Abort --> Wait[Wait 500ms]
     Wait --> Retry{Retry count < 2?}
     Retry -->|Yes| Fetch
-    Retry -->|No| Fail[Mark directive as failed]
+    Retry -->|No| Fail[Mark task as failed]
     Push --> Done[Merge complete]
 ```
 
@@ -172,16 +172,16 @@ When a merge conflict occurs:
 2. Wait 500ms (mitigates race conditions)
 3. Fetch latest `main`
 4. Retry the rebase
-5. If still failing after 2 retries, mark directive as failed
+5. If still failing after 2 retries, mark task as failed
 
 ## File Overlap Detection
 
-Before executing directives in parallel, `DirectiveScheduler` checks for file overlap:
+Before executing tasks in parallel, `TaskScheduler` checks for file overlap:
 
 ```java
-// DirectiveScheduler.computeNextWave()
+// TaskScheduler.computeNextWave()
 Set<String> usedFiles = new HashSet<>();
-for (Directive candidate : pending) {
+for (Task candidate : pending) {
     Set<String> targetFiles = candidate.targetFiles();
     if (hasOverlap(usedFiles, targetFiles)) {
         deferred.add(candidate);
@@ -206,9 +206,9 @@ File paths are normalized to handle variations:
 
 When overlap is detected:
 
-1. First directive gets the files
-2. Conflicting directives are deferred to the next wave
-3. Deferred directives execute after the first completes and merges
+1. First task gets the files
+2. Conflicting tasks are deferred to the next wave
+3. Deferred tasks execute after the first completes and merges
 
 ## Configuration
 
@@ -216,7 +216,7 @@ When overlap is detected:
 
 ```yaml
 worldmind:
-  starblaster:
+  sandbox:
     worktrees-enabled: true    # Enable worktree isolation
 ```
 
@@ -224,8 +224,8 @@ worldmind:
 
 ```yaml
 worldmind:
-  starblaster:
-    max-parallel: 4           # Max concurrent directives
+  sandbox:
+    max-parallel: 4           # Max concurrent tasks
     wave-cooldown-seconds: 5  # Delay between waves
 ```
 
@@ -237,7 +237,7 @@ The following metrics are recorded for monitoring:
 |--------|------|-------------|
 | `worldmind.parallel.worktree_operations` | Counter | Worktree acquire/release/cleanup by success |
 | `worldmind.parallel.active_worktrees` | Gauge | Active worktrees at wave execution |
-| `worldmind.parallel.file_overlap_deferrals` | Counter | Directives deferred due to file conflicts |
+| `worldmind.parallel.file_overlap_deferrals` | Counter | Tasks deferred due to file conflicts |
 | `worldmind.parallel.merge_conflicts` | Counter | Merge conflicts by resolution status |
 | `worldmind.parallel.merge_retry_success` | Counter | Successful merge retries |
 
@@ -246,8 +246,8 @@ The following metrics are recorded for monitoring:
 ### Current Limitations
 
 1. **Local execution only** -- Worktrees require filesystem access; CF Tasks use git branches directly
-2. **Branch namespace** -- Each directive creates a branch; many directives = many branches
-3. **Merge order** -- Merges happen in completion order, not directive order
+2. **Branch namespace** -- Each task creates a branch; many tasks = many branches
+3. **Merge order** -- Merges happen in completion order, not task order
 
 ### Future Improvements
 

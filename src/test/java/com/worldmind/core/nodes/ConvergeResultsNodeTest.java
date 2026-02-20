@@ -31,29 +31,29 @@ class ConvergeResultsNodeTest {
     @Test
     @DisplayName("converges with mixed results — 2 PASSED + 1 FAILED yields COMPLETED")
     void convergesWithMixedResults() {
-        var d1 = new Directive(
-            "DIR-001", "FORGE", "Create service",
+        var d1 = new Task(
+            "TASK-001", "CODER", "Create service",
             "", "Service exists",
-            List.of(), DirectiveStatus.PASSED, 1, 3,
+            List.of(), TaskStatus.PASSED, 1, 3,
             FailureStrategy.RETRY, List.of(), List.of(), 2000L
         );
-        var d2 = new Directive(
-            "DIR-002", "FORGE", "Create controller",
+        var d2 = new Task(
+            "TASK-002", "CODER", "Create controller",
             "", "Controller exists",
-            List.of(), DirectiveStatus.PASSED, 1, 3,
+            List.of(), TaskStatus.PASSED, 1, 3,
             FailureStrategy.RETRY, List.of(), List.of(), 3000L
         );
-        var d3 = new Directive(
-            "DIR-003", "FORGE", "Create tests",
+        var d3 = new Task(
+            "TASK-003", "CODER", "Create tests",
             "", "Tests pass",
-            List.of(), DirectiveStatus.FAILED, 2, 3,
+            List.of(), TaskStatus.FAILED, 2, 3,
             FailureStrategy.RETRY, List.of(), List.of(), 5000L
         );
 
         var state = new WorldmindState(Map.of(
-            "directives", List.of(d1, d2, d3),
+            "tasks", List.of(d1, d2, d3),
             "testResults", List.of(),
-            "starblasters", List.of()
+            "sandboxes", List.of()
         ));
 
         var result = node.apply(state);
@@ -61,47 +61,47 @@ class ConvergeResultsNodeTest {
         assertEquals(MissionStatus.COMPLETED.name(), result.get("status"));
         var metrics = (MissionMetrics) result.get("metrics");
         assertNotNull(metrics);
-        assertEquals(2, metrics.directivesCompleted());
-        assertEquals(1, metrics.directivesFailed());
+        assertEquals(2, metrics.tasksCompleted());
+        assertEquals(1, metrics.tasksFailed());
     }
 
     @Test
-    @DisplayName("all failed directives result in FAILED status")
+    @DisplayName("all failed tasks result in FAILED status")
     void allFailedResultsInFailedStatus() {
-        var d1 = new Directive(
-            "DIR-001", "FORGE", "Create service",
+        var d1 = new Task(
+            "TASK-001", "CODER", "Create service",
             "", "Service exists",
-            List.of(), DirectiveStatus.FAILED, 3, 3,
+            List.of(), TaskStatus.FAILED, 3, 3,
             FailureStrategy.RETRY, List.of(), List.of(), 10000L
         );
-        var d2 = new Directive(
-            "DIR-002", "FORGE", "Create controller",
+        var d2 = new Task(
+            "TASK-002", "CODER", "Create controller",
             "", "Controller exists",
-            List.of(), DirectiveStatus.FAILED, 3, 3,
+            List.of(), TaskStatus.FAILED, 3, 3,
             FailureStrategy.RETRY, List.of(), List.of(), 8000L
         );
 
         var state = new WorldmindState(Map.of(
-            "directives", List.of(d1, d2),
+            "tasks", List.of(d1, d2),
             "testResults", List.of(),
-            "starblasters", List.of()
+            "sandboxes", List.of()
         ));
 
         var result = node.apply(state);
 
         assertEquals(MissionStatus.FAILED.name(), result.get("status"));
         var metrics = (MissionMetrics) result.get("metrics");
-        assertEquals(0, metrics.directivesCompleted());
-        assertEquals(2, metrics.directivesFailed());
+        assertEquals(0, metrics.tasksCompleted());
+        assertEquals(2, metrics.tasksFailed());
     }
 
     @Test
-    @DisplayName("empty directives results in COMPLETED status with zero metrics")
-    void emptyDirectivesResultsInCompleted() {
+    @DisplayName("empty tasks results in COMPLETED status with zero metrics")
+    void emptyTasksResultsInCompleted() {
         var state = new WorldmindState(Map.of(
-            "directives", List.of(),
+            "tasks", List.of(),
             "testResults", List.of(),
-            "starblasters", List.of()
+            "sandboxes", List.of()
         ));
 
         var result = node.apply(state);
@@ -109,8 +109,8 @@ class ConvergeResultsNodeTest {
         assertEquals(MissionStatus.COMPLETED.name(), result.get("status"));
         var metrics = (MissionMetrics) result.get("metrics");
         assertNotNull(metrics);
-        assertEquals(0, metrics.directivesCompleted());
-        assertEquals(0, metrics.directivesFailed());
+        assertEquals(0, metrics.tasksCompleted());
+        assertEquals(0, metrics.tasksFailed());
         assertEquals(0, metrics.totalIterations());
         assertEquals(0, metrics.filesCreated());
         assertEquals(0, metrics.filesModified());
@@ -122,13 +122,13 @@ class ConvergeResultsNodeTest {
     @Test
     @DisplayName("aggregates test metrics from multiple TestResults")
     void aggregatesTestMetrics() {
-        var tr1 = new TestResult("DIR-001", true, 10, 2, "output1", 500L);
-        var tr2 = new TestResult("DIR-002", true, 5, 0, "output2", 300L);
+        var tr1 = new TestResult("TASK-001", true, 10, 2, "output1", 500L);
+        var tr2 = new TestResult("TASK-002", true, 5, 0, "output2", 300L);
 
         var state = new WorldmindState(Map.of(
-            "directives", List.of(),
+            "tasks", List.of(),
             "testResults", List.of(tr1, tr2),
-            "starblasters", List.of()
+            "sandboxes", List.of()
         ));
 
         var result = node.apply(state);
@@ -141,10 +141,10 @@ class ConvergeResultsNodeTest {
     @Test
     @DisplayName("counts file changes — created vs modified")
     void countsFileChanges() {
-        var d1 = new Directive(
-            "DIR-001", "FORGE", "Create files",
+        var d1 = new Task(
+            "TASK-001", "CODER", "Create files",
             "", "Files exist",
-            List.of(), DirectiveStatus.PASSED, 1, 3,
+            List.of(), TaskStatus.PASSED, 1, 3,
             FailureStrategy.RETRY, List.of(),
             List.of(
                 new FileRecord("src/Main.java", "created", 50),
@@ -153,10 +153,10 @@ class ConvergeResultsNodeTest {
             ),
             2000L
         );
-        var d2 = new Directive(
-            "DIR-002", "FORGE", "Update config",
+        var d2 = new Task(
+            "TASK-002", "CODER", "Update config",
             "", "Config updated",
-            List.of(), DirectiveStatus.PASSED, 1, 3,
+            List.of(), TaskStatus.PASSED, 1, 3,
             FailureStrategy.RETRY, List.of(),
             List.of(
                 new FileRecord("application.yml", "modified", 10),
@@ -166,9 +166,9 @@ class ConvergeResultsNodeTest {
         );
 
         var state = new WorldmindState(Map.of(
-            "directives", List.of(d1, d2),
+            "tasks", List.of(d1, d2),
             "testResults", List.of(),
-            "starblasters", List.of()
+            "sandboxes", List.of()
         ));
 
         var result = node.apply(state);
@@ -179,31 +179,31 @@ class ConvergeResultsNodeTest {
     }
 
     @Test
-    @DisplayName("calculates total iterations across directives")
+    @DisplayName("calculates total iterations across tasks")
     void calculatesIterations() {
-        var d1 = new Directive(
-            "DIR-001", "FORGE", "Create service",
+        var d1 = new Task(
+            "TASK-001", "CODER", "Create service",
             "", "Service exists",
-            List.of(), DirectiveStatus.PASSED, 1, 3,
+            List.of(), TaskStatus.PASSED, 1, 3,
             FailureStrategy.RETRY, List.of(), List.of(), 1000L
         );
-        var d2 = new Directive(
-            "DIR-002", "FORGE", "Create controller",
+        var d2 = new Task(
+            "TASK-002", "CODER", "Create controller",
             "", "Controller exists",
-            List.of(), DirectiveStatus.PASSED, 3, 5,
+            List.of(), TaskStatus.PASSED, 3, 5,
             FailureStrategy.RETRY, List.of(), List.of(), 5000L
         );
-        var d3 = new Directive(
-            "DIR-003", "FORGE", "Create tests",
+        var d3 = new Task(
+            "TASK-003", "CODER", "Create tests",
             "", "Tests pass",
-            List.of(), DirectiveStatus.FAILED, 2, 3,
+            List.of(), TaskStatus.FAILED, 2, 3,
             FailureStrategy.RETRY, List.of(), List.of(), 4000L
         );
 
         var state = new WorldmindState(Map.of(
-            "directives", List.of(d1, d2, d3),
+            "tasks", List.of(d1, d2, d3),
             "testResults", List.of(),
-            "starblasters", List.of()
+            "sandboxes", List.of()
         ));
 
         var result = node.apply(state);
@@ -215,23 +215,23 @@ class ConvergeResultsNodeTest {
     @Test
     @DisplayName("includes waveCount and aggregateDurationMs in metrics")
     void includesWaveMetrics() {
-        var d1 = new Directive(
-            "DIR-001", "FORGE", "Create service",
+        var d1 = new Task(
+            "TASK-001", "CODER", "Create service",
             "", "Service exists",
-            List.of(), DirectiveStatus.PASSED, 1, 3,
+            List.of(), TaskStatus.PASSED, 1, 3,
             FailureStrategy.RETRY, List.of(), List.of(), 2000L
         );
-        var d2 = new Directive(
-            "DIR-002", "FORGE", "Create controller",
+        var d2 = new Task(
+            "TASK-002", "CODER", "Create controller",
             "", "Controller exists",
-            List.of(), DirectiveStatus.PASSED, 1, 3,
+            List.of(), TaskStatus.PASSED, 1, 3,
             FailureStrategy.RETRY, List.of(), List.of(), 3000L
         );
 
         var state = new WorldmindState(Map.of(
-            "directives", List.of(d1, d2),
+            "tasks", List.of(d1, d2),
             "testResults", List.of(),
-            "starblasters", List.of(),
+            "sandboxes", List.of(),
             "waveCount", 2
         ));
 
@@ -243,22 +243,22 @@ class ConvergeResultsNodeTest {
     }
 
     @Test
-    @DisplayName("calculates duration from starblaster start/completion times")
-    void calculatesDurationFromStarblasters() {
+    @DisplayName("calculates duration from sandbox start/completion times")
+    void calculatesDurationFromSandboxes() {
         var start1 = Instant.parse("2026-02-06T10:00:00Z");
         var end1 = Instant.parse("2026-02-06T10:00:05Z"); // 5000ms
         var start2 = Instant.parse("2026-02-06T10:01:00Z");
         var end2 = Instant.parse("2026-02-06T10:01:03Z"); // 3000ms
 
-        var sg1 = new StarblasterInfo("c-1", "FORGE", "DIR-001", "completed", start1, end1);
-        var sg2 = new StarblasterInfo("c-2", "FORGE", "DIR-002", "completed", start2, end2);
-        // Starblaster with null timestamps should be excluded
-        var sg3 = new StarblasterInfo("c-3", "FORGE", "DIR-003", "failed", null, null);
+        var sg1 = new SandboxInfo("c-1", "CODER", "TASK-001", "completed", start1, end1);
+        var sg2 = new SandboxInfo("c-2", "CODER", "TASK-002", "completed", start2, end2);
+        // Sandbox with null timestamps should be excluded
+        var sg3 = new SandboxInfo("c-3", "CODER", "TASK-003", "failed", null, null);
 
         var state = new WorldmindState(Map.of(
-            "directives", List.of(),
+            "tasks", List.of(),
             "testResults", List.of(),
-            "starblasters", List.of(sg1, sg2, sg3)
+            "sandboxes", List.of(sg1, sg2, sg3)
         ));
 
         var result = node.apply(state);

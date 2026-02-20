@@ -18,104 +18,104 @@ class PathRestrictionServiceTest {
     void setUp() {
         SecurityProperties props = new SecurityProperties();
 
-        SecurityProperties.PathRule forgeRule = new SecurityProperties.PathRule();
-        forgeRule.setWritable(List.of("src/**", "lib/**", "app/**", "pkg/**"));
-        forgeRule.setReadOnly(List.of("**"));
+        SecurityProperties.PathRule coderRule = new SecurityProperties.PathRule();
+        coderRule.setWritable(List.of("src/**", "lib/**", "app/**", "pkg/**"));
+        coderRule.setReadOnly(List.of("**"));
 
-        SecurityProperties.PathRule gauntletRule = new SecurityProperties.PathRule();
-        gauntletRule.setWritable(List.of("src/test/**", "test/**", "tests/**", "spec/**"));
-        gauntletRule.setReadOnly(List.of("**"));
+        SecurityProperties.PathRule testerRule = new SecurityProperties.PathRule();
+        testerRule.setWritable(List.of("src/test/**", "test/**", "tests/**", "spec/**"));
+        testerRule.setReadOnly(List.of("**"));
 
-        SecurityProperties.PathRule vigilRule = new SecurityProperties.PathRule();
-        vigilRule.setWritable(List.of());
-        vigilRule.setReadOnly(List.of("**"));
+        SecurityProperties.PathRule reviewerRule = new SecurityProperties.PathRule();
+        reviewerRule.setWritable(List.of());
+        reviewerRule.setReadOnly(List.of("**"));
 
-        SecurityProperties.PathRule pulseRule = new SecurityProperties.PathRule();
-        pulseRule.setWritable(List.of());
-        pulseRule.setReadOnly(List.of("**"));
+        SecurityProperties.PathRule researcherRule = new SecurityProperties.PathRule();
+        researcherRule.setWritable(List.of());
+        researcherRule.setReadOnly(List.of("**"));
 
         props.setPathRestrictions(Map.of(
-                "FORGE", forgeRule,
-                "GAUNTLET", gauntletRule,
-                "VIGIL", vigilRule,
-                "PULSE", pulseRule
+                "CODER", coderRule,
+                "TESTER", testerRule,
+                "REVIEWER", reviewerRule,
+                "RESEARCHER", researcherRule
         ));
 
         service = new PathRestrictionService(props);
     }
 
     @Nested
-    @DisplayName("FORGE centurion")
-    class ForgeTests {
+    @DisplayName("CODER agent")
+    class CoderTests {
 
         @Test
         @DisplayName("can write to src/main/java/Foo.java")
         void canWriteToSrcMain() {
-            assertTrue(service.isPathWritable("FORGE", "src/main/java/Foo.java"));
+            assertTrue(service.isPathWritable("CODER", "src/main/java/Foo.java"));
         }
 
         @Test
         @DisplayName("can write to src/test/java/FooTest.java")
         void canWriteToSrcTest() {
-            assertTrue(service.isPathWritable("FORGE", "src/test/java/FooTest.java"));
+            assertTrue(service.isPathWritable("CODER", "src/test/java/FooTest.java"));
         }
 
         @Test
         @DisplayName("can read everything")
         void canReadEverything() {
-            assertTrue(service.isPathReadable("FORGE", "pom.xml"));
-            assertTrue(service.isPathReadable("FORGE", "src/main/java/Foo.java"));
-            assertTrue(service.isPathReadable("FORGE", "README.md"));
+            assertTrue(service.isPathReadable("CODER", "pom.xml"));
+            assertTrue(service.isPathReadable("CODER", "src/main/java/Foo.java"));
+            assertTrue(service.isPathReadable("CODER", "README.md"));
         }
     }
 
     @Nested
-    @DisplayName("GAUNTLET centurion")
-    class GauntletTests {
+    @DisplayName("TESTER agent")
+    class TesterTests {
 
         @Test
         @DisplayName("can write to src/test/java/FooTest.java")
         void canWriteToTestDir() {
-            assertTrue(service.isPathWritable("GAUNTLET", "src/test/java/FooTest.java"));
+            assertTrue(service.isPathWritable("TESTER", "src/test/java/FooTest.java"));
         }
 
         @Test
         @DisplayName("cannot write to src/main/java/Foo.java")
         void cannotWriteToMainDir() {
-            assertFalse(service.isPathWritable("GAUNTLET", "src/main/java/Foo.java"));
+            assertFalse(service.isPathWritable("TESTER", "src/main/java/Foo.java"));
         }
 
         @Test
         @DisplayName("can read everything")
         void canReadEverything() {
-            assertTrue(service.isPathReadable("GAUNTLET", "pom.xml"));
-            assertTrue(service.isPathReadable("GAUNTLET", "src/main/java/Foo.java"));
+            assertTrue(service.isPathReadable("TESTER", "pom.xml"));
+            assertTrue(service.isPathReadable("TESTER", "src/main/java/Foo.java"));
         }
     }
 
     @Nested
-    @DisplayName("VIGIL centurion")
-    class VigilTests {
+    @DisplayName("REVIEWER agent")
+    class ReviewerTests {
 
         @Test
         @DisplayName("cannot write anywhere")
         void cannotWriteAnywhere() {
-            assertFalse(service.isPathWritable("VIGIL", "src/main/java/Foo.java"));
-            assertFalse(service.isPathWritable("VIGIL", "src/test/java/FooTest.java"));
-            assertFalse(service.isPathWritable("VIGIL", "pom.xml"));
+            assertFalse(service.isPathWritable("REVIEWER", "src/main/java/Foo.java"));
+            assertFalse(service.isPathWritable("REVIEWER", "src/test/java/FooTest.java"));
+            assertFalse(service.isPathWritable("REVIEWER", "pom.xml"));
         }
 
         @Test
         @DisplayName("can read everything")
         void canReadEverything() {
-            assertTrue(service.isPathReadable("VIGIL", "pom.xml"));
-            assertTrue(service.isPathReadable("VIGIL", "src/main/java/Foo.java"));
-            assertTrue(service.isPathReadable("VIGIL", "README.md"));
+            assertTrue(service.isPathReadable("REVIEWER", "pom.xml"));
+            assertTrue(service.isPathReadable("REVIEWER", "src/main/java/Foo.java"));
+            assertTrue(service.isPathReadable("REVIEWER", "README.md"));
         }
     }
 
     @Nested
-    @DisplayName("unknown centurion type")
+    @DisplayName("unknown agent type")
     class UnknownTypeTests {
 
         @Test

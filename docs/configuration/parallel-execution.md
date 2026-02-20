@@ -1,6 +1,6 @@
 # Configuration: Parallel Execution
 
-This guide covers configuration options for parallel directive execution in Worldmind.
+This guide covers configuration options for parallel task execution in Worldmind.
 
 ## Execution Strategy Selection
 
@@ -8,8 +8,8 @@ This guide covers configuration options for parallel directive execution in Worl
 
 | Strategy | Description | Use Case |
 |----------|-------------|----------|
-| `SEQUENTIAL` | One directive at a time | New projects, high-risk changes, interdependent work |
-| `PARALLEL` | Multiple directives concurrently | Mature codebases, independent features, performance |
+| `SEQUENTIAL` | One task at a time | New projects, high-risk changes, interdependent work |
+| `PARALLEL` | Multiple tasks concurrently | Mature codebases, independent features, performance |
 
 ### How Strategy is Determined
 
@@ -28,7 +28,7 @@ This guide covers configuration options for parallel directive execution in Worl
 │  ├─ YES → Use SEQUENTIAL                                    │
 │  └─ NO ↓                                                    │
 │                                                             │
-│  Do the directives modify shared files?                     │
+│  Do the tasks modify shared files?                     │
 │  ├─ YES → Use SEQUENTIAL                                    │
 │  └─ NO ↓                                                    │
 │                                                             │
@@ -47,12 +47,12 @@ This guide covers configuration options for parallel directive execution in Worl
 
 ```yaml
 worldmind:
-  starblaster:
+  sandbox:
     # Enable git worktree isolation for parallel execution
-    # When false, directives share a single working directory
+    # When false, tasks share a single working directory
     worktrees-enabled: true
 
-    # Maximum number of directives executing concurrently
+    # Maximum number of tasks executing concurrently
     # Higher values = more parallelism, more resource usage
     max-parallel: 4
 
@@ -68,30 +68,30 @@ worldmind:
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `worldmind.starblaster.worktrees-enabled` | boolean | `false` | Enable worktree-based isolation |
-| `worldmind.starblaster.max-parallel` | int | `4` | Maximum concurrent directives |
-| `worldmind.starblaster.wave-cooldown-seconds` | int | `5` | Delay between waves |
-| `worldmind.starblaster.provider` | string | `docker` | Container provider |
+| `worldmind.sandbox.worktrees-enabled` | boolean | `false` | Enable worktree-based isolation |
+| `worldmind.sandbox.max-parallel` | int | `4` | Maximum concurrent tasks |
+| `worldmind.sandbox.wave-cooldown-seconds` | int | `5` | Delay between waves |
+| `worldmind.sandbox.provider` | string | `docker` | Container provider |
 
 ### Environment Variables
 
 Properties can also be set via environment variables:
 
 ```bash
-export WORLDMIND_STARBLASTER_WORKTREES_ENABLED=true
-export WORLDMIND_STARBLASTER_MAX_PARALLEL=4
-export WORLDMIND_STARBLASTER_WAVE_COOLDOWN_SECONDS=5
+export WORLDMIND_SANDBOX_WORKTREES_ENABLED=true
+export WORLDMIND_SANDBOX_MAX_PARALLEL=4
+export WORLDMIND_SANDBOX_WAVE_COOLDOWN_SECONDS=5
 ```
 
 ## Tuning Parameters
 
 ### max-parallel
 
-Controls how many directives can execute simultaneously in a single wave.
+Controls how many tasks can execute simultaneously in a single wave.
 
 **Considerations:**
 - Higher values increase throughput but require more resources (CPU, memory, disk I/O)
-- Each parallel directive needs its own container and worktree
+- Each parallel task needs its own container and worktree
 - Network bandwidth to LLM providers may become a bottleneck
 
 **Recommendations:**
@@ -128,7 +128,7 @@ Enables git worktree isolation for parallel execution.
 **When to enable:**
 - Running with `PARALLEL` strategy
 - Using Docker provider (local execution)
-- Need true file isolation between directives
+- Need true file isolation between tasks
 
 **When to disable:**
 - Using Cloud Foundry provider (uses git branches instead)
@@ -142,7 +142,7 @@ flowchart TD
     Start[Mission Start] --> Plan[Generate Plan]
     Plan --> Strategy{Strategy?}
     
-    Strategy -->|SEQUENTIAL| SeqLoop[Execute directives one by one]
+    Strategy -->|SEQUENTIAL| SeqLoop[Execute tasks one by one]
     SeqLoop --> Complete
     
     Strategy -->|PARALLEL| Wave1[Wave 1: Schedule up to max-parallel]
@@ -151,15 +151,15 @@ flowchart TD
     CheckWorktrees -->|Yes| CreateWT[Create worktrees]
     CheckWorktrees -->|No| SharedDir[Use shared directory]
     
-    CreateWT --> Execute1[Execute directives in parallel]
+    CreateWT --> Execute1[Execute tasks in parallel]
     SharedDir --> Execute1
     
     Execute1 --> Merge1[Merge completed branches]
     Merge1 --> Cooldown1[Wait wave-cooldown-seconds]
-    Cooldown1 --> MoreWaves{More directives?}
+    Cooldown1 --> MoreWaves{More tasks?}
     
     MoreWaves -->|Yes| Wave2[Wave 2: Schedule next batch]
-    Wave2 --> Execute2[Execute directives in parallel]
+    Wave2 --> Execute2[Execute tasks in parallel]
     Execute2 --> Merge2[Merge completed branches]
     Merge2 --> MoreWaves
     
@@ -172,25 +172,25 @@ flowchart TD
 
 ```yaml
 worldmind:
-  starblaster:
+  sandbox:
     provider: docker
     worktrees-enabled: true      # Recommended for Docker
     image-registry: ghcr.io/dbbaskette
-    image-prefix: starblaster
+    image-prefix: sandbox
 ```
 
-Docker provider runs centurions in local containers with filesystem access. Worktrees provide true isolation.
+Docker provider runs agents in local containers with filesystem access. Worktrees provide true isolation.
 
 ### Cloud Foundry Provider
 
 ```yaml
 worldmind:
-  starblaster:
+  sandbox:
     provider: cloudfoundry
     worktrees-enabled: false     # CF uses git branches instead
 ```
 
-CF provider runs centurions as CF tasks. Each task clones the repository and pushes to its own branch. Worktrees are not used because tasks don't share filesystem.
+CF provider runs agents as CF tasks. Each task clones the repository and pushes to its own branch. Worktrees are not used because tasks don't share filesystem.
 
 ## Monitoring Parallel Execution
 
@@ -199,7 +199,7 @@ CF provider runs centurions as CF tasks. Each task clones the repository and pus
 | Metric | What to Watch |
 |--------|---------------|
 | `worldmind_wave_executions_total` | Total waves executed by strategy |
-| `worldmind_wave_directive_count` | Directives per wave (should match `max-parallel`) |
+| `worldmind_wave_task_count` | Tasks per wave (should match `max-parallel`) |
 | `worldmind_parallel_active_worktrees` | Should not exceed `max-parallel` |
 | `worldmind_parallel_file_overlap_deferrals_total` | High values = too much overlap |
 | `worldmind_parallel_merge_conflicts_total` | High unresolved = tune settings |
@@ -207,12 +207,12 @@ CF provider runs centurions as CF tasks. Each task clones the repository and pus
 ### Prometheus Queries
 
 ```promql
-# Average directives per wave
-avg(worldmind_wave_directive_count)
+# Average tasks per wave
+avg(worldmind_wave_task_count)
 
-# Percentage of directives deferred due to overlap
+# Percentage of tasks deferred due to overlap
 sum(rate(worldmind_parallel_file_overlap_deferrals_total[5m])) /
-sum(rate(worldmind_directive_dispatched_total[5m])) * 100
+sum(rate(worldmind_task_dispatched_total[5m])) * 100
 
 # Merge conflict resolution rate
 sum(worldmind_parallel_merge_conflicts_total{resolved="true"}) /
@@ -232,10 +232,10 @@ sum(worldmind_parallel_merge_conflicts_total) * 100
 
 | Symptom | Likely Cause | Solution |
 |---------|--------------|----------|
-| Directives execute sequentially despite PARALLEL | `worktrees-enabled: false` or file overlap | Enable worktrees or reduce overlap |
+| Tasks execute sequentially despite PARALLEL | `worktrees-enabled: false` or file overlap | Enable worktrees or reduce overlap |
 | OOM errors during parallel execution | `max-parallel` too high | Reduce `max-parallel` |
 | Frequent merge conflicts | `wave-cooldown-seconds` too low | Increase cooldown |
-| Directives stuck waiting | File overlap detection | Review plan for overlapping `targetFiles` |
+| Tasks stuck waiting | File overlap detection | Review plan for overlapping `targetFiles` |
 | Slow wave startup | Container pull time | Pre-pull images or use local registry |
 
 ### Debug Logging
@@ -247,8 +247,8 @@ logging:
   level:
     com.worldmind.core.scheduler: DEBUG
     com.worldmind.core.nodes.ParallelDispatchNode: DEBUG
-    com.worldmind.starblaster.WorktreeExecutionContext: DEBUG
-    com.worldmind.starblaster.cf.GitWorkspaceManager: DEBUG
+    com.worldmind.sandbox.WorktreeExecutionContext: DEBUG
+    com.worldmind.sandbox.cf.GitWorkspaceManager: DEBUG
 ```
 
 ## Example Configurations
@@ -257,7 +257,7 @@ logging:
 
 ```yaml
 worldmind:
-  starblaster:
+  sandbox:
     worktrees-enabled: true
     max-parallel: 2
     wave-cooldown-seconds: 10
@@ -267,7 +267,7 @@ worldmind:
 
 ```yaml
 worldmind:
-  starblaster:
+  sandbox:
     worktrees-enabled: true
     max-parallel: 8
     wave-cooldown-seconds: 2
@@ -277,7 +277,7 @@ worldmind:
 
 ```yaml
 worldmind:
-  starblaster:
+  sandbox:
     worktrees-enabled: true
     max-parallel: 4
     wave-cooldown-seconds: 5
@@ -288,7 +288,7 @@ worldmind:
 
 ```yaml
 worldmind:
-  starblaster:
+  sandbox:
     worktrees-enabled: false
     max-parallel: 4
     wave-cooldown-seconds: 10

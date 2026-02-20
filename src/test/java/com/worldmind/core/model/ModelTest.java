@@ -39,14 +39,14 @@ class ModelTest {
         }
 
         @Test
-        @DisplayName("DirectiveStatus has all expected values")
-        void directiveStatusValues() {
-            DirectiveStatus[] expected = {
-                DirectiveStatus.PENDING, DirectiveStatus.RUNNING,
-                DirectiveStatus.PASSED, DirectiveStatus.FAILED, DirectiveStatus.SKIPPED
+        @DisplayName("TaskStatus has all expected values")
+        void taskStatusValues() {
+            TaskStatus[] expected = {
+                TaskStatus.PENDING, TaskStatus.RUNNING,
+                TaskStatus.PASSED, TaskStatus.FAILED, TaskStatus.SKIPPED
             };
-            assertArrayEquals(expected, DirectiveStatus.values());
-            assertEquals(5, DirectiveStatus.values().length);
+            assertArrayEquals(expected, TaskStatus.values());
+            assertEquals(5, TaskStatus.values().length);
         }
 
         @Test
@@ -86,8 +86,8 @@ class ModelTest {
             for (MissionStatus s : MissionStatus.values()) {
                 assertEquals(s, MissionStatus.valueOf(s.name()));
             }
-            for (DirectiveStatus s : DirectiveStatus.values()) {
-                assertEquals(s, DirectiveStatus.valueOf(s.name()));
+            for (TaskStatus s : TaskStatus.values()) {
+                assertEquals(s, TaskStatus.valueOf(s.name()));
             }
             for (InteractionMode m : InteractionMode.values()) {
                 assertEquals(m, InteractionMode.valueOf(m.name()));
@@ -144,18 +144,18 @@ class ModelTest {
         }
 
         @Test
-        @DisplayName("Directive record construction and accessors")
-        void directiveRecord() {
+        @DisplayName("Task record construction and accessors")
+        void taskRecord() {
             var files = List.of(new FileRecord("Foo.java", "created", 100));
-            var d = new Directive(
+            var d = new Task(
                 "d-001", "code-writer", "Implement Foo service",
                 "context blob", "tests pass", List.of(),
-                DirectiveStatus.PENDING, 0, 3,
+                TaskStatus.PENDING, 0, 3,
                 FailureStrategy.RETRY, List.of(), files, null
             );
             assertEquals("d-001", d.id());
-            assertEquals("code-writer", d.centurion());
-            assertEquals(DirectiveStatus.PENDING, d.status());
+            assertEquals("code-writer", d.agent());
+            assertEquals(TaskStatus.PENDING, d.status());
             assertEquals(FailureStrategy.RETRY, d.onFailure());
             assertEquals(1, d.filesAffected().size());
             assertNull(d.elapsedMs());
@@ -165,7 +165,7 @@ class ModelTest {
         @DisplayName("TestResult record construction and accessors")
         void testResultRecord() {
             var tr = new TestResult("d-001", true, 10, 0, "All passed", 1234L);
-            assertEquals("d-001", tr.directiveId());
+            assertEquals("d-001", tr.taskId());
             assertTrue(tr.passed());
             assertEquals(10, tr.totalTests());
             assertEquals(0, tr.failedTests());
@@ -179,19 +179,19 @@ class ModelTest {
                 "d-001", true, "Looks good",
                 List.of(), List.of("Add logging"), 9
             );
-            assertEquals("d-001", rf.directiveId());
+            assertEquals("d-001", rf.taskId());
             assertTrue(rf.approved());
             assertEquals(9, rf.score());
             assertEquals(1, rf.suggestions().size());
         }
 
         @Test
-        @DisplayName("StarblasterInfo record construction and accessors")
-        void starblasterInfoRecord() {
+        @DisplayName("SandboxInfo record construction and accessors")
+        void sandboxInfoRecord() {
             Instant now = Instant.now();
-            var si = new StarblasterInfo("ctr-abc", "code-writer", "d-001", "running", now, null);
+            var si = new SandboxInfo("ctr-abc", "code-writer", "d-001", "running", now, null);
             assertEquals("ctr-abc", si.containerId());
-            assertEquals("code-writer", si.centurionType());
+            assertEquals("code-writer", si.agentType());
             assertEquals("running", si.status());
             assertEquals(now, si.startedAt());
             assertNull(si.completedAt());
@@ -202,8 +202,8 @@ class ModelTest {
         void missionMetricsRecord() {
             var mm = new MissionMetrics(60000L, 5, 1, 8, 3, 4, 20, 18, 3, 45000L);
             assertEquals(60000L, mm.totalDurationMs());
-            assertEquals(5, mm.directivesCompleted());
-            assertEquals(1, mm.directivesFailed());
+            assertEquals(5, mm.tasksCompleted());
+            assertEquals(1, mm.tasksFailed());
             assertEquals(8, mm.totalIterations());
             assertEquals(3, mm.filesCreated());
             assertEquals(4, mm.filesModified());
@@ -225,9 +225,9 @@ class ModelTest {
         @DisplayName("WaveDispatchResult record construction and accessors")
         void waveDispatchResultRecord() {
             var files = List.of(new FileRecord("Foo.java", "created", 50));
-            var wdr = new WaveDispatchResult("d-001", DirectiveStatus.PASSED, files, "output text", 1500L);
-            assertEquals("d-001", wdr.directiveId());
-            assertEquals(DirectiveStatus.PASSED, wdr.status());
+            var wdr = new WaveDispatchResult("d-001", TaskStatus.PASSED, files, "output text", 1500L);
+            assertEquals("d-001", wdr.taskId());
+            assertEquals(TaskStatus.PASSED, wdr.status());
             assertEquals(1, wdr.filesAffected().size());
             assertEquals("output text", wdr.output());
             assertEquals(1500L, wdr.elapsedMs());
@@ -268,10 +268,10 @@ class ModelTest {
             var expected = List.of(
                 "missionId", "request", "interactionMode", "status",
                 "classification", "projectContext", "productSpec", "executionStrategy",
-                "directives", "currentDirectiveIndex", "starblasters",
-                "testResults", "reviewFeedback", "sealGranted",
+                "tasks", "currentTaskIndex", "sandboxes",
+                "testResults", "reviewFeedback", "quality_gateGranted",
                 "retryContext", "metrics", "errors", "projectPath", "gitRemoteUrl",
-                "completedDirectiveIds", "waveDirectiveIds", "waveCount", "waveDispatchResults"
+                "completedTaskIds", "waveTaskIds", "waveCount", "waveDispatchResults"
             );
             for (String key : expected) {
                 assertTrue(keys.contains(key), "SCHEMA missing key: " + key);
@@ -288,8 +288,8 @@ class ModelTest {
             assertEquals(InteractionMode.APPROVE_PLAN, state.interactionMode());
             assertEquals(MissionStatus.CLASSIFYING, state.status());
             assertEquals(ExecutionStrategy.SEQUENTIAL, state.executionStrategy());
-            assertEquals(0, state.currentDirectiveIndex());
-            assertFalse(state.sealGranted());
+            assertEquals(0, state.currentTaskIndex());
+            assertFalse(state.quality_gateGranted());
         }
 
         @Test
@@ -308,13 +308,13 @@ class ModelTest {
             init.put("missionId", "m-42");
             init.put("request", "Add logging to all services");
             init.put("status", MissionStatus.PLANNING.name());
-            init.put("sealGranted", true);
+            init.put("quality_gateGranted", true);
 
             var state = new WorldmindState(init);
             assertEquals("m-42", state.missionId());
             assertEquals("Add logging to all services", state.request());
             assertEquals(MissionStatus.PLANNING, state.status());
-            assertTrue(state.sealGranted());
+            assertTrue(state.quality_gateGranted());
         }
 
         @Test
@@ -349,78 +349,78 @@ class ModelTest {
         @DisplayName("Wave channels default to empty/zero")
         void waveChannelsDefault() {
             var state = new WorldmindState(Map.of());
-            assertTrue(state.waveDirectiveIds().isEmpty());
+            assertTrue(state.waveTaskIds().isEmpty());
             assertEquals(0, state.waveCount());
             assertTrue(state.waveDispatchResults().isEmpty());
-            assertTrue(state.completedDirectiveIds().isEmpty());
+            assertTrue(state.completedTaskIds().isEmpty());
         }
 
         @Test
         @DisplayName("Wave channels can be set and retrieved")
         void waveChannelsSetAndRetrieve() {
-            var wdr = new WaveDispatchResult("d-1", DirectiveStatus.PASSED, List.of(), "ok", 100L);
+            var wdr = new WaveDispatchResult("d-1", TaskStatus.PASSED, List.of(), "ok", 100L);
             var state = new WorldmindState(Map.of(
-                "waveDirectiveIds", List.of("d-1", "d-2"),
+                "waveTaskIds", List.of("d-1", "d-2"),
                 "waveCount", 3,
                 "waveDispatchResults", List.of(wdr),
-                "completedDirectiveIds", List.of("d-0")
+                "completedTaskIds", List.of("d-0")
             ));
-            assertEquals(List.of("d-1", "d-2"), state.waveDirectiveIds());
+            assertEquals(List.of("d-1", "d-2"), state.waveTaskIds());
             assertEquals(3, state.waveCount());
             assertEquals(1, state.waveDispatchResults().size());
-            assertEquals("d-1", state.waveDispatchResults().get(0).directiveId());
-            assertEquals(List.of("d-0"), state.completedDirectiveIds());
+            assertEquals("d-1", state.waveDispatchResults().get(0).taskId());
+            assertEquals(List.of("d-0"), state.completedTaskIds());
         }
 
         @Test
-        @DisplayName("completedDirectiveIds appender accumulates")
-        void completedDirectiveIdsAppenderAccumulates() {
+        @DisplayName("completedTaskIds appender accumulates")
+        void completedTaskIdsAppenderAccumulates() {
             var initData = new HashMap<String, Object>();
-            initData.put("completedDirectiveIds", List.of("d-1"));
+            initData.put("completedTaskIds", List.of("d-1"));
             var state1Data = AgentState.updateState(initData, Map.of(), WorldmindState.SCHEMA);
             var state1 = new WorldmindState(state1Data);
-            assertEquals(1, state1.completedDirectiveIds().size());
+            assertEquals(1, state1.completedTaskIds().size());
 
-            var update = Map.<String, Object>of("completedDirectiveIds", List.of("d-2"));
+            var update = Map.<String, Object>of("completedTaskIds", List.of("d-2"));
             var state2Data = AgentState.updateState(state1, update, WorldmindState.SCHEMA);
             var state2 = new WorldmindState(state2Data);
-            assertEquals(2, state2.completedDirectiveIds().size());
-            assertEquals("d-1", state2.completedDirectiveIds().get(0));
-            assertEquals("d-2", state2.completedDirectiveIds().get(1));
+            assertEquals(2, state2.completedTaskIds().size());
+            assertEquals("d-1", state2.completedTaskIds().get(0));
+            assertEquals("d-2", state2.completedTaskIds().get(1));
         }
 
         @Test
         @DisplayName("List fields default to empty lists")
         void listFieldsDefaultEmpty() {
             var state = new WorldmindState(Map.of());
-            assertTrue(state.directives().isEmpty());
-            assertTrue(state.starblasters().isEmpty());
+            assertTrue(state.tasks().isEmpty());
+            assertTrue(state.sandboxes().isEmpty());
             assertTrue(state.testResults().isEmpty());
             assertTrue(state.reviewFeedback().isEmpty());
             assertTrue(state.errors().isEmpty());
         }
 
         @Test
-        @DisplayName("AppenderChannel accumulates directives via updateState")
-        void appenderChannelAccumulatesDirectives() {
-            // Start with one directive
-            var d1 = new Directive("d-1", "coder", "First", "", "", List.of(),
-                DirectiveStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of(), List.of(), null);
+        @DisplayName("AppenderChannel accumulates tasks via updateState")
+        void appenderChannelAccumulatesTasks() {
+            // Start with one task
+            var d1 = new Task("d-1", "coder", "First", "", "", List.of(),
+                TaskStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of(), List.of(), null);
             var initData = new HashMap<String, Object>();
-            initData.put("directives", List.of(d1));
+            initData.put("tasks", List.of(d1));
             var state1Data = AgentState.updateState(initData, Map.of(), WorldmindState.SCHEMA);
             var state1 = new WorldmindState(state1Data);
-            assertEquals(1, state1.directives().size());
+            assertEquals(1, state1.tasks().size());
 
-            // Add a second directive via updateState
-            var d2 = new Directive("d-2", "tester", "Second", "", "", List.of(),
-                DirectiveStatus.PENDING, 0, 3, FailureStrategy.SKIP, List.of(), List.of(), null);
-            var update = Map.<String, Object>of("directives", List.of(d2));
+            // Add a second task via updateState
+            var d2 = new Task("d-2", "tester", "Second", "", "", List.of(),
+                TaskStatus.PENDING, 0, 3, FailureStrategy.SKIP, List.of(), List.of(), null);
+            var update = Map.<String, Object>of("tasks", List.of(d2));
             var state2Data = AgentState.updateState(state1, update, WorldmindState.SCHEMA);
             var state2 = new WorldmindState(state2Data);
-            assertEquals(2, state2.directives().size());
-            assertEquals("d-1", state2.directives().get(0).id());
-            assertEquals("d-2", state2.directives().get(1).id());
+            assertEquals(2, state2.tasks().size());
+            assertEquals("d-1", state2.tasks().get(0).id());
+            assertEquals("d-2", state2.tasks().get(1).id());
         }
 
         @Test

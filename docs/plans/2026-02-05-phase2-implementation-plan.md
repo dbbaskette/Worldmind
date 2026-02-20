@@ -1,56 +1,56 @@
-# Phase 2: First Centurion — Implementation Plan
+# Phase 2: First Agent — Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Execute directives by spinning up Docker containers running Goose (Centurion Forge) that generate code in the user's project directory.
+**Goal:** Execute tasks by spinning up Docker containers running Goose (Agent Coder) that generate code in the user's project directory.
 
-**Architecture:** A `StarblasterProvider` interface abstracts container orchestration (Docker for dev, Cloud Foundry for prod). `StarblasterManager` handles file change detection and delegates to the provider. `StarblasterBridge` translates between domain records and the starblaster infrastructure. `DispatchCenturionNode` plugs into the LangGraph4j graph as a sequential loop after plan approval. Goose runs headlessly via `goose run -t "<instruction>"` inside containers, connecting to LM Studio on the host (dev) or Anthropic API (prod).
+**Architecture:** A `SandboxProvider` interface abstracts container orchestration (Docker for dev, Cloud Foundry for prod). `SandboxManager` handles file change detection and delegates to the provider. `AgentDispatcher` translates between domain records and the sandbox infrastructure. `DispatchAgentNode` plugs into the LangGraph4j graph as a sequential loop after plan approval. Goose runs headlessly via `goose run -t "<instruction>"` inside containers, connecting to LM Studio on the host (dev) or Anthropic API (prod).
 
 **Tech Stack:** Java 21, Docker Java client 3.4.1, Goose CLI (headless), LM Studio (OpenAI-compatible), LangGraph4j 1.8
 
 ---
 
-## Task 2.1: StarblasterProvider Interface & StarblasterRequest Record
+## Task 2.1: SandboxProvider Interface & AgentRequest Record
 
 **Files:**
-- Create: `src/main/java/com/worldmind/starblaster/StarblasterProvider.java`
-- Create: `src/main/java/com/worldmind/starblaster/StarblasterRequest.java`
-- Test: `src/test/java/com/worldmind/starblaster/StarblasterProviderTest.java`
+- Create: `src/main/java/com/worldmind/sandbox/SandboxProvider.java`
+- Create: `src/main/java/com/worldmind/sandbox/AgentRequest.java`
+- Test: `src/test/java/com/worldmind/sandbox/SandboxProviderTest.java`
 
 **Step 1: Write the test**
 
 ```java
-package com.worldmind.starblaster;
+package com.worldmind.sandbox;
 
 import org.junit.jupiter.api.Test;
 import java.nio.file.Path;
 import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
-class StarblasterProviderTest {
+class SandboxProviderTest {
 
     @Test
-    void starblasterRequestBuildsWithAllFields() {
-        var request = new StarblasterRequest(
-            "forge",
-            "directive-001",
+    void sandboxRequestBuildsWithAllFields() {
+        var request = new AgentRequest(
+            "coder",
+            "task-001",
             Path.of("/tmp/project"),
             "Create hello.py that prints hello world",
             Map.of("GOOSE_PROVIDER", "openai"),
             4096,
             2
         );
-        assertEquals("forge", request.centurionType());
-        assertEquals("directive-001", request.directiveId());
+        assertEquals("coder", request.agentType());
+        assertEquals("task-001", request.taskId());
         assertEquals(Path.of("/tmp/project"), request.projectPath());
         assertEquals(4096, request.memoryLimitMb());
         assertEquals(2, request.cpuCount());
     }
 
     @Test
-    void starblasterRequestInstructionTextIsPreserved() {
-        var request = new StarblasterRequest(
-            "forge", "d-001", Path.of("/tmp"),
+    void sandboxRequestInstructionTextIsPreserved() {
+        var request = new AgentRequest(
+            "coder", "d-001", Path.of("/tmp"),
             "Build the feature",
             Map.of(), 2048, 1
         );
@@ -61,67 +61,67 @@ class StarblasterProviderTest {
 
 **Step 2: Run test to verify it fails**
 
-Run: `mvn test -pl . -Dtest=StarblasterProviderTest -f /Users/dbbaskette/Projects/Worldmind/pom.xml`
+Run: `mvn test -pl . -Dtest=SandboxProviderTest -f /Users/dbbaskette/Projects/Worldmind/pom.xml`
 Expected: FAIL — class not found
 
 **Step 3: Write the interface and record**
 
-`StarblasterProvider.java`:
+`SandboxProvider.java`:
 ```java
-package com.worldmind.starblaster;
+package com.worldmind.sandbox;
 
 /**
  * Abstraction for container orchestration.
- * Implementations: DockerStarblasterProvider (dev), CloudFoundryStarblasterProvider (prod).
+ * Implementations: DockerSandboxProvider (dev), CloudFoundrySandboxProvider (prod).
  */
-public interface StarblasterProvider {
+public interface SandboxProvider {
 
     /**
-     * Creates and starts a container for a Centurion.
-     * @return the container/starblaster ID
+     * Creates and starts a container for a Agent.
+     * @return the container/sandbox ID
      */
-    String openStarblaster(StarblasterRequest request);
+    String openSandbox(AgentRequest request);
 
     /**
      * Blocks until the container exits or timeout is reached.
      * @return the container exit code (0 = success)
      */
-    int waitForCompletion(String starblasterId, int timeoutSeconds);
+    int waitForCompletion(String sandboxId, int timeoutSeconds);
 
     /**
      * Captures stdout/stderr logs from the container.
      */
-    String captureOutput(String starblasterId);
+    String captureOutput(String sandboxId);
 
     /**
      * Stops and removes the container.
      */
-    void teardownStarblaster(String starblasterId);
+    void teardownSandbox(String sandboxId);
 }
 ```
 
-`StarblasterRequest.java`:
+`AgentRequest.java`:
 ```java
-package com.worldmind.starblaster;
+package com.worldmind.sandbox;
 
 import java.io.Serializable;
 import java.nio.file.Path;
 import java.util.Map;
 
 /**
- * Everything needed to open a Starblaster container.
+ * Everything needed to open a Sandbox container.
  *
- * @param centurionType  e.g. "forge", "vigil", "gauntlet"
- * @param directiveId    the directive this starblaster serves
+ * @param agentType  e.g. "coder", "reviewer", "tester"
+ * @param taskId    the task this sandbox serves
  * @param projectPath    host path to the project directory (bind-mounted as /workspace)
  * @param instructionText the full instruction markdown for Goose
  * @param envVars        environment variables to inject (GOOSE_PROVIDER, GOOSE_MODEL, etc.)
  * @param memoryLimitMb  memory limit in MB
  * @param cpuCount       CPU count limit
  */
-public record StarblasterRequest(
-    String centurionType,
-    String directiveId,
+public record AgentRequest(
+    String agentType,
+    String taskId,
     Path projectPath,
     String instructionText,
     Map<String, String> envVars,
@@ -132,40 +132,40 @@ public record StarblasterRequest(
 
 **Step 4: Run test to verify it passes**
 
-Run: `mvn test -pl . -Dtest=StarblasterProviderTest -f /Users/dbbaskette/Projects/Worldmind/pom.xml`
+Run: `mvn test -pl . -Dtest=SandboxProviderTest -f /Users/dbbaskette/Projects/Worldmind/pom.xml`
 Expected: PASS (2 tests)
 
 **Step 5: Commit**
 
 ```bash
-git add src/main/java/com/worldmind/starblaster/StarblasterProvider.java \
-        src/main/java/com/worldmind/starblaster/StarblasterRequest.java \
-        src/test/java/com/worldmind/starblaster/StarblasterProviderTest.java
-git commit -m "feat: StarblasterProvider interface and StarblasterRequest record"
+git add src/main/java/com/worldmind/sandbox/SandboxProvider.java \
+        src/main/java/com/worldmind/sandbox/AgentRequest.java \
+        src/test/java/com/worldmind/sandbox/SandboxProviderTest.java
+git commit -m "feat: SandboxProvider interface and AgentRequest record"
 ```
 
 ---
 
-## Task 2.2: StarblasterProperties Configuration
+## Task 2.2: SandboxProperties Configuration
 
 **Files:**
-- Create: `src/main/java/com/worldmind/starblaster/StarblasterProperties.java`
+- Create: `src/main/java/com/worldmind/sandbox/SandboxProperties.java`
 - Modify: `src/main/resources/application.yml:38-46`
-- Test: `src/test/java/com/worldmind/starblaster/StarblasterPropertiesTest.java`
+- Test: `src/test/java/com/worldmind/sandbox/SandboxPropertiesTest.java`
 
 **Step 1: Write the test**
 
 ```java
-package com.worldmind.starblaster;
+package com.worldmind.sandbox;
 
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
-class StarblasterPropertiesTest {
+class SandboxPropertiesTest {
 
     @Test
     void defaultsAreReasonable() {
-        var props = new StarblasterProperties();
+        var props = new SandboxProperties();
         assertEquals("docker", props.getProvider());
         assertEquals(300, props.getTimeoutSeconds());
         assertEquals(4096, props.getMemoryLimitMb());
@@ -175,7 +175,7 @@ class StarblasterPropertiesTest {
 
     @Test
     void gooseDefaultsAreReasonable() {
-        var props = new StarblasterProperties();
+        var props = new SandboxProperties();
         assertEquals("openai", props.getGooseProvider());
         assertEquals("http://host.docker.internal:1234/v1", props.getLmStudioUrl());
     }
@@ -186,32 +186,32 @@ class StarblasterPropertiesTest {
 
 **Step 3: Write implementation**
 
-`StarblasterProperties.java`:
+`SandboxProperties.java`:
 ```java
-package com.worldmind.starblaster;
+package com.worldmind.sandbox;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
 /**
- * Configuration properties for Starblaster container management and Goose model provider.
+ * Configuration properties for Sandbox container management and Goose model provider.
  * Bound from application.yml under the "worldmind" prefix.
  */
 @Component
 @ConfigurationProperties(prefix = "worldmind")
-public class StarblasterProperties {
+public class SandboxProperties {
 
-    private Starblaster starblaster = new Starblaster();
+    private Sandbox sandbox = new Sandbox();
     private Goose goose = new Goose();
 
-    // -- Starblaster accessors (delegate to nested) --
+    // -- Sandbox accessors (delegate to nested) --
 
-    public String getProvider() { return starblaster.provider; }
-    public int getTimeoutSeconds() { return starblaster.timeoutSeconds; }
-    public int getMemoryLimitMb() { return starblaster.memoryLimitMb; }
-    public int getCpuCount() { return starblaster.cpuCount; }
-    public int getMaxParallel() { return starblaster.maxParallel; }
-    public String getImage() { return starblaster.image; }
+    public String getProvider() { return sandbox.provider; }
+    public int getTimeoutSeconds() { return sandbox.timeoutSeconds; }
+    public int getMemoryLimitMb() { return sandbox.memoryLimitMb; }
+    public int getCpuCount() { return sandbox.cpuCount; }
+    public int getMaxParallel() { return sandbox.maxParallel; }
+    public String getImage() { return sandbox.image; }
 
     // -- Goose accessors (delegate to nested) --
 
@@ -219,18 +219,18 @@ public class StarblasterProperties {
     public String getGooseModel() { return goose.model; }
     public String getLmStudioUrl() { return goose.lmStudioUrl; }
 
-    public Starblaster getStarblaster() { return starblaster; }
-    public void setStarblaster(Starblaster starblaster) { this.starblaster = starblaster; }
+    public Sandbox getSandbox() { return sandbox; }
+    public void setSandbox(Sandbox sandbox) { this.sandbox = sandbox; }
     public Goose getGoose() { return goose; }
     public void setGoose(Goose goose) { this.goose = goose; }
 
-    public static class Starblaster {
+    public static class Sandbox {
         private String provider = "docker";
         private int maxParallel = 10;
         private int timeoutSeconds = 300;
         private int memoryLimitMb = 4096;
         private int cpuCount = 2;
-        private String image = "worldmind/centurion-forge:latest";
+        private String image = "worldmind/agent-coder:latest";
 
         // getters and setters for all fields
         public String getProvider() { return provider; }
@@ -270,13 +270,13 @@ worldmind:
     provider: ${GOOSE_PROVIDER:openai}
     model: ${GOOSE_MODEL:qwen2.5-coder-32b}
     lm-studio-url: ${LM_STUDIO_URL:http://host.docker.internal:1234/v1}
-  starblaster:
-    provider: ${STARBLASTER_PROVIDER:docker}
+  sandbox:
+    provider: ${SANDBOX_PROVIDER:docker}
     max-parallel: 10
     timeout-seconds: 300
     memory-limit-mb: 4096
     cpu-count: 2
-    image: worldmind/centurion-forge:latest
+    image: worldmind/agent-coder:latest
 ```
 
 **Step 4: Run test — expect PASS**
@@ -284,10 +284,10 @@ worldmind:
 **Step 5: Commit**
 
 ```bash
-git add src/main/java/com/worldmind/starblaster/StarblasterProperties.java \
+git add src/main/java/com/worldmind/sandbox/SandboxProperties.java \
         src/main/resources/application.yml \
-        src/test/java/com/worldmind/starblaster/StarblasterPropertiesTest.java
-git commit -m "feat: StarblasterProperties with Goose provider and container config"
+        src/test/java/com/worldmind/sandbox/SandboxPropertiesTest.java
+git commit -m "feat: SandboxProperties with Goose provider and container config"
 ```
 
 ---
@@ -295,13 +295,13 @@ git commit -m "feat: StarblasterProperties with Goose provider and container con
 ## Task 2.3: InstructionBuilder
 
 **Files:**
-- Create: `src/main/java/com/worldmind/starblaster/InstructionBuilder.java`
-- Test: `src/test/java/com/worldmind/starblaster/InstructionBuilderTest.java`
+- Create: `src/main/java/com/worldmind/sandbox/InstructionBuilder.java`
+- Test: `src/test/java/com/worldmind/sandbox/InstructionBuilderTest.java`
 
 **Step 1: Write the test**
 
 ```java
-package com.worldmind.starblaster;
+package com.worldmind.sandbox;
 
 import com.worldmind.core.model.*;
 import org.junit.jupiter.api.Test;
@@ -311,19 +311,19 @@ import static org.junit.jupiter.api.Assertions.*;
 class InstructionBuilderTest {
 
     @Test
-    void buildIncludesDirectiveFields() {
-        var directive = new Directive(
-            "DIR-001", "FORGE", "Create hello.py",
+    void buildIncludesTaskFields() {
+        var task = new Task(
+            "TASK-001", "CODER", "Create hello.py",
             "Python project with pytest", "File hello.py exists and is valid Python",
-            List.of(), DirectiveStatus.PENDING, 0, 3,
+            List.of(), TaskStatus.PENDING, 0, 3,
             FailureStrategy.RETRY, List.of(), null
         );
         var context = new ProjectContext("/tmp/project", "src/\n  main.py",
             "python", "flask", "flask,pytest", 10, "A Flask web app");
 
-        String instruction = InstructionBuilder.build(directive, context);
+        String instruction = InstructionBuilder.build(task, context);
 
-        assertTrue(instruction.contains("DIR-001"));
+        assertTrue(instruction.contains("TASK-001"));
         assertTrue(instruction.contains("Create hello.py"));
         assertTrue(instruction.contains("File hello.py exists and is valid Python"));
         assertTrue(instruction.contains("python"));
@@ -333,32 +333,32 @@ class InstructionBuilderTest {
 
     @Test
     void buildIncludesConstraintsSection() {
-        var directive = new Directive(
-            "DIR-002", "FORGE", "Add endpoint",
+        var task = new Task(
+            "TASK-002", "CODER", "Add endpoint",
             "", "Endpoint returns 200",
-            List.of(), DirectiveStatus.PENDING, 0, 3,
+            List.of(), TaskStatus.PENDING, 0, 3,
             FailureStrategy.RETRY, List.of(), null
         );
         var context = new ProjectContext("/tmp/p", "", "java", "spring", "", 5, "");
 
-        String instruction = InstructionBuilder.build(directive, context);
+        String instruction = InstructionBuilder.build(task, context);
 
         assertTrue(instruction.contains("Constraints"));
-        assertTrue(instruction.contains("Only modify files related to this directive"));
+        assertTrue(instruction.contains("Only modify files related to this task"));
     }
 
     @Test
     void buildWithNullContextDoesNotThrow() {
-        var directive = new Directive(
-            "DIR-003", "FORGE", "Do something",
+        var task = new Task(
+            "TASK-003", "CODER", "Do something",
             "some context", "It works",
-            List.of(), DirectiveStatus.PENDING, 0, 3,
+            List.of(), TaskStatus.PENDING, 0, 3,
             FailureStrategy.RETRY, List.of(), null
         );
 
-        String instruction = InstructionBuilder.build(directive, null);
+        String instruction = InstructionBuilder.build(task, null);
 
-        assertTrue(instruction.contains("DIR-003"));
+        assertTrue(instruction.contains("TASK-003"));
         assertTrue(instruction.contains("Do something"));
     }
 }
@@ -369,30 +369,30 @@ class InstructionBuilderTest {
 **Step 3: Write implementation**
 
 ```java
-package com.worldmind.starblaster;
+package com.worldmind.sandbox;
 
-import com.worldmind.core.model.Directive;
+import com.worldmind.core.model.Task;
 import com.worldmind.core.model.ProjectContext;
 
 /**
- * Converts a Directive and ProjectContext into a Goose-readable instruction string.
+ * Converts a Task and ProjectContext into a Goose-readable instruction string.
  * Pure function — no Spring dependencies.
  */
 public final class InstructionBuilder {
 
     private InstructionBuilder() {}
 
-    public static String build(Directive directive, ProjectContext context) {
+    public static String build(Task task, ProjectContext context) {
         var sb = new StringBuilder();
 
-        sb.append("# Directive: ").append(directive.id()).append("\n\n");
+        sb.append("# Task: ").append(task.id()).append("\n\n");
 
         sb.append("## Objective\n\n");
-        sb.append(directive.description()).append("\n\n");
+        sb.append(task.description()).append("\n\n");
 
-        if (directive.inputContext() != null && !directive.inputContext().isBlank()) {
+        if (task.inputContext() != null && !task.inputContext().isBlank()) {
             sb.append("## Additional Context\n\n");
-            sb.append(directive.inputContext()).append("\n\n");
+            sb.append(task.inputContext()).append("\n\n");
         }
 
         if (context != null) {
@@ -413,11 +413,11 @@ public final class InstructionBuilder {
         }
 
         sb.append("## Success Criteria\n\n");
-        sb.append(directive.successCriteria()).append("\n\n");
+        sb.append(task.successCriteria()).append("\n\n");
 
         sb.append("## Constraints\n\n");
-        sb.append("- Only modify files related to this directive\n");
-        sb.append("- Do not modify test files (Gauntlet handles tests)\n");
+        sb.append("- Only modify files related to this task\n");
+        sb.append("- Do not modify test files (Tester handles tests)\n");
         sb.append("- Commit nothing — file changes are detected externally\n");
         sb.append("- If you encounter an error, attempt to fix it before reporting failure\n");
 
@@ -431,23 +431,23 @@ public final class InstructionBuilder {
 **Step 5: Commit**
 
 ```bash
-git add src/main/java/com/worldmind/starblaster/InstructionBuilder.java \
-        src/test/java/com/worldmind/starblaster/InstructionBuilderTest.java
-git commit -m "feat: InstructionBuilder converts directives to Goose instructions"
+git add src/main/java/com/worldmind/sandbox/InstructionBuilder.java \
+        src/test/java/com/worldmind/sandbox/InstructionBuilderTest.java
+git commit -m "feat: InstructionBuilder converts tasks to Goose instructions"
 ```
 
 ---
 
-## Task 2.4: DockerStarblasterProvider
+## Task 2.4: DockerSandboxProvider
 
 **Files:**
-- Create: `src/main/java/com/worldmind/starblaster/DockerStarblasterProvider.java`
-- Test: `src/test/java/com/worldmind/starblaster/DockerStarblasterProviderTest.java`
+- Create: `src/main/java/com/worldmind/sandbox/DockerSandboxProvider.java`
+- Test: `src/test/java/com/worldmind/sandbox/DockerSandboxProviderTest.java`
 
 **Step 1: Write the test**
 
 ```java
-package com.worldmind.starblaster;
+package com.worldmind.sandbox;
 
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.*;
@@ -464,19 +464,19 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-class DockerStarblasterProviderTest {
+class DockerSandboxProviderTest {
 
     private DockerClient dockerClient;
-    private DockerStarblasterProvider provider;
+    private DockerSandboxProvider provider;
 
     @BeforeEach
     void setUp() {
         dockerClient = mock(DockerClient.class, RETURNS_DEEP_STUBS);
-        provider = new DockerStarblasterProvider(dockerClient);
+        provider = new DockerSandboxProvider(dockerClient);
     }
 
     @Test
-    void openStarblasterCreatesAndStartsContainer() {
+    void openSandboxCreatesAndStartsContainer() {
         when(dockerClient.createContainerCmd(any(String.class))
                 .withName(any())
                 .withHostConfig(any())
@@ -484,19 +484,19 @@ class DockerStarblasterProviderTest {
                 .exec())
                 .thenReturn(mock(CreateContainerResponse.class));
 
-        var request = new StarblasterRequest(
-            "forge", "DIR-001", Path.of("/tmp/project"),
+        var request = new AgentRequest(
+            "coder", "TASK-001", Path.of("/tmp/project"),
             "Create hello.py", Map.of("GOOSE_PROVIDER", "openai"),
             4096, 2
         );
 
         // Should not throw
-        assertDoesNotThrow(() -> provider.openStarblaster(request));
+        assertDoesNotThrow(() -> provider.openSandbox(request));
     }
 
     @Test
-    void teardownStarblasterStopsAndRemovesContainer() {
-        provider.teardownStarblaster("container-123");
+    void teardownSandboxStopsAndRemovesContainer() {
+        provider.teardownSandbox("container-123");
 
         verify(dockerClient).stopContainerCmd("container-123");
         verify(dockerClient).removeContainerCmd("container-123");
@@ -509,7 +509,7 @@ class DockerStarblasterProviderTest {
 **Step 3: Write implementation**
 
 ```java
-package com.worldmind.starblaster;
+package com.worldmind.sandbox;
 
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.WaitContainerResultCallback;
@@ -522,23 +522,23 @@ import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Docker-based StarblasterProvider for local development.
- * Creates Docker containers for each Centurion directive execution.
+ * Docker-based SandboxProvider for local development.
+ * Creates Docker containers for each Agent task execution.
  */
-public class DockerStarblasterProvider implements StarblasterProvider {
+public class DockerSandboxProvider implements SandboxProvider {
 
-    private static final Logger log = LoggerFactory.getLogger(DockerStarblasterProvider.class);
+    private static final Logger log = LoggerFactory.getLogger(DockerSandboxProvider.class);
 
     private final DockerClient dockerClient;
 
-    public DockerStarblasterProvider(DockerClient dockerClient) {
+    public DockerSandboxProvider(DockerClient dockerClient) {
         this.dockerClient = dockerClient;
     }
 
     @Override
-    public String openStarblaster(StarblasterRequest request) {
-        String containerName = "starblaster-" + request.centurionType() + "-" + request.directiveId();
-        log.info("Opening Starblaster {} for directive {}", containerName, request.directiveId());
+    public String openSandbox(AgentRequest request) {
+        String containerName = "sandbox-" + request.agentType() + "-" + request.taskId();
+        log.info("Opening Sandbox {} for task {}", containerName, request.taskId());
 
         var envList = new ArrayList<String>();
         request.envVars().forEach((k, v) -> envList.add(k + "=" + v));
@@ -552,7 +552,7 @@ public class DockerStarblasterProvider implements StarblasterProvider {
                 .withCpuCount((long) request.cpuCount())
                 .withExtraHosts(new String[]{"host.docker.internal:host-gateway"});
 
-        var response = dockerClient.createContainerCmd("worldmind/centurion-forge:latest")
+        var response = dockerClient.createContainerCmd("worldmind/agent-coder:latest")
                 .withName(containerName)
                 .withHostConfig(hostConfig)
                 .withEnv(envList)
@@ -562,28 +562,28 @@ public class DockerStarblasterProvider implements StarblasterProvider {
 
         String containerId = response.getId();
         dockerClient.startContainerCmd(containerId).exec();
-        log.info("Starblaster {} started (container {})", containerName, containerId);
+        log.info("Sandbox {} started (container {})", containerName, containerId);
         return containerId;
     }
 
     @Override
-    public int waitForCompletion(String starblasterId, int timeoutSeconds) {
+    public int waitForCompletion(String sandboxId, int timeoutSeconds) {
         try {
-            var callback = dockerClient.waitContainerCmd(starblasterId)
+            var callback = dockerClient.waitContainerCmd(sandboxId)
                     .exec(new WaitContainerResultCallback());
             var result = callback.awaitStatusCode(timeoutSeconds, TimeUnit.SECONDS);
             return result != null ? result : -1;
         } catch (Exception e) {
-            log.error("Timeout or error waiting for starblaster {}", starblasterId, e);
+            log.error("Timeout or error waiting for sandbox {}", sandboxId, e);
             return -1;
         }
     }
 
     @Override
-    public String captureOutput(String starblasterId) {
+    public String captureOutput(String sandboxId) {
         var sb = new StringBuilder();
         try {
-            dockerClient.logContainerCmd(starblasterId)
+            dockerClient.logContainerCmd(sandboxId)
                     .withStdOut(true)
                     .withStdErr(true)
                     .withFollowStream(false)
@@ -595,23 +595,23 @@ public class DockerStarblasterProvider implements StarblasterProvider {
                     }).awaitCompletion(30, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            log.warn("Interrupted while capturing output from starblaster {}", starblasterId);
+            log.warn("Interrupted while capturing output from sandbox {}", sandboxId);
         }
         return sb.toString();
     }
 
     @Override
-    public void teardownStarblaster(String starblasterId) {
+    public void teardownSandbox(String sandboxId) {
         try {
-            dockerClient.stopContainerCmd(starblasterId).exec();
+            dockerClient.stopContainerCmd(sandboxId).exec();
         } catch (Exception e) {
-            log.debug("Container {} may already be stopped", starblasterId);
+            log.debug("Container {} may already be stopped", sandboxId);
         }
         try {
-            dockerClient.removeContainerCmd(starblasterId).withForce(true).exec();
-            log.info("Starblaster {} torn down", starblasterId);
+            dockerClient.removeContainerCmd(sandboxId).withForce(true).exec();
+            log.info("Sandbox {} torn down", sandboxId);
         } catch (Exception e) {
-            log.warn("Failed to remove container {}", starblasterId, e);
+            log.warn("Failed to remove container {}", sandboxId, e);
         }
     }
 }
@@ -622,23 +622,23 @@ public class DockerStarblasterProvider implements StarblasterProvider {
 **Step 5: Commit**
 
 ```bash
-git add src/main/java/com/worldmind/starblaster/DockerStarblasterProvider.java \
-        src/test/java/com/worldmind/starblaster/DockerStarblasterProviderTest.java
-git commit -m "feat: DockerStarblasterProvider for container lifecycle management"
+git add src/main/java/com/worldmind/sandbox/DockerSandboxProvider.java \
+        src/test/java/com/worldmind/sandbox/DockerSandboxProviderTest.java
+git commit -m "feat: DockerSandboxProvider for container lifecycle management"
 ```
 
 ---
 
-## Task 2.5: StarblasterManager (File Diffing + Provider Delegation)
+## Task 2.5: SandboxManager (File Diffing + Provider Delegation)
 
 **Files:**
-- Create: `src/main/java/com/worldmind/starblaster/StarblasterManager.java`
-- Test: `src/test/java/com/worldmind/starblaster/StarblasterManagerTest.java`
+- Create: `src/main/java/com/worldmind/sandbox/SandboxManager.java`
+- Test: `src/test/java/com/worldmind/sandbox/SandboxManagerTest.java`
 
 **Step 1: Write the test**
 
 ```java
-package com.worldmind.starblaster;
+package com.worldmind.sandbox;
 
 import com.worldmind.core.model.FileRecord;
 import org.junit.jupiter.api.BeforeEach;
@@ -655,45 +655,45 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.*;
 
-class StarblasterManagerTest {
+class SandboxManagerTest {
 
-    private StarblasterProvider provider;
-    private StarblasterProperties properties;
-    private StarblasterManager manager;
+    private SandboxProvider provider;
+    private SandboxProperties properties;
+    private SandboxManager manager;
 
     @BeforeEach
     void setUp() {
-        provider = mock(StarblasterProvider.class);
-        properties = new StarblasterProperties();
-        manager = new StarblasterManager(provider, properties);
+        provider = mock(SandboxProvider.class);
+        properties = new SandboxProperties();
+        manager = new SandboxManager(provider, properties);
     }
 
     @Test
-    void executeDirectiveCallsProviderLifecycle() {
-        when(provider.openStarblaster(any())).thenReturn("container-1");
+    void executeTaskCallsProviderLifecycle() {
+        when(provider.openSandbox(any())).thenReturn("container-1");
         when(provider.waitForCompletion("container-1", 300)).thenReturn(0);
         when(provider.captureOutput("container-1")).thenReturn("done");
 
-        var result = manager.executeDirective(
-            "forge", "DIR-001", Path.of("/tmp/test"),
+        var result = manager.executeTask(
+            "coder", "TASK-001", Path.of("/tmp/test"),
             "Create file", Map.of()
         );
 
-        verify(provider).openStarblaster(any());
+        verify(provider).openSandbox(any());
         verify(provider).waitForCompletion("container-1", 300);
         verify(provider).captureOutput("container-1");
-        verify(provider).teardownStarblaster("container-1");
+        verify(provider).teardownSandbox("container-1");
         assertEquals(0, result.exitCode());
     }
 
     @Test
-    void executeDirectiveReportsFailureOnNonZeroExit() {
-        when(provider.openStarblaster(any())).thenReturn("container-2");
+    void executeTaskReportsFailureOnNonZeroExit() {
+        when(provider.openSandbox(any())).thenReturn("container-2");
         when(provider.waitForCompletion("container-2", 300)).thenReturn(1);
         when(provider.captureOutput("container-2")).thenReturn("error");
 
-        var result = manager.executeDirective(
-            "forge", "DIR-002", Path.of("/tmp/test"),
+        var result = manager.executeTask(
+            "coder", "TASK-002", Path.of("/tmp/test"),
             "Bad instruction", Map.of()
         );
 
@@ -704,13 +704,13 @@ class StarblasterManagerTest {
     @Test
     void detectFileChangesFindsNewFiles(@TempDir Path tempDir) throws IOException {
         // Take snapshot with no files
-        var before = StarblasterManager.snapshotFiles(tempDir);
+        var before = SandboxManager.snapshotFiles(tempDir);
 
         // Create a new file
         Files.writeString(tempDir.resolve("hello.py"), "print('hello')");
 
         // Detect changes
-        var changes = StarblasterManager.detectChanges(before, tempDir);
+        var changes = SandboxManager.detectChanges(before, tempDir);
 
         assertEquals(1, changes.size());
         assertEquals("hello.py", changes.get(0).path());
@@ -721,12 +721,12 @@ class StarblasterManagerTest {
     void detectFileChangesFindsModifiedFiles(@TempDir Path tempDir) throws IOException {
         Files.writeString(tempDir.resolve("existing.py"), "old");
 
-        var before = StarblasterManager.snapshotFiles(tempDir);
+        var before = SandboxManager.snapshotFiles(tempDir);
 
         // Modify the file
         Files.writeString(tempDir.resolve("existing.py"), "new content");
 
-        var changes = StarblasterManager.detectChanges(before, tempDir);
+        var changes = SandboxManager.detectChanges(before, tempDir);
 
         assertEquals(1, changes.size());
         assertEquals("existing.py", changes.get(0).path());
@@ -740,7 +740,7 @@ class StarblasterManagerTest {
 **Step 3: Write implementation**
 
 ```java
-package com.worldmind.starblaster;
+package com.worldmind.sandbox;
 
 import com.worldmind.core.model.FileRecord;
 import org.slf4j.Logger;
@@ -755,39 +755,39 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * Manages Starblaster lifecycle and file change detection.
- * Delegates container operations to the active StarblasterProvider.
+ * Manages Sandbox lifecycle and file change detection.
+ * Delegates container operations to the active SandboxProvider.
  */
 @Service
-public class StarblasterManager {
+public class SandboxManager {
 
-    private static final Logger log = LoggerFactory.getLogger(StarblasterManager.class);
+    private static final Logger log = LoggerFactory.getLogger(SandboxManager.class);
 
-    private final StarblasterProvider provider;
-    private final StarblasterProperties properties;
+    private final SandboxProvider provider;
+    private final SandboxProperties properties;
 
-    public StarblasterManager(StarblasterProvider provider, StarblasterProperties properties) {
+    public SandboxManager(SandboxProvider provider, SandboxProperties properties) {
         this.provider = provider;
         this.properties = properties;
     }
 
     /**
-     * Result of a starblaster execution.
+     * Result of a sandbox execution.
      */
     public record ExecutionResult(
         int exitCode,
         String output,
-        String starblasterId,
+        String sandboxId,
         List<FileRecord> fileChanges,
         long elapsedMs
     ) {}
 
     /**
-     * Executes a directive in a Starblaster container.
+     * Executes a task in a Sandbox container.
      */
-    public ExecutionResult executeDirective(
-            String centurionType,
-            String directiveId,
+    public ExecutionResult executeTask(
+            String agentType,
+            String taskId,
             Path projectPath,
             String instructionText,
             Map<String, String> extraEnv) {
@@ -801,8 +801,8 @@ public class StarblasterManager {
             envVars.put("OPENAI_API_KEY", "not-needed-for-local");
         }
 
-        var request = new StarblasterRequest(
-            centurionType, directiveId, projectPath,
+        var request = new AgentRequest(
+            agentType, taskId, projectPath,
             instructionText, envVars,
             properties.getMemoryLimitMb(), properties.getCpuCount()
         );
@@ -811,22 +811,22 @@ public class StarblasterManager {
         Map<String, Long> beforeSnapshot = snapshotFiles(projectPath);
 
         long startMs = System.currentTimeMillis();
-        String starblasterId = provider.openStarblaster(request);
+        String sandboxId = provider.openSandbox(request);
 
         try {
-            int exitCode = provider.waitForCompletion(starblasterId, properties.getTimeoutSeconds());
-            String output = provider.captureOutput(starblasterId);
+            int exitCode = provider.waitForCompletion(sandboxId, properties.getTimeoutSeconds());
+            String output = provider.captureOutput(sandboxId);
             long elapsedMs = System.currentTimeMillis() - startMs;
 
             // Detect file changes
             List<FileRecord> changes = detectChanges(beforeSnapshot, projectPath);
 
-            log.info("Starblaster {} completed with exit code {} in {}ms — {} file changes",
-                    starblasterId, exitCode, elapsedMs, changes.size());
+            log.info("Sandbox {} completed with exit code {} in {}ms — {} file changes",
+                    sandboxId, exitCode, elapsedMs, changes.size());
 
-            return new ExecutionResult(exitCode, output, starblasterId, changes, elapsedMs);
+            return new ExecutionResult(exitCode, output, sandboxId, changes, elapsedMs);
         } finally {
-            provider.teardownStarblaster(starblasterId);
+            provider.teardownSandbox(sandboxId);
         }
     }
 
@@ -879,23 +879,23 @@ public class StarblasterManager {
 **Step 5: Commit**
 
 ```bash
-git add src/main/java/com/worldmind/starblaster/StarblasterManager.java \
-        src/test/java/com/worldmind/starblaster/StarblasterManagerTest.java
-git commit -m "feat: StarblasterManager with file change detection"
+git add src/main/java/com/worldmind/sandbox/SandboxManager.java \
+        src/test/java/com/worldmind/sandbox/SandboxManagerTest.java
+git commit -m "feat: SandboxManager with file change detection"
 ```
 
 ---
 
-## Task 2.6: StarblasterBridge
+## Task 2.6: AgentDispatcher
 
 **Files:**
-- Create: `src/main/java/com/worldmind/starblaster/StarblasterBridge.java`
-- Test: `src/test/java/com/worldmind/starblaster/StarblasterBridgeTest.java`
+- Create: `src/main/java/com/worldmind/sandbox/AgentDispatcher.java`
+- Test: `src/test/java/com/worldmind/sandbox/AgentDispatcherTest.java`
 
 **Step 1: Write the test**
 
 ```java
-package com.worldmind.starblaster;
+package com.worldmind.sandbox;
 
 import com.worldmind.core.model.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -909,57 +909,57 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-class StarblasterBridgeTest {
+class AgentDispatcherTest {
 
-    private StarblasterManager manager;
-    private StarblasterBridge bridge;
+    private SandboxManager manager;
+    private AgentDispatcher bridge;
 
     @BeforeEach
     void setUp() {
-        manager = mock(StarblasterManager.class);
-        bridge = new StarblasterBridge(manager);
+        manager = mock(SandboxManager.class);
+        bridge = new AgentDispatcher(manager);
     }
 
     @Test
-    void executeDirectiveReturnsUpdatedDirectiveOnSuccess() {
-        var directive = new Directive(
-            "DIR-001", "FORGE", "Create hello.py",
+    void executeTaskReturnsUpdatedTaskOnSuccess() {
+        var task = new Task(
+            "TASK-001", "CODER", "Create hello.py",
             "context", "hello.py exists",
-            List.of(), DirectiveStatus.PENDING, 0, 3,
+            List.of(), TaskStatus.PENDING, 0, 3,
             FailureStrategy.RETRY, List.of(), null
         );
         var context = new ProjectContext("/tmp/p", "", "python", "none", "", 0, "");
         var fileChanges = List.of(new FileRecord("hello.py", "created", 1));
-        var execResult = new StarblasterManager.ExecutionResult(0, "done", "c-1", fileChanges, 5000L);
+        var execResult = new SandboxManager.ExecutionResult(0, "done", "c-1", fileChanges, 5000L);
 
-        when(manager.executeDirective(
-            eq("FORGE"), eq("DIR-001"), any(), anyString(), any()))
+        when(manager.executeTask(
+            eq("CODER"), eq("TASK-001"), any(), anyString(), any()))
             .thenReturn(execResult);
 
-        var result = bridge.executeDirective(directive, context, Path.of("/tmp/p"));
+        var result = bridge.executeTask(task, context, Path.of("/tmp/p"));
 
-        assertEquals(DirectiveStatus.PASSED, result.directive().status());
-        assertEquals(5000L, result.directive().elapsedMs());
-        assertEquals(1, result.directive().filesAffected().size());
-        assertNotNull(result.starblasterInfo());
+        assertEquals(TaskStatus.PASSED, result.task().status());
+        assertEquals(5000L, result.task().elapsedMs());
+        assertEquals(1, result.task().filesAffected().size());
+        assertNotNull(result.sandboxInfo());
     }
 
     @Test
-    void executeDirectiveMarksFailedOnNonZeroExit() {
-        var directive = new Directive(
-            "DIR-002", "FORGE", "Bad task",
+    void executeTaskMarksFailedOnNonZeroExit() {
+        var task = new Task(
+            "TASK-002", "CODER", "Bad task",
             "", "never",
-            List.of(), DirectiveStatus.PENDING, 0, 3,
+            List.of(), TaskStatus.PENDING, 0, 3,
             FailureStrategy.RETRY, List.of(), null
         );
-        var execResult = new StarblasterManager.ExecutionResult(1, "error", "c-2", List.of(), 3000L);
+        var execResult = new SandboxManager.ExecutionResult(1, "error", "c-2", List.of(), 3000L);
 
-        when(manager.executeDirective(any(), any(), any(), anyString(), any()))
+        when(manager.executeTask(any(), any(), any(), anyString(), any()))
             .thenReturn(execResult);
 
-        var result = bridge.executeDirective(directive, null, Path.of("/tmp"));
+        var result = bridge.executeTask(task, null, Path.of("/tmp"));
 
-        assertEquals(DirectiveStatus.FAILED, result.directive().status());
+        assertEquals(TaskStatus.FAILED, result.task().status());
     }
 }
 ```
@@ -969,7 +969,7 @@ class StarblasterBridgeTest {
 **Step 3: Write implementation**
 
 ```java
-package com.worldmind.starblaster;
+package com.worldmind.sandbox;
 
 import com.worldmind.core.model.*;
 import org.slf4j.Logger;
@@ -981,42 +981,42 @@ import java.time.Instant;
 import java.util.Map;
 
 /**
- * Thin orchestration layer between domain records and the StarblasterManager.
- * Translates Directives into starblaster executions and results back into records.
+ * Thin orchestration layer between domain records and the SandboxManager.
+ * Translates Tasks into sandbox executions and results back into records.
  */
 @Service
-public class StarblasterBridge {
+public class AgentDispatcher {
 
-    private static final Logger log = LoggerFactory.getLogger(StarblasterBridge.class);
+    private static final Logger log = LoggerFactory.getLogger(AgentDispatcher.class);
 
-    private final StarblasterManager manager;
+    private final SandboxManager manager;
 
-    public StarblasterBridge(StarblasterManager manager) {
+    public AgentDispatcher(SandboxManager manager) {
         this.manager = manager;
     }
 
     /**
-     * Result of executing a directive through the bridge.
+     * Result of executing a task through the bridge.
      */
     public record BridgeResult(
-        Directive directive,
-        StarblasterInfo starblasterInfo,
+        Task task,
+        SandboxInfo sandboxInfo,
         String output
     ) {}
 
     /**
-     * Executes a single directive via the Starblaster infrastructure.
+     * Executes a single task via the Sandbox infrastructure.
      */
-    public BridgeResult executeDirective(Directive directive, ProjectContext context, Path projectPath) {
-        log.info("Executing directive {} [{}]: {}",
-                directive.id(), directive.centurion(), directive.description());
+    public BridgeResult executeTask(Task task, ProjectContext context, Path projectPath) {
+        log.info("Executing task {} [{}]: {}",
+                task.id(), task.agent(), task.description());
 
-        String instruction = InstructionBuilder.build(directive, context);
+        String instruction = InstructionBuilder.build(task, context);
         Instant startedAt = Instant.now();
 
-        var execResult = manager.executeDirective(
-            directive.centurion(),
-            directive.id(),
+        var execResult = manager.executeTask(
+            task.agent(),
+            task.id(),
             projectPath,
             instruction,
             Map.of()
@@ -1025,32 +1025,32 @@ public class StarblasterBridge {
         Instant completedAt = Instant.now();
         boolean success = execResult.exitCode() == 0;
 
-        // Build updated directive with results
-        var updatedDirective = new Directive(
-            directive.id(),
-            directive.centurion(),
-            directive.description(),
-            directive.inputContext(),
-            directive.successCriteria(),
-            directive.dependencies(),
-            success ? DirectiveStatus.PASSED : DirectiveStatus.FAILED,
-            directive.iteration() + 1,
-            directive.maxIterations(),
-            directive.onFailure(),
+        // Build updated task with results
+        var updatedTask = new Task(
+            task.id(),
+            task.agent(),
+            task.description(),
+            task.inputContext(),
+            task.successCriteria(),
+            task.dependencies(),
+            success ? TaskStatus.PASSED : TaskStatus.FAILED,
+            task.iteration() + 1,
+            task.maxIterations(),
+            task.onFailure(),
             execResult.fileChanges(),
             execResult.elapsedMs()
         );
 
-        var starblasterInfo = new StarblasterInfo(
-            execResult.starblasterId(),
-            directive.centurion(),
-            directive.id(),
+        var sandboxInfo = new SandboxInfo(
+            execResult.sandboxId(),
+            task.agent(),
+            task.id(),
             success ? "completed" : "failed",
             startedAt,
             completedAt
         );
 
-        return new BridgeResult(updatedDirective, starblasterInfo, execResult.output());
+        return new BridgeResult(updatedTask, sandboxInfo, execResult.output());
     }
 }
 ```
@@ -1060,23 +1060,23 @@ public class StarblasterBridge {
 **Step 5: Commit**
 
 ```bash
-git add src/main/java/com/worldmind/starblaster/StarblasterBridge.java \
-        src/test/java/com/worldmind/starblaster/StarblasterBridgeTest.java
-git commit -m "feat: StarblasterBridge translates directives to starblaster executions"
+git add src/main/java/com/worldmind/sandbox/AgentDispatcher.java \
+        src/test/java/com/worldmind/sandbox/AgentDispatcherTest.java
+git commit -m "feat: AgentDispatcher translates tasks to sandbox executions"
 ```
 
 ---
 
-## Task 2.7: StarblasterConfig (Spring Bean Wiring)
+## Task 2.7: SandboxConfig (Spring Bean Wiring)
 
 **Files:**
-- Create: `src/main/java/com/worldmind/starblaster/StarblasterConfig.java`
+- Create: `src/main/java/com/worldmind/sandbox/SandboxConfig.java`
 - Test: (covered by existing tests + integration)
 
 **Step 1: Write the config**
 
 ```java
-package com.worldmind.starblaster;
+package com.worldmind.sandbox;
 
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
@@ -1089,14 +1089,14 @@ import org.springframework.context.annotation.Configuration;
 import java.net.URI;
 
 /**
- * Spring configuration for Starblaster beans.
- * Selects the active StarblasterProvider based on worldmind.starblaster.provider property.
+ * Spring configuration for Sandbox beans.
+ * Selects the active SandboxProvider based on worldmind.sandbox.provider property.
  */
 @Configuration
-public class StarblasterConfig {
+public class SandboxConfig {
 
     @Bean
-    @ConditionalOnProperty(name = "worldmind.starblaster.provider", havingValue = "docker", matchIfMissing = true)
+    @ConditionalOnProperty(name = "worldmind.sandbox.provider", havingValue = "docker", matchIfMissing = true)
     public DockerClient dockerClient() {
         var config = DefaultDockerClientConfig.createDefaultConfigBuilder().build();
         var httpClient = new ApacheDockerHttpClient.Builder()
@@ -1107,9 +1107,9 @@ public class StarblasterConfig {
     }
 
     @Bean
-    @ConditionalOnProperty(name = "worldmind.starblaster.provider", havingValue = "docker", matchIfMissing = true)
-    public StarblasterProvider dockerStarblasterProvider(DockerClient dockerClient) {
-        return new DockerStarblasterProvider(dockerClient);
+    @ConditionalOnProperty(name = "worldmind.sandbox.provider", havingValue = "docker", matchIfMissing = true)
+    public SandboxProvider dockerSandboxProvider(DockerClient dockerClient) {
+        return new DockerSandboxProvider(dockerClient);
     }
 }
 ```
@@ -1122,17 +1122,17 @@ Expected: BUILD SUCCESS
 **Step 3: Commit**
 
 ```bash
-git add src/main/java/com/worldmind/starblaster/StarblasterConfig.java
-git commit -m "feat: StarblasterConfig wires Docker provider beans"
+git add src/main/java/com/worldmind/sandbox/SandboxConfig.java
+git commit -m "feat: SandboxConfig wires Docker provider beans"
 ```
 
 ---
 
-## Task 2.8: DispatchCenturionNode
+## Task 2.8: DispatchAgentNode
 
 **Files:**
-- Create: `src/main/java/com/worldmind/core/nodes/DispatchCenturionNode.java`
-- Test: `src/test/java/com/worldmind/core/nodes/DispatchCenturionNodeTest.java`
+- Create: `src/main/java/com/worldmind/core/nodes/DispatchAgentNode.java`
+- Test: `src/test/java/com/worldmind/core/nodes/DispatchAgentNodeTest.java`
 
 **Step 1: Write the test**
 
@@ -1141,7 +1141,7 @@ package com.worldmind.core.nodes;
 
 import com.worldmind.core.model.*;
 import com.worldmind.core.state.WorldmindState;
-import com.worldmind.starblaster.StarblasterBridge;
+import com.worldmind.sandbox.AgentDispatcher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -1154,57 +1154,57 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-class DispatchCenturionNodeTest {
+class DispatchAgentNodeTest {
 
-    private StarblasterBridge bridge;
-    private DispatchCenturionNode node;
+    private AgentDispatcher bridge;
+    private DispatchAgentNode node;
 
     @BeforeEach
     void setUp() {
-        bridge = mock(StarblasterBridge.class);
-        node = new DispatchCenturionNode(bridge);
+        bridge = mock(AgentDispatcher.class);
+        node = new DispatchAgentNode(bridge);
     }
 
     @Test
-    void applyDispatchesNextPendingDirective() {
-        var directive = new Directive(
-            "DIR-001", "FORGE", "Create file",
+    void applyDispatchesNextPendingTask() {
+        var task = new Task(
+            "TASK-001", "CODER", "Create file",
             "", "File exists",
-            List.of(), DirectiveStatus.PENDING, 0, 3,
+            List.of(), TaskStatus.PENDING, 0, 3,
             FailureStrategy.RETRY, List.of(), null
         );
-        var updatedDirective = new Directive(
-            "DIR-001", "FORGE", "Create file",
+        var updatedTask = new Task(
+            "TASK-001", "CODER", "Create file",
             "", "File exists",
-            List.of(), DirectiveStatus.PASSED, 1, 3,
+            List.of(), TaskStatus.PASSED, 1, 3,
             FailureStrategy.RETRY, List.of(new FileRecord("hello.py", "created", 1)), 5000L
         );
-        var starblasterInfo = new StarblasterInfo("c-1", "FORGE", "DIR-001", "completed",
+        var sandboxInfo = new SandboxInfo("c-1", "CODER", "TASK-001", "completed",
             Instant.now(), Instant.now());
-        var bridgeResult = new StarblasterBridge.BridgeResult(updatedDirective, starblasterInfo, "ok");
+        var bridgeResult = new AgentDispatcher.BridgeResult(updatedTask, sandboxInfo, "ok");
 
-        when(bridge.executeDirective(any(), any(), any())).thenReturn(bridgeResult);
+        when(bridge.executeTask(any(), any(), any())).thenReturn(bridgeResult);
 
         var context = new ProjectContext("/tmp/p", "", "java", "spring", "", 5, "");
         var state = new WorldmindState(Map.of(
-            "directives", List.of(directive),
-            "currentDirectiveIndex", 0,
+            "tasks", List.of(task),
+            "currentTaskIndex", 0,
             "projectContext", context
         ));
 
         var result = node.apply(state);
 
         assertNotNull(result);
-        assertTrue(result.containsKey("starblasters"));
-        assertTrue(result.containsKey("currentDirectiveIndex"));
-        assertEquals(1, result.get("currentDirectiveIndex"));
+        assertTrue(result.containsKey("sandboxes"));
+        assertTrue(result.containsKey("currentTaskIndex"));
+        assertEquals(1, result.get("currentTaskIndex"));
     }
 
     @Test
-    void applySkipsWhenNoDirectivesPending() {
+    void applySkipsWhenNoTasksPending() {
         var state = new WorldmindState(Map.of(
-            "directives", List.of(),
-            "currentDirectiveIndex", 0
+            "tasks", List.of(),
+            "currentTaskIndex", 0
         ));
 
         var result = node.apply(state);
@@ -1222,10 +1222,10 @@ class DispatchCenturionNodeTest {
 ```java
 package com.worldmind.core.nodes;
 
-import com.worldmind.core.model.DirectiveStatus;
+import com.worldmind.core.model.TaskStatus;
 import com.worldmind.core.model.MissionStatus;
 import com.worldmind.core.state.WorldmindState;
-import com.worldmind.starblaster.StarblasterBridge;
+import com.worldmind.sandbox.AgentDispatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -1236,53 +1236,53 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * LangGraph4j node that dispatches the next pending directive to a Starblaster.
- * Calls StarblasterBridge to execute the directive and returns updated state.
+ * LangGraph4j node that dispatches the next pending task to a Sandbox.
+ * Calls AgentDispatcher to execute the task and returns updated state.
  */
 @Component
-public class DispatchCenturionNode {
+public class DispatchAgentNode {
 
-    private static final Logger log = LoggerFactory.getLogger(DispatchCenturionNode.class);
+    private static final Logger log = LoggerFactory.getLogger(DispatchAgentNode.class);
 
-    private final StarblasterBridge bridge;
+    private final AgentDispatcher bridge;
 
-    public DispatchCenturionNode(StarblasterBridge bridge) {
+    public DispatchAgentNode(AgentDispatcher bridge) {
         this.bridge = bridge;
     }
 
     public Map<String, Object> apply(WorldmindState state) {
-        var directives = state.directives();
-        int currentIndex = state.currentDirectiveIndex();
+        var tasks = state.tasks();
+        int currentIndex = state.currentTaskIndex();
 
-        if (directives.isEmpty() || currentIndex >= directives.size()) {
-            log.info("No pending directives — mission complete");
+        if (tasks.isEmpty() || currentIndex >= tasks.size()) {
+            log.info("No pending tasks — mission complete");
             return Map.of("status", MissionStatus.COMPLETED.name());
         }
 
-        var directive = directives.get(currentIndex);
-        if (directive.status() != DirectiveStatus.PENDING) {
-            log.info("Directive {} already {}, advancing", directive.id(), directive.status());
-            return Map.of("currentDirectiveIndex", currentIndex + 1);
+        var task = tasks.get(currentIndex);
+        if (task.status() != TaskStatus.PENDING) {
+            log.info("Task {} already {}, advancing", task.id(), task.status());
+            return Map.of("currentTaskIndex", currentIndex + 1);
         }
 
-        log.info("Dispatching directive {} [{}]: {}",
-                directive.id(), directive.centurion(), directive.description());
+        log.info("Dispatching task {} [{}]: {}",
+                task.id(), task.agent(), task.description());
 
         var projectContext = state.projectContext().orElse(null);
         String projectPath = projectContext != null ? projectContext.rootPath() : ".";
 
-        var result = bridge.executeDirective(
-            directive, projectContext, Path.of(projectPath)
+        var result = bridge.executeTask(
+            task, projectContext, Path.of(projectPath)
         );
 
         var updates = new HashMap<String, Object>();
-        updates.put("starblasters", List.of(result.starblasterInfo()));
-        updates.put("currentDirectiveIndex", currentIndex + 1);
+        updates.put("sandboxes", List.of(result.sandboxInfo()));
+        updates.put("currentTaskIndex", currentIndex + 1);
         updates.put("status", MissionStatus.EXECUTING.name());
 
-        if (result.directive().status() == DirectiveStatus.FAILED) {
+        if (result.task().status() == TaskStatus.FAILED) {
             updates.put("errors", List.of(
-                "Directive " + directive.id() + " failed: " + result.output()));
+                "Task " + task.id() + " failed: " + result.output()));
         }
 
         return updates;
@@ -1295,14 +1295,14 @@ public class DispatchCenturionNode {
 **Step 5: Commit**
 
 ```bash
-git add src/main/java/com/worldmind/core/nodes/DispatchCenturionNode.java \
-        src/test/java/com/worldmind/core/nodes/DispatchCenturionNodeTest.java
-git commit -m "feat: DispatchCenturionNode dispatches directives to Starblasters"
+git add src/main/java/com/worldmind/core/nodes/DispatchAgentNode.java \
+        src/test/java/com/worldmind/core/nodes/DispatchAgentNodeTest.java
+git commit -m "feat: DispatchAgentNode dispatches tasks to Sandboxes"
 ```
 
 ---
 
-## Task 2.9: Wire DispatchCenturionNode into Graph
+## Task 2.9: Wire DispatchAgentNode into Graph
 
 **Files:**
 - Modify: `src/main/java/com/worldmind/core/graph/WorldmindGraph.java`
@@ -1311,11 +1311,11 @@ git commit -m "feat: DispatchCenturionNode dispatches directives to Starblasters
 **Step 1: Update the graph**
 
 Modify `WorldmindGraph.java` to:
-1. Inject `DispatchCenturionNode` in the constructor
-2. Add `"dispatch_centurion"` node
-3. Change `await_approval` edge to go to `dispatch_centurion` instead of END
-4. Add conditional edge after `dispatch_centurion` that loops or exits
-5. For FULL_AUTO mode, route from `plan_mission` to `dispatch_centurion` directly
+1. Inject `DispatchAgentNode` in the constructor
+2. Add `"dispatch_agent"` node
+3. Change `await_approval` edge to go to `dispatch_agent` instead of END
+4. Add conditional edge after `dispatch_agent` that loops or exits
+5. For FULL_AUTO mode, route from `plan_mission` to `dispatch_agent` directly
 
 The updated constructor and routing:
 
@@ -1324,7 +1324,7 @@ public WorldmindGraph(
         ClassifyRequestNode classifyNode,
         UploadContextNode uploadNode,
         PlanMissionNode planNode,
-        DispatchCenturionNode dispatchNode,
+        DispatchAgentNode dispatchNode,
         @Autowired(required = false) BaseCheckpointSaver checkpointSaver) throws Exception {
 
     var graph = new StateGraph<>(WorldmindState.SCHEMA, WorldmindState::new)
@@ -1333,18 +1333,18 @@ public WorldmindGraph(
             .addNode("plan_mission", node_async(planNode::apply))
             .addNode("await_approval", node_async(
                     state -> Map.of("status", MissionStatus.AWAITING_APPROVAL.name())))
-            .addNode("dispatch_centurion", node_async(dispatchNode::apply))
+            .addNode("dispatch_agent", node_async(dispatchNode::apply))
             .addEdge(START, "classify_request")
             .addEdge("classify_request", "upload_context")
             .addEdge("upload_context", "plan_mission")
             .addConditionalEdges("plan_mission",
                     edge_async(this::routeAfterPlan),
                     Map.of("await_approval", "await_approval",
-                            "dispatch", "dispatch_centurion"))
-            .addEdge("await_approval", "dispatch_centurion")
-            .addConditionalEdges("dispatch_centurion",
+                            "dispatch", "dispatch_agent"))
+            .addEdge("await_approval", "dispatch_agent")
+            .addConditionalEdges("dispatch_agent",
                     edge_async(this::routeAfterDispatch),
-                    Map.of("dispatch_centurion", "dispatch_centurion",
+                    Map.of("dispatch_agent", "dispatch_agent",
                             "end", END));
 
     // ... checkpointer config same as before
@@ -1358,10 +1358,10 @@ String routeAfterPlan(WorldmindState state) {
 }
 
 String routeAfterDispatch(WorldmindState state) {
-    int currentIndex = state.currentDirectiveIndex();
-    int totalDirectives = state.directives().size();
-    if (currentIndex < totalDirectives) {
-        return "dispatch_centurion";
+    int currentIndex = state.currentTaskIndex();
+    int totalTasks = state.tasks().size();
+    if (currentIndex < totalTasks) {
+        return "dispatch_agent";
     }
     return "end";
 }
@@ -1379,30 +1379,30 @@ Expected: ALL PASS
 ```bash
 git add src/main/java/com/worldmind/core/graph/WorldmindGraph.java \
         src/test/java/com/worldmind/core/graph/GraphTest.java
-git commit -m "feat: wire dispatch_centurion node into LangGraph4j graph"
+git commit -m "feat: wire dispatch_agent node into LangGraph4j graph"
 ```
 
 ---
 
-## Task 2.10: Update CLI Output for Starblaster Activity
+## Task 2.10: Update CLI Output for Sandbox Activity
 
 **Files:**
 - Modify: `src/main/java/com/worldmind/dispatch/cli/ConsoleOutput.java`
 - Modify: `src/main/java/com/worldmind/dispatch/cli/MissionCommand.java:86-91`
 
-**Step 1: Add starblaster output methods to ConsoleOutput**
+**Step 1: Add sandbox output methods to ConsoleOutput**
 
 Add to `ConsoleOutput.java`:
 
 ```java
-public static void starblaster(String message) {
+public static void sandbox(String message) {
     System.out.println(CommandLine.Help.Ansi.AUTO.string(
-            "@|fg(magenta) [STARBLASTER]|@ " + message));
+            "@|fg(magenta) [SANDBOX]|@ " + message));
 }
 
-public static void centurion(String type, String message) {
+public static void agent(String type, String message) {
     System.out.println(CommandLine.Help.Ansi.AUTO.string(
-            "@|fg(blue) [CENTURION " + type + "]|@ " + message));
+            "@|fg(blue) [AGENT " + type + "]|@ " + message));
 }
 
 public static void fileChange(String action, String path) {
@@ -1414,23 +1414,23 @@ public static void fileChange(String action, String path) {
 
 **Step 2: Update MissionCommand to display execution results**
 
-Replace lines 86-91 of `MissionCommand.java` (the `AWAITING_APPROVAL` block) with logic that also shows starblaster activity and file changes when the mission has executed:
+Replace lines 86-91 of `MissionCommand.java` (the `AWAITING_APPROVAL` block) with logic that also shows sandbox activity and file changes when the mission has executed:
 
 ```java
 // Display execution results
-var starblasters = finalState.starblasters();
-if (!starblasters.isEmpty()) {
+var sandboxes = finalState.sandboxes();
+if (!sandboxes.isEmpty()) {
     System.out.println();
-    for (var sg : starblasters) {
-        ConsoleOutput.starblaster(String.format(
-            "Centurion %s — %s (%s)",
-            sg.centurionType(), sg.directiveId(), sg.status()));
+    for (var sg : sandboxes) {
+        ConsoleOutput.sandbox(String.format(
+            "Agent %s — %s (%s)",
+            sg.agentType(), sg.taskId(), sg.status()));
     }
 }
 
-// Display file changes from directives
-var allDirectives = finalState.directives();
-for (var d : allDirectives) {
+// Display file changes from tasks
+var allTasks = finalState.tasks();
+for (var d : allTasks) {
     if (d.filesAffected() != null) {
         for (var f : d.filesAffected()) {
             ConsoleOutput.fileChange(f.action(), f.path());
@@ -1461,20 +1461,20 @@ Run: `mvn test -f /Users/dbbaskette/Projects/Worldmind/pom.xml`
 ```bash
 git add src/main/java/com/worldmind/dispatch/cli/ConsoleOutput.java \
         src/main/java/com/worldmind/dispatch/cli/MissionCommand.java
-git commit -m "feat: CLI output for Starblaster activity and file changes"
+git commit -m "feat: CLI output for Sandbox activity and file changes"
 ```
 
 ---
 
-## Task 2.11: Centurion Forge Docker Image
+## Task 2.11: Agent Coder Docker Image
 
 **Files:**
-- Modify: `docker/centurion-base/Dockerfile` — update Goose install (Goose uses `pipx install goose-ai` or `brew install goose`)
-- Create: `docker/centurion-forge/Dockerfile`
+- Modify: `docker/agent-base/Dockerfile` — update Goose install (Goose uses `pipx install goose-ai` or `brew install goose`)
+- Create: `docker/agent-coder/Dockerfile`
 
 **Step 1: Update the base Dockerfile**
 
-The base image should have Goose CLI properly installed. Update `docker/centurion-base/Dockerfile`:
+The base image should have Goose CLI properly installed. Update `docker/agent-base/Dockerfile`:
 
 ```dockerfile
 FROM python:3.12-slim
@@ -1492,23 +1492,23 @@ RUN pip install --no-cache-dir goose-ai
 RUN npm install -g @modelcontextprotocol/server-filesystem
 
 # Create non-root user
-RUN useradd -m -s /bin/bash centurion
+RUN useradd -m -s /bin/bash agent
 
 WORKDIR /workspace
 
-USER centurion
+USER agent
 ```
 
-**Step 2: Create the Forge Dockerfile**
+**Step 2: Create the Coder Dockerfile**
 
-`docker/centurion-forge/Dockerfile`:
+`docker/agent-coder/Dockerfile`:
 
 ```dockerfile
-FROM worldmind/centurion-base:latest
+FROM worldmind/agent-base:latest
 
-# Forge-specific label
-LABEL com.worldmind.centurion="forge"
-LABEL com.worldmind.description="Code generation centurion"
+# Coder-specific label
+LABEL com.worldmind.agent="coder"
+LABEL com.worldmind.description="Code generation agent"
 
 # Goose config is provided via environment variables:
 #   GOOSE_PROVIDER - openai (LM Studio) or anthropic
@@ -1526,8 +1526,8 @@ ENTRYPOINT ["goose", "run"]
 
 ```bash
 cd /Users/dbbaskette/Projects/Worldmind
-docker build -t worldmind/centurion-base:latest docker/centurion-base/
-docker build -t worldmind/centurion-forge:latest docker/centurion-forge/
+docker build -t worldmind/agent-base:latest docker/agent-base/
+docker build -t worldmind/agent-coder:latest docker/agent-coder/
 ```
 
 Expected: Both images build successfully.
@@ -1535,8 +1535,8 @@ Expected: Both images build successfully.
 **Step 4: Commit**
 
 ```bash
-git add docker/centurion-base/Dockerfile docker/centurion-forge/Dockerfile
-git commit -m "feat: Centurion Forge Docker image with Goose CLI"
+git add docker/agent-base/Dockerfile docker/agent-coder/Dockerfile
+git commit -m "feat: Agent Coder Docker image with Goose CLI"
 ```
 
 ---
@@ -1544,16 +1544,16 @@ git commit -m "feat: Centurion Forge Docker image with Goose CLI"
 ## Task 2.12: End-to-End Integration Test
 
 **Files:**
-- Create: `src/test/java/com/worldmind/integration/ForgeIntegrationTest.java`
+- Create: `src/test/java/com/worldmind/integration/CoderIntegrationTest.java`
 
 **Step 1: Write the integration test**
 
-This test requires Docker running and the centurion-forge image built. It uses a simple inline instruction (no LLM needed) to verify the full starblaster lifecycle.
+This test requires Docker running and the agent-coder image built. It uses a simple inline instruction (no LLM needed) to verify the full sandbox lifecycle.
 
 ```java
 package com.worldmind.integration;
 
-import com.worldmind.starblaster.*;
+import com.worldmind.sandbox.*;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
 import com.github.dockerjava.core.DockerClientImpl;
 import com.github.dockerjava.httpclient5.ApacheDockerHttpClient;
@@ -1568,15 +1568,15 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * End-to-end integration test for Starblaster execution.
- * Requires Docker to be running and the centurion-forge image built.
+ * End-to-end integration test for Sandbox execution.
+ * Requires Docker to be running and the agent-coder image built.
  * Run with: mvn test -Dgroups=integration
  */
 @Tag("integration")
-class ForgeIntegrationTest {
+class CoderIntegrationTest {
 
     @Test
-    void starblasterExecutesGooseAndCreatesFile(@TempDir Path tempDir) {
+    void sandboxExecutesGooseAndCreatesFile(@TempDir Path tempDir) {
         // Setup Docker client
         var dockerConfig = DefaultDockerClientConfig.createDefaultConfigBuilder().build();
         var httpClient = new ApacheDockerHttpClient.Builder()
@@ -1585,13 +1585,13 @@ class ForgeIntegrationTest {
                 .build();
         var dockerClient = DockerClientImpl.getInstance(dockerConfig, httpClient);
 
-        var provider = new DockerStarblasterProvider(dockerClient);
-        var properties = new StarblasterProperties();
-        var manager = new StarblasterManager(provider, properties);
+        var provider = new DockerSandboxProvider(dockerClient);
+        var properties = new SandboxProperties();
+        var manager = new SandboxManager(provider, properties);
 
         // Execute a simple file creation task
-        var result = manager.executeDirective(
-            "forge", "INT-001", tempDir,
+        var result = manager.executeTask(
+            "coder", "INT-001", tempDir,
             "Create a file named hello.py in the current directory with the content: print('Hello from Worldmind')",
             Map.of("GOOSE_PROVIDER", "openai",
                    "GOOSE_MODEL", "qwen2.5-coder-32b",
@@ -1625,8 +1625,8 @@ Note: This will only pass if Docker is running, the image is built, and LM Studi
 **Step 3: Commit**
 
 ```bash
-git add src/test/java/com/worldmind/integration/ForgeIntegrationTest.java
-git commit -m "test: end-to-end Centurion Forge integration test"
+git add src/test/java/com/worldmind/integration/CoderIntegrationTest.java
+git commit -m "test: end-to-end Agent Coder integration test"
 ```
 
 ---
@@ -1646,8 +1646,8 @@ Expected: BUILD SUCCESS, JAR created in target/
 **Step 3: Build Docker images**
 
 ```bash
-docker build -t worldmind/centurion-base:latest /Users/dbbaskette/Projects/Worldmind/docker/centurion-base/
-docker build -t worldmind/centurion-forge:latest /Users/dbbaskette/Projects/Worldmind/docker/centurion-forge/
+docker build -t worldmind/agent-base:latest /Users/dbbaskette/Projects/Worldmind/docker/agent-base/
+docker build -t worldmind/agent-coder:latest /Users/dbbaskette/Projects/Worldmind/docker/agent-coder/
 ```
 
 **Step 4: Commit any remaining fixes**
@@ -1663,16 +1663,16 @@ git commit -m "chore: Phase 2 final cleanup and test fixes"
 
 | Task | Component | Commit Message |
 |------|-----------|---------------|
-| 2.1 | StarblasterProvider + StarblasterRequest | `feat: StarblasterProvider interface and StarblasterRequest record` |
-| 2.2 | StarblasterProperties | `feat: StarblasterProperties with Goose provider and container config` |
-| 2.3 | InstructionBuilder | `feat: InstructionBuilder converts directives to Goose instructions` |
-| 2.4 | DockerStarblasterProvider | `feat: DockerStarblasterProvider for container lifecycle management` |
-| 2.5 | StarblasterManager | `feat: StarblasterManager with file change detection` |
-| 2.6 | StarblasterBridge | `feat: StarblasterBridge translates directives to starblaster executions` |
-| 2.7 | StarblasterConfig | `feat: StarblasterConfig wires Docker provider beans` |
-| 2.8 | DispatchCenturionNode | `feat: DispatchCenturionNode dispatches directives to Starblasters` |
-| 2.9 | Graph wiring | `feat: wire dispatch_centurion node into LangGraph4j graph` |
-| 2.10 | CLI output | `feat: CLI output for Starblaster activity and file changes` |
-| 2.11 | Docker image | `feat: Centurion Forge Docker image with Goose CLI` |
-| 2.12 | Integration test | `test: end-to-end Centurion Forge integration test` |
+| 2.1 | SandboxProvider + AgentRequest | `feat: SandboxProvider interface and AgentRequest record` |
+| 2.2 | SandboxProperties | `feat: SandboxProperties with Goose provider and container config` |
+| 2.3 | InstructionBuilder | `feat: InstructionBuilder converts tasks to Goose instructions` |
+| 2.4 | DockerSandboxProvider | `feat: DockerSandboxProvider for container lifecycle management` |
+| 2.5 | SandboxManager | `feat: SandboxManager with file change detection` |
+| 2.6 | AgentDispatcher | `feat: AgentDispatcher translates tasks to sandbox executions` |
+| 2.7 | SandboxConfig | `feat: SandboxConfig wires Docker provider beans` |
+| 2.8 | DispatchAgentNode | `feat: DispatchAgentNode dispatches tasks to Sandboxes` |
+| 2.9 | Graph wiring | `feat: wire dispatch_agent node into LangGraph4j graph` |
+| 2.10 | CLI output | `feat: CLI output for Sandbox activity and file changes` |
+| 2.11 | Docker image | `feat: Agent Coder Docker image with Goose CLI` |
+| 2.12 | Integration test | `test: end-to-end Agent Coder integration test` |
 | 2.13 | Final verification | `chore: Phase 2 final cleanup and test fixes` |

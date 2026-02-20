@@ -2,16 +2,16 @@ package com.worldmind.dispatch.api;
 
 import com.worldmind.core.engine.MissionEngine;
 import com.worldmind.core.events.EventBus;
-import com.worldmind.core.model.Directive;
-import com.worldmind.core.model.DirectiveStatus;
+import com.worldmind.core.model.Task;
+import com.worldmind.core.model.TaskStatus;
 import com.worldmind.core.model.InteractionMode;
 import com.worldmind.core.model.MissionStatus;
 import com.worldmind.core.model.ReviewFeedback;
 import com.worldmind.core.scheduler.OscillationDetector;
 import com.worldmind.core.state.WorldmindState;
-import com.worldmind.starblaster.InstructionStore;
-import com.worldmind.starblaster.cf.CloudFoundryProperties;
-import com.worldmind.starblaster.cf.GitWorkspaceManager;
+import com.worldmind.sandbox.InstructionStore;
+import com.worldmind.sandbox.cf.CloudFoundryProperties;
+import com.worldmind.sandbox.cf.GitWorkspaceManager;
 import org.bsc.langgraph4j.RunnableConfig;
 import org.bsc.langgraph4j.checkpoint.BaseCheckpointSaver;
 import org.bsc.langgraph4j.checkpoint.Checkpoint;
@@ -157,8 +157,8 @@ public class MissionController {
     }
 
     /**
-     * GET /api/v1/missions/{id} — Get mission status with all directive statuses.
-     * During active execution, reads the latest checkpoint for live directive progress.
+     * GET /api/v1/missions/{id} — Get mission status with all task statuses.
+     * During active execution, reads the latest checkpoint for live task progress.
      */
     @GetMapping("/{id}")
     public ResponseEntity<MissionResponse> getMission(@PathVariable String id) {
@@ -168,15 +168,15 @@ public class MissionController {
         }
 
         // During active execution, read the latest checkpoint for live state.
-        // Only use checkpoint if it has directives — early checkpoints from graph
-        // re-invocation may be partial and would erase the in-memory directives.
+        // Only use checkpoint if it has tasks — early checkpoints from graph
+        // re-invocation may be partial and would erase the in-memory tasks.
         if (isActiveStatus(state.status())) {
             try {
                 RunnableConfig config = RunnableConfig.builder().threadId(id).build();
                 Optional<Checkpoint> latest = checkpointSaver.get(config);
                 if (latest.isPresent()) {
                     var checkpointState = new WorldmindState(latest.get().getState());
-                    if (!checkpointState.directives().isEmpty()) {
+                    if (!checkpointState.tasks().isEmpty()) {
                         state = checkpointState;
                         missionStates.put(id, state);
                     }
@@ -383,9 +383,9 @@ public class MissionController {
     }
 
     /**
-     * POST /api/v1/missions/{id}/retry — Retry failed directives.
-     * Accepts optional { "directive_ids": ["DIR-002"] } body.
-     * If no body or empty list, retries ALL failed directives.
+     * POST /api/v1/missions/{id}/retry — Retry failed tasks.
+     * Accepts optional { "task_ids": ["TASK-002"] } body.
+     * If no body or empty list, retries ALL failed tasks.
      */
     @PostMapping("/{id}/retry")
     public ResponseEntity<Map<String, String>> retryMission(
@@ -402,33 +402,33 @@ public class MissionController {
                     Map.of("error", "Retry only allowed when mission is COMPLETED or FAILED; current status: " + state.status()));
         }
 
-        // Determine which directives to retry
+        // Determine which tasks to retry
         List<String> targetIds;
-        if (retryRequest != null && retryRequest.directiveIds() != null && !retryRequest.directiveIds().isEmpty()) {
-            targetIds = retryRequest.directiveIds();
+        if (retryRequest != null && retryRequest.taskIds() != null && !retryRequest.taskIds().isEmpty()) {
+            targetIds = retryRequest.taskIds();
         } else {
-            // Retry all failed directives
-            targetIds = state.directives().stream()
-                    .filter(d -> d.status() == DirectiveStatus.FAILED)
-                    .map(Directive::id)
+            // Retry all failed tasks
+            targetIds = state.tasks().stream()
+                    .filter(d -> d.status() == TaskStatus.FAILED)
+                    .map(Task::id)
                     .toList();
         }
 
         if (targetIds.isEmpty()) {
             return ResponseEntity.badRequest().body(
-                    Map.of("error", "No failed directives to retry"));
+                    Map.of("error", "No failed tasks to retry"));
         }
 
-        log.info("Retrying mission {} — directives: {}", id, targetIds);
+        log.info("Retrying mission {} — tasks: {}", id, targetIds);
 
-        // Reset directives: status→PENDING, iteration→0
-        List<Directive> resetDirectives = state.directives().stream()
+        // Reset tasks: status→PENDING, iteration→0
+        List<Task> resetTasks = state.tasks().stream()
                 .map(d -> {
                     if (targetIds.contains(d.id())) {
-                        return new Directive(
-                                d.id(), d.centurion(), d.description(),
+                        return new Task(
+                                d.id(), d.agent(), d.description(),
                                 d.inputContext(), d.successCriteria(), d.dependencies(),
-                                DirectiveStatus.PENDING, 0, d.maxIterations(),
+                                TaskStatus.PENDING, 0, d.maxIterations(),
                                 d.onFailure(), d.targetFiles(), d.filesAffected(), null
                         );
                     }
@@ -437,19 +437,19 @@ public class MissionController {
                 .toList();
 
         // Build completed IDs excluding the ones being retried
-        List<String> completedIds = state.completedDirectiveIds().stream()
+        List<String> completedIds = state.completedTaskIds().stream()
                 .filter(cid -> !targetIds.contains(cid))
                 .toList();
 
-        // Clear oscillation history for retried directives
-        for (String directiveId : targetIds) {
-            oscillationDetector.clearHistory(directiveId);
+        // Clear oscillation history for retried tasks
+        for (String taskId : targetIds) {
+            oscillationDetector.clearHistory(taskId);
         }
 
-        // Build new state for retry — start from shared base, override directives/completedIds
+        // Build new state for retry — start from shared base, override tasks/completedIds
         var retryState = buildExecutionStateMap(state);
-        retryState.put("directives", resetDirectives);
-        retryState.put("completedDirectiveIds", completedIds);
+        retryState.put("tasks", resetTasks);
+        retryState.put("completedTaskIds", completedIds);
         missionStates.put(id, new WorldmindState(retryState));
 
         // Use launchAsyncWithState to preserve the full state (including execution strategy)
@@ -488,10 +488,10 @@ public class MissionController {
     }
 
     /**
-     * GET /api/v1/missions/{id}/directives/{did} — Detailed directive result.
+     * GET /api/v1/missions/{id}/tasks/{did} — Detailed task result.
      */
-    @GetMapping("/{id}/directives/{did}")
-    public ResponseEntity<MissionResponse.DirectiveResponse> getDirective(
+    @GetMapping("/{id}/tasks/{did}")
+    public ResponseEntity<MissionResponse.TaskResponse> getTask(
             @PathVariable String id,
             @PathVariable String did) {
         WorldmindState state = missionStates.get(id);
@@ -499,12 +499,12 @@ public class MissionController {
             return ResponseEntity.notFound().build();
         }
 
-        var activeWaveIds = new HashSet<>(state.waveDirectiveIds());
-        var completedIds = new HashSet<>(state.completedDirectiveIds());
-        return state.directives().stream()
+        var activeWaveIds = new HashSet<>(state.waveTaskIds());
+        var completedIds = new HashSet<>(state.completedTaskIds());
+        return state.tasks().stream()
                 .filter(d -> d.id().equals(did))
                 .findFirst()
-                .map(d -> ResponseEntity.ok(toDirectiveResponse(d, state, activeWaveIds, completedIds)))
+                .map(d -> ResponseEntity.ok(toTaskResponse(d, state, activeWaveIds, completedIds)))
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -556,7 +556,7 @@ public class MissionController {
         if (userStrategy != null && !userStrategy.isBlank()) {
             map.put("userExecutionStrategy", userStrategy);
         }
-        map.put("directives", state.directives());
+        map.put("tasks", state.tasks());
         state.classification().ifPresent(c -> map.put("classification", c));
         state.projectContext().ifPresent(pc -> map.put("projectContext", pc));
         state.productSpec().ifPresent(ps -> map.put("productSpec", ps));
@@ -569,12 +569,12 @@ public class MissionController {
 
     /**
      * Frees memory-heavy resources after a mission completes (success or failure).
-     * On CF, cleans up any remaining directive branches.
+     * On CF, cleans up any remaining task branches.
      * 
-     * <p>Note: With per-wave merge enabled, passed FORGE/PRISM branches are already merged
+     * <p>Note: With per-wave merge enabled, passed CODER/REFACTORER branches are already merged
      * into main after each wave (in EvaluateWaveNode). This cleanup handles:
      * <ul>
-     *   <li>Failed directives (branches preserved for debugging)</li>
+     *   <li>Failed tasks (branches preserved for debugging)</li>
      *   <li>Conflicted branches that couldn't be merged</li>
      *   <li>All branches if the mission itself failed</li>
      * </ul>
@@ -590,13 +590,13 @@ public class MissionController {
             // CF git branch cleanup
             if (gitWorkspaceManager != null && cfProperties != null) {
                 WorldmindState state = missionStates.get(missionId);
-                if (state != null && !state.directives().isEmpty()) {
-                    List<String> allDirectiveIds = state.directives().stream()
-                            .map(Directive::id)
+                if (state != null && !state.tasks().isEmpty()) {
+                    List<String> allTaskIds = state.tasks().stream()
+                            .map(Task::id)
                             .toList();
-                    List<String> passedIds = state.directives().stream()
-                            .filter(d -> d.status() == DirectiveStatus.PASSED)
-                            .map(Directive::id)
+                    List<String> passedIds = state.tasks().stream()
+                            .filter(d -> d.status() == TaskStatus.PASSED)
+                            .map(Task::id)
                             .toList();
 
                     // Use the mission's git URL, falling back to config if not set
@@ -609,10 +609,10 @@ public class MissionController {
                                 missionGitUrl != null ? missionGitUrl.replaceAll("://[^@]+@", "://***@") : "null");
                     }
 
-                    // Per-wave merge already handles passed FORGE/PRISM branches during execution.
+                    // Per-wave merge already handles passed CODER/REFACTORER branches during execution.
                     // At cleanup, we only need to delete branches for:
-                    // 1. Failed directives (for debugging, user may want to inspect)
-                    // 2. All directives if the mission failed (rollback scenario)
+                    // 1. Failed tasks (for debugging, user may want to inspect)
+                    // 2. All tasks if the mission failed (rollback scenario)
                     // 
                     // For successful missions, passed branches should already be merged and deleted.
                     // We still attempt cleanup in case any were missed (e.g., merge conflict).
@@ -620,24 +620,24 @@ public class MissionController {
                         // Mission succeeded — clean up passed branches (should already be deleted,
                         // but cleanup handles any stragglers from merge conflicts)
                         if (!passedIds.isEmpty()) {
-                            log.info("Cleaning up {} passed directive branches for completed mission {}", 
+                            log.info("Cleaning up {} passed task branches for completed mission {}", 
                                     passedIds.size(), missionId);
-                            gitWorkspaceManager.cleanupDirectiveBranches(passedIds, cfProperties.getGitToken(), missionGitUrl);
+                            gitWorkspaceManager.cleanupTaskBranches(passedIds, cfProperties.getGitToken(), missionGitUrl);
                         }
-                        // Clean up failed/skipped directive branches
-                        List<String> failedIds = allDirectiveIds.stream()
+                        // Clean up failed/skipped task branches
+                        List<String> failedIds = allTaskIds.stream()
                                 .filter(id -> !passedIds.contains(id))
                                 .toList();
                         if (!failedIds.isEmpty()) {
-                            log.info("Cleaning up {} failed/skipped directive branches for mission {}", 
+                            log.info("Cleaning up {} failed/skipped task branches for mission {}", 
                                     failedIds.size(), missionId);
-                            gitWorkspaceManager.cleanupDirectiveBranches(failedIds, cfProperties.getGitToken(), missionGitUrl);
+                            gitWorkspaceManager.cleanupTaskBranches(failedIds, cfProperties.getGitToken(), missionGitUrl);
                         }
                     } else {
                         // Mission failed — clean up all branches
-                        log.info("Mission {} failed, cleaning up all {} directive branches", 
-                                missionId, allDirectiveIds.size());
-                        gitWorkspaceManager.cleanupDirectiveBranches(allDirectiveIds, cfProperties.getGitToken(), missionGitUrl);
+                        log.info("Mission {} failed, cleaning up all {} task branches", 
+                                missionId, allTaskIds.size());
+                        gitWorkspaceManager.cleanupTaskBranches(allTaskIds, cfProperties.getGitToken(), missionGitUrl);
                     }
                 }
             }
@@ -649,12 +649,12 @@ public class MissionController {
     }
 
     private MissionResponse toResponse(WorldmindState state) {
-        // Build a set of currently-dispatched directive IDs so we can show them as EXECUTING
-        var activeWaveIds = new HashSet<>(state.waveDirectiveIds());
-        var completedIds = new HashSet<>(state.completedDirectiveIds());
+        // Build a set of currently-dispatched task IDs so we can show them as EXECUTING
+        var activeWaveIds = new HashSet<>(state.waveTaskIds());
+        var completedIds = new HashSet<>(state.completedTaskIds());
 
-        List<MissionResponse.DirectiveResponse> directives = state.directives().stream()
-                .map(d -> toDirectiveResponse(d, state, activeWaveIds, completedIds))
+        List<MissionResponse.TaskResponse> tasks = state.tasks().stream()
+                .map(d -> toTaskResponse(d, state, activeWaveIds, completedIds))
                 .toList();
 
         int waveCount = state.metrics()
@@ -670,24 +670,24 @@ public class MissionController {
                 state.classification().orElse(null),
                 state.productSpec().orElse(null),
                 state.clarifyingQuestions().orElse(null),
-                directives,
-                state.sealGranted(),
+                tasks,
+                state.quality_gateGranted(),
                 state.metrics().orElse(null),
                 state.errors(),
                 waveCount
         );
     }
 
-    private MissionResponse.DirectiveResponse toDirectiveResponse(Directive d, WorldmindState state,
+    private MissionResponse.TaskResponse toTaskResponse(Task d, WorldmindState state,
                                                                     Set<String> activeWaveIds,
                                                                     Set<String> completedIds) {
-        // Find review feedback for this directive
+        // Find review feedback for this task
         Integer reviewScore = null;
         String reviewSummary = null;
         List<String> reviewIssues = null;
         List<String> reviewSuggestions = null;
         for (ReviewFeedback rf : state.reviewFeedback()) {
-            if (d.id().equals(rf.directiveId())) {
+            if (d.id().equals(rf.taskId())) {
                 reviewScore = rf.score();
                 reviewSummary = rf.summary();
                 reviewIssues = rf.issues();
@@ -696,22 +696,22 @@ public class MissionController {
             }
         }
 
-        // Synthesize EXECUTING status for directives in the current wave that haven't
-        // been completed yet. The directives channel isn't updated until EvaluateWaveNode
+        // Synthesize EXECUTING status for tasks in the current wave that haven't
+        // been completed yet. The tasks channel isn't updated until EvaluateWaveNode
         // runs, so during dispatch they still show PENDING in the checkpoint.
         String uiStatus;
-        if (d.status() == DirectiveStatus.PENDING
+        if (d.status() == TaskStatus.PENDING
                 && activeWaveIds.contains(d.id())
                 && !completedIds.contains(d.id())
                 && state.status() == MissionStatus.EXECUTING) {
             uiStatus = "EXECUTING";
         } else {
-            uiStatus = mapDirectiveStatus(d.status());
+            uiStatus = mapTaskStatus(d.status());
         }
 
-        return new MissionResponse.DirectiveResponse(
+        return new MissionResponse.TaskResponse(
                 d.id(),
-                d.centurion(),
+                d.agent(),
                 d.description(),
                 uiStatus,
                 d.iteration(),
@@ -727,10 +727,10 @@ public class MissionController {
     }
 
     /**
-     * Maps internal DirectiveStatus enum names to UI-expected status strings.
+     * Maps internal TaskStatus enum names to UI-expected status strings.
      * Java: PASSED/RUNNING/VERIFYING → UI: FULFILLED/EXECUTING/VERIFYING
      */
-    private String mapDirectiveStatus(DirectiveStatus status) {
+    private String mapTaskStatus(TaskStatus status) {
         if (status == null) return null;
         return switch (status) {
             case PASSED -> "FULFILLED";

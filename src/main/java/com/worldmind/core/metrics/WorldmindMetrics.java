@@ -26,15 +26,15 @@ public class WorldmindMetrics {
                 .record(Duration.ofMillis(ms));
     }
 
-    public void recordDirectiveExecution(String centurionType, long ms) {
-        Timer.builder("worldmind.directive.duration")
-                .tag("centurion", centurionType)
+    public void recordTaskExecution(String agentType, long ms) {
+        Timer.builder("worldmind.task.duration")
+                .tag("agent", agentType)
                 .register(registry)
                 .record(Duration.ofMillis(ms));
     }
 
-    public void recordSealResult(boolean granted) {
-        Counter.builder("worldmind.seal.evaluations")
+    public void recordQualityGateResult(boolean granted) {
+        Counter.builder("worldmind.quality_gate.evaluations")
                 .tag("result", granted ? "granted" : "denied")
                 .register(registry)
                 .increment();
@@ -63,27 +63,27 @@ public class WorldmindMetrics {
     // --- Parallel Execution Observability ---
 
     /**
-     * Records when a directive is deferred from a wave due to file overlap with another directive.
-     * Helps identify how often the scheduler serializes potentially conflicting directives.
+     * Records when a task is deferred from a wave due to file overlap with another task.
+     * Helps identify how often the scheduler serializes potentially conflicting tasks.
      *
-     * @param directiveId the directive that was deferred
+     * @param taskId the task that was deferred
      */
-    public void recordFileOverlapDeferral(String directiveId) {
+    public void recordFileOverlapDeferral(String taskId) {
         Counter.builder("worldmind.parallel.file_overlap_deferrals")
-                .description("Directives deferred due to file overlap conflicts")
+                .description("Tasks deferred due to file overlap conflicts")
                 .register(registry)
                 .increment();
     }
 
     /**
-     * Records a merge conflict that occurred during directive branch merging.
+     * Records a merge conflict that occurred during task branch merging.
      *
-     * @param directiveId the directive whose merge conflicted
-     * @param resolved    true if conflict was resolved via retry, false if directive must be re-executed
+     * @param taskId the task whose merge conflicted
+     * @param resolved    true if conflict was resolved via retry, false if task must be re-executed
      */
-    public void recordMergeConflict(String directiveId, boolean resolved) {
+    public void recordMergeConflict(String taskId, boolean resolved) {
         Counter.builder("worldmind.parallel.merge_conflicts")
-                .description("Merge conflicts during directive branch merging")
+                .description("Merge conflicts during task branch merging")
                 .tag("resolved", String.valueOf(resolved))
                 .register(registry)
                 .increment();
@@ -131,20 +131,20 @@ public class WorldmindMetrics {
     /**
      * Records wave execution metrics for parallel vs sequential analysis.
      *
-     * @param directiveCount number of directives in the wave
+     * @param taskCount number of tasks in the wave
      * @param strategy       "parallel" or "sequential"
      */
-    public void recordWaveExecution(int directiveCount, String strategy) {
+    public void recordWaveExecution(int taskCount, String strategy) {
         Counter.builder("worldmind.wave.executions")
                 .description("Wave executions by strategy")
                 .tag("strategy", strategy)
                 .register(registry)
                 .increment();
 
-        DistributionSummary.builder("worldmind.wave.directive_count")
-                .description("Number of directives per wave")
+        DistributionSummary.builder("worldmind.wave.task_count")
+                .description("Number of tasks per wave")
                 .tag("strategy", strategy)
                 .register(registry)
-                .record(directiveCount);
+                .record(taskCount);
     }
 }

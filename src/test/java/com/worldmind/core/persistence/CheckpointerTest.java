@@ -46,8 +46,8 @@ class CheckpointerTest {
                         "Implement feature",
                         "sequential",
                         List.of(
-                                new MissionPlan.DirectivePlan("FORGE", "Implement feature", "", "Feature works", List.of(), List.of()),
-                                new MissionPlan.DirectivePlan("VIGIL", "Review code", "", "Code quality ok", List.of("DIR-001"), List.of())
+                                new MissionPlan.TaskPlan("CODER", "Implement feature", "", "Feature works", List.of(), List.of()),
+                                new MissionPlan.TaskPlan("REVIEWER", "Review code", "", "Code quality ok", List.of("TASK-001"), List.of())
                         )
                 ));
         when(mockLlm.structuredCall(anyString(), anyString(), eq(ProductSpec.class)))
@@ -67,19 +67,19 @@ class CheckpointerTest {
         mockScheduleWave = mock(ScheduleWaveNode.class);
         when(mockScheduleWave.apply(any(WorldmindState.class))).thenAnswer(invocation -> {
             WorldmindState state = invocation.getArgument(0);
-            var completedIds = new HashSet<>(state.completedDirectiveIds());
-            var directives = state.directives();
-            for (var d : directives) {
+            var completedIds = new HashSet<>(state.completedTaskIds());
+            var tasks = state.tasks();
+            for (var d : tasks) {
                 if (!completedIds.contains(d.id())) {
                     return Map.of(
-                            "waveDirectiveIds", List.of(d.id()),
+                            "waveTaskIds", List.of(d.id()),
                             "waveCount", state.waveCount() + 1,
                             "status", MissionStatus.EXECUTING.name()
                     );
                 }
             }
             return Map.of(
-                    "waveDirectiveIds", List.of(),
+                    "waveTaskIds", List.of(),
                     "waveCount", state.waveCount() + 1,
                     "status", MissionStatus.EXECUTING.name()
             );
@@ -89,14 +89,14 @@ class CheckpointerTest {
         mockParallelDispatch = mock(ParallelDispatchNode.class);
         when(mockParallelDispatch.apply(any(WorldmindState.class))).thenAnswer(invocation -> {
             WorldmindState state = invocation.getArgument(0);
-            var waveIds = state.waveDirectiveIds();
+            var waveIds = state.waveTaskIds();
             var results = new ArrayList<WaveDispatchResult>();
             for (var id : waveIds) {
-                results.add(new WaveDispatchResult(id, DirectiveStatus.PASSED, List.of(), "OK", 100L));
+                results.add(new WaveDispatchResult(id, TaskStatus.PASSED, List.of(), "OK", 100L));
             }
             return Map.of(
                     "waveDispatchResults", results,
-                    "starblasters", List.of(),
+                    "sandboxes", List.of(),
                     "status", MissionStatus.EXECUTING.name()
             );
         });
@@ -105,8 +105,8 @@ class CheckpointerTest {
         mockEvaluateWave = mock(EvaluateWaveNode.class);
         when(mockEvaluateWave.apply(any(WorldmindState.class))).thenAnswer(invocation -> {
             WorldmindState state = invocation.getArgument(0);
-            var waveIds = state.waveDirectiveIds();
-            return Map.of("completedDirectiveIds", new ArrayList<>(waveIds));
+            var waveIds = state.waveTaskIds();
+            return Map.of("completedTaskIds", new ArrayList<>(waveIds));
         });
 
         mockConvergeNode = mock(ConvergeResultsNode.class);

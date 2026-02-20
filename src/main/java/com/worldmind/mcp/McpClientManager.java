@@ -20,7 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Manages MCP sync client lifecycle for all configured servers.
  * <p>
- * Creates MCP clients on-demand per consumer (e.g. "classify", "plan", "forge"),
+ * Creates MCP clients on-demand per consumer (e.g. "classify", "plan", "coder"),
  * each authenticated with that consumer's scoped token. Clients are cached and
  * reused — consumers sharing the same token share the same connection.
  */
@@ -82,7 +82,7 @@ public class McpClientManager {
      * Returns a client for the given consumer, creating and caching it if needed.
      * Consumers with identical tokens share the same underlying MCP connection.
      *
-     * @param consumer the consumer name (e.g. "classify", "plan", "forge")
+     * @param consumer the consumer name (e.g. "classify", "plan", "coder")
      * @return the MCP sync client, or null if not configured
      */
     public McpSyncClient getClientFor(String consumer) {

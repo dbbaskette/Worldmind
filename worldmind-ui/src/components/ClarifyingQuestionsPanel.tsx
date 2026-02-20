@@ -82,8 +82,8 @@ export function ClarifyingQuestionsPanel({ missionId, questions, onRefresh }: Cl
   return (
     <div className="mb-5 rounded-lg border border-wm-border bg-wm-card p-4">
       <div className="flex items-center gap-2 mb-3">
-        <div className="w-5 h-5 rounded bg-centurion-pulse/20 flex items-center justify-center">
-          <svg className="w-3 h-3 text-centurion-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="w-5 h-5 rounded bg-agent-researcher/20 flex items-center justify-center">
+          <svg className="w-3 h-3 text-agent-researcher" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
@@ -130,7 +130,7 @@ export function ClarifyingQuestionsPanel({ missionId, questions, onRefresh }: Cl
                     onClick={() => handleOptionSelect(q.id, opt)}
                     className={`px-2 py-1 text-[10px] rounded border transition-colors ${
                       answers[q.id]?.includes(opt)
-                        ? 'bg-centurion-pulse/20 border-centurion-pulse text-centurion-pulse'
+                        ? 'bg-agent-researcher/20 border-agent-researcher text-agent-researcher'
                         : 'bg-wm-card border-wm-border text-wm_text-muted hover:border-wm_text-muted'
                     }`}
                   >
@@ -144,7 +144,7 @@ export function ClarifyingQuestionsPanel({ missionId, questions, onRefresh }: Cl
               value={answers[q.id] || ''}
               onChange={(e) => handleAnswerChange(q.id, e.target.value)}
               placeholder={q.default_answer || 'Type your answer...'}
-              className="w-full bg-wm-surface border border-wm-border rounded px-3 py-2 text-xs text-wm_text-primary placeholder:text-wm_text-dim focus:outline-none focus:border-centurion-pulse resize-none"
+              className="w-full bg-wm-surface border border-wm-border rounded px-3 py-2 text-xs text-wm_text-primary placeholder:text-wm_text-dim focus:outline-none focus:border-agent-researcher resize-none"
               rows={2}
             />
           </div>
@@ -166,7 +166,7 @@ export function ClarifyingQuestionsPanel({ missionId, questions, onRefresh }: Cl
         <button
           onClick={handleSubmit}
           disabled={submitting || !allRequiredAnswered}
-          className="px-4 py-2 bg-centurion-pulse text-wm-background font-mono text-xs rounded-lg hover:bg-centurion-pulse/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="px-4 py-2 bg-agent-researcher text-wm-background font-mono text-xs rounded-lg hover:bg-agent-researcher/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {submitting ? 'Submitting...' : 'Continue to Spec Generation'}
         </button>

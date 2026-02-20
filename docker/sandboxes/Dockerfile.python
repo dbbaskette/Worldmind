@@ -1,0 +1,9 @@
+FROM ghcr.io/dbbaskette/sandbox:base
+
+USER root
+
+RUN pip install --no-cache-dir uv && \
+    python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:${PATH}"
+
+USER agent

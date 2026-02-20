@@ -8,7 +8,7 @@ export const STATUS_COLORS = {
   SKIPPED: 'bg-status-warning/20 text-amber-400 border border-amber-500/30',
   CLASSIFYING: 'bg-purple-500/20 text-purple-400 border border-purple-500/30',
   UPLOADING: 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30',
-  CLARIFYING: 'bg-centurion-pulse/20 text-centurion-pulse border border-centurion-pulse/30',
+  CLARIFYING: 'bg-agent-researcher/20 text-agent-researcher border border-agent-researcher/30',
   SPECIFYING: 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30',
   PLANNING: 'bg-blue-500/20 text-blue-400 border border-blue-500/30',
   AWAITING_APPROVAL: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
@@ -16,35 +16,35 @@ export const STATUS_COLORS = {
   CANCELLED: 'bg-wm-elevated text-wm_text-muted border border-wm-border',
 } as const
 
-// Centurion badge colors
-export const CENTURION_COLORS = {
-  FORGE: 'bg-centurion-forge/20 text-centurion-forge border border-centurion-forge/30',
-  GAUNTLET: 'bg-centurion-gauntlet/20 text-centurion-gauntlet border border-centurion-gauntlet/30',
-  VIGIL: 'bg-centurion-vigil/20 text-centurion-vigil border border-centurion-vigil/30',
-  PULSE: 'bg-centurion-pulse/20 text-centurion-pulse border border-centurion-pulse/30',
-  PRISM: 'bg-centurion-prism/20 text-centurion-prism border border-centurion-prism/30',
+// Agent badge colors
+export const AGENT_COLORS = {
+  CODER: 'bg-agent-coder/20 text-agent-coder border border-agent-coder/30',
+  TESTER: 'bg-agent-tester/20 text-agent-tester border border-agent-tester/30',
+  REVIEWER: 'bg-agent-reviewer/20 text-agent-reviewer border border-agent-reviewer/30',
+  RESEARCHER: 'bg-agent-researcher/20 text-agent-researcher border border-agent-researcher/30',
+  REFACTORER: 'bg-agent-refactorer/20 text-agent-refactorer border border-agent-refactorer/30',
 } as const
 
-// Centurion solid accent colors for left-border tints
-export const CENTURION_ACCENT: Record<string, string> = {
-  FORGE: '#FF6B35',
-  GAUNTLET: '#C084FC',
-  VIGIL: '#818CF8',
-  PULSE: '#22D3EE',
-  PRISM: '#F472B6',
+// Agent solid accent colors for left-border tints
+export const AGENT_ACCENT: Record<string, string> = {
+  CODER: '#FF6B35',
+  TESTER: '#C084FC',
+  REVIEWER: '#818CF8',
+  RESEARCHER: '#22D3EE',
+  REFACTORER: '#F472B6',
 }
 
 // Event type colors for log entries
 export const EVENT_COLORS = {
   'mission.created': 'text-purple-400',
-  'directive.started': 'text-blue-400',
-  'directive.fulfilled': 'text-emerald-400',
-  'directive.failed': 'text-red-400',
-  'directive.progress': 'text-wm_text-secondary',
-  'directive.phase': 'text-indigo-400',
-  'starblaster.opened': 'text-cyan-400',
-  'seal.denied': 'text-amber-400',
-  'seal.granted': 'text-emerald-400',
+  'task.started': 'text-blue-400',
+  'task.fulfilled': 'text-emerald-400',
+  'task.failed': 'text-red-400',
+  'task.progress': 'text-wm_text-secondary',
+  'task.phase': 'text-indigo-400',
+  'sandbox.opened': 'text-cyan-400',
+  'quality_gate.denied': 'text-amber-400',
+  'quality_gate.granted': 'text-emerald-400',
   'wave.scheduled': 'text-cyan-400',
   'wave.completed': 'text-teal-400',
 } as const

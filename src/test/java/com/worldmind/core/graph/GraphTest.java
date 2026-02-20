@@ -34,8 +34,8 @@ class GraphTest {
                         "Implement feature",
                         "sequential",
                         List.of(
-                                new MissionPlan.DirectivePlan("FORGE", "Implement feature", "", "Feature works", List.of(), List.of()),
-                                new MissionPlan.DirectivePlan("VIGIL", "Review code", "", "Code quality ok", List.of("DIR-001"), List.of())
+                                new MissionPlan.TaskPlan("CODER", "Implement feature", "", "Feature works", List.of(), List.of()),
+                                new MissionPlan.TaskPlan("REVIEWER", "Review code", "", "Code quality ok", List.of("TASK-001"), List.of())
                         )
                 ));
         when(mockLlm.structuredCall(anyString(), anyString(), eq(ProductSpec.class)))
@@ -55,13 +55,13 @@ class GraphTest {
         ScheduleWaveNode mockScheduleWave = mock(ScheduleWaveNode.class);
         when(mockScheduleWave.apply(any(WorldmindState.class))).thenAnswer(invocation -> {
             WorldmindState state = invocation.getArgument(0);
-            var completedIds = new HashSet<>(state.completedDirectiveIds());
-            var directives = state.directives();
-            // Find first non-completed directive
-            for (var d : directives) {
+            var completedIds = new HashSet<>(state.completedTaskIds());
+            var tasks = state.tasks();
+            // Find first non-completed task
+            for (var d : tasks) {
                 if (!completedIds.contains(d.id())) {
                     return Map.of(
-                            "waveDirectiveIds", List.of(d.id()),
+                            "waveTaskIds", List.of(d.id()),
                             "waveCount", state.waveCount() + 1,
                             "status", MissionStatus.EXECUTING.name()
                     );
@@ -69,7 +69,7 @@ class GraphTest {
             }
             // All done
             return Map.of(
-                    "waveDirectiveIds", List.of(),
+                    "waveTaskIds", List.of(),
                     "waveCount", state.waveCount() + 1,
                     "status", MissionStatus.EXECUTING.name()
             );
@@ -79,24 +79,24 @@ class GraphTest {
         ParallelDispatchNode mockParallelDispatch = mock(ParallelDispatchNode.class);
         when(mockParallelDispatch.apply(any(WorldmindState.class))).thenAnswer(invocation -> {
             WorldmindState state = invocation.getArgument(0);
-            var waveIds = state.waveDirectiveIds();
+            var waveIds = state.waveTaskIds();
             var results = new ArrayList<WaveDispatchResult>();
             for (var id : waveIds) {
-                results.add(new WaveDispatchResult(id, DirectiveStatus.PASSED, List.of(), "OK", 100L));
+                results.add(new WaveDispatchResult(id, TaskStatus.PASSED, List.of(), "OK", 100L));
             }
             return Map.of(
                     "waveDispatchResults", results,
-                    "starblasters", List.of(),
+                    "sandboxes", List.of(),
                     "status", MissionStatus.EXECUTING.name()
             );
         });
 
-        // Mock EvaluateWaveNode: marks all dispatched directives as completed
+        // Mock EvaluateWaveNode: marks all dispatched tasks as completed
         EvaluateWaveNode mockEvaluateWave = mock(EvaluateWaveNode.class);
         when(mockEvaluateWave.apply(any(WorldmindState.class))).thenAnswer(invocation -> {
             WorldmindState state = invocation.getArgument(0);
-            var waveIds = state.waveDirectiveIds();
-            return Map.of("completedDirectiveIds", new ArrayList<>(waveIds));
+            var waveIds = state.waveTaskIds();
+            return Map.of("completedTaskIds", new ArrayList<>(waveIds));
         });
 
         ConvergeResultsNode mockConvergeNode = mock(ConvergeResultsNode.class);
@@ -152,8 +152,8 @@ class GraphTest {
         assertEquals(MissionStatus.AWAITING_APPROVAL, finalState.status());
         assertTrue(finalState.classification().isPresent());
         assertTrue(finalState.projectContext().isPresent());
-        assertFalse(finalState.directives().isEmpty());
-        assertEquals("DIR-001", finalState.directives().get(0).id());
+        assertFalse(finalState.tasks().isEmpty());
+        assertEquals("TASK-001", finalState.tasks().get(0).id());
     }
 
     // ===================================================================
@@ -177,7 +177,7 @@ class GraphTest {
         assertEquals(InteractionMode.FULL_AUTO, finalState.interactionMode());
         assertTrue(finalState.classification().isPresent());
         assertTrue(finalState.projectContext().isPresent());
-        assertFalse(finalState.directives().isEmpty());
+        assertFalse(finalState.tasks().isEmpty());
     }
 
     // ===================================================================
@@ -219,7 +219,7 @@ class GraphTest {
     @DisplayName("routeAfterSchedule returns 'parallel_dispatch' when wave is non-empty")
     void routeAfterScheduleNonEmpty() {
         var state = new WorldmindState(Map.of(
-                "waveDirectiveIds", List.of("DIR-001")
+                "waveTaskIds", List.of("TASK-001")
         ));
         assertEquals("parallel_dispatch", worldmindGraph.routeAfterSchedule(state));
     }
@@ -228,7 +228,7 @@ class GraphTest {
     @DisplayName("routeAfterSchedule returns 'converge_results' when wave is empty")
     void routeAfterScheduleEmpty() {
         var state = new WorldmindState(Map.of(
-                "waveDirectiveIds", List.of()
+                "waveTaskIds", List.of()
         ));
         assertEquals("converge_results", worldmindGraph.routeAfterSchedule(state));
     }
@@ -242,35 +242,35 @@ class GraphTest {
     void routeAfterWaveEvalFailed() {
         var state = new WorldmindState(Map.of(
                 "status", MissionStatus.FAILED.name(),
-                "directives", List.of()
+                "tasks", List.of()
         ));
         assertEquals("converge_results", worldmindGraph.routeAfterWaveEval(state));
     }
 
     @Test
-    @DisplayName("routeAfterWaveEval returns 'converge_results' when all directives completed")
+    @DisplayName("routeAfterWaveEval returns 'converge_results' when all tasks completed")
     void routeAfterWaveEvalAllComplete() {
-        var d1 = new Directive("DIR-001", "FORGE", "Do", "", "Done", List.of(),
-                DirectiveStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of(), List.of(), null);
+        var d1 = new Task("TASK-001", "CODER", "Do", "", "Done", List.of(),
+                TaskStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of(), List.of(), null);
         var state = new WorldmindState(Map.of(
                 "status", MissionStatus.EXECUTING.name(),
-                "directives", List.of(d1),
-                "completedDirectiveIds", List.of("DIR-001")
+                "tasks", List.of(d1),
+                "completedTaskIds", List.of("TASK-001")
         ));
         assertEquals("converge_results", worldmindGraph.routeAfterWaveEval(state));
     }
 
     @Test
-    @DisplayName("routeAfterWaveEval returns 'schedule_wave' when directives remain")
+    @DisplayName("routeAfterWaveEval returns 'schedule_wave' when tasks remain")
     void routeAfterWaveEvalRemaining() {
-        var d1 = new Directive("DIR-001", "FORGE", "Do", "", "Done", List.of(),
-                DirectiveStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of(), List.of(), null);
-        var d2 = new Directive("DIR-002", "FORGE", "Do2", "", "Done", List.of(),
-                DirectiveStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of(), List.of(), null);
+        var d1 = new Task("TASK-001", "CODER", "Do", "", "Done", List.of(),
+                TaskStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of(), List.of(), null);
+        var d2 = new Task("TASK-002", "CODER", "Do2", "", "Done", List.of(),
+                TaskStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of(), List.of(), null);
         var state = new WorldmindState(Map.of(
                 "status", MissionStatus.EXECUTING.name(),
-                "directives", List.of(d1, d2),
-                "completedDirectiveIds", List.of("DIR-001")
+                "tasks", List.of(d1, d2),
+                "completedTaskIds", List.of("TASK-001")
         ));
         assertEquals("schedule_wave", worldmindGraph.routeAfterWaveEval(state));
     }

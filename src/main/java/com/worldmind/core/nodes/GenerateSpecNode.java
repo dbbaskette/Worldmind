@@ -7,7 +7,7 @@ import com.worldmind.core.model.ProductSpec;
 import com.worldmind.core.model.ProjectContext;
 import com.worldmind.core.state.WorldmindState;
 import com.worldmind.mcp.McpToolProvider;
-import com.worldmind.starblaster.cf.CloudFoundryProperties;
+import com.worldmind.sandbox.cf.CloudFoundryProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;

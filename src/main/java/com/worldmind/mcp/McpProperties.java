@@ -22,7 +22,7 @@ import java.util.Map;
  *         token: shared-token
  *         tokens:
  *           orchestrator: scoped-token-for-orchestrator
- *           forge: scoped-token-for-forge
+ *           coder: scoped-token-for-coder
  * </pre>
  */
 @Component
@@ -59,7 +59,7 @@ public class McpProperties {
         public void setTokens(Map<String, String> tokens) { this.tokens = tokens; }
 
         /**
-         * Returns the token for a specific consumer (e.g. "orchestrator", "forge").
+         * Returns the token for a specific consumer (e.g. "orchestrator", "coder").
          * Falls back to the shared token if no per-consumer override exists.
          */
         public String getTokenFor(String consumer) {

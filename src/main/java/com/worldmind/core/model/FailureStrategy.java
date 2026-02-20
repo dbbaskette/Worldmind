@@ -1,7 +1,7 @@
 package com.worldmind.core.model;
 
 /**
- * Strategy applied when a directive fails execution.
+ * Strategy applied when a task fails execution.
  */
 public enum FailureStrategy {
     RETRY,

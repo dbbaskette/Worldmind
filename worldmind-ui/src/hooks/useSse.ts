@@ -7,11 +7,11 @@ import { WorldmindEvent } from '../api/types'
 // so refreshing on every one causes rapid re-renders that visually scramble the sidebar.
 const REFRESH_TRIGGERING_EVENTS = new Set([
   'mission.created',
-  'directive.started',
-  'directive.fulfilled',
-  'directive.failed',
-  'seal.denied',
-  'seal.granted',
+  'task.started',
+  'task.fulfilled',
+  'task.failed',
+  'quality_gate.denied',
+  'quality_gate.granted',
   'wave.completed',
 ])
 
@@ -39,14 +39,14 @@ export function useSse(missionId: string | null, onRefresh?: () => void) {
     // Event handlers for different event types
     const handlers = {
       'mission.created': addEvent,
-      'directive.started': addEvent,
-      'directive.fulfilled': addEvent,
-      'directive.failed': addEvent,
-      'directive.progress': addEvent,
-      'directive.phase': addEvent,
-      'starblaster.opened': addEvent,
-      'seal.denied': addEvent,
-      'seal.granted': addEvent,
+      'task.started': addEvent,
+      'task.fulfilled': addEvent,
+      'task.failed': addEvent,
+      'task.progress': addEvent,
+      'task.phase': addEvent,
+      'sandbox.opened': addEvent,
+      'quality_gate.denied': addEvent,
+      'quality_gate.granted': addEvent,
       'wave.scheduled': addEvent,
       'wave.completed': addEvent,
     }

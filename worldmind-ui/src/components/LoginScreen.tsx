@@ -50,7 +50,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full bg-wm-bg border border-wm-border rounded-lg px-4 py-2.5 text-sm text-wm_text-primary placeholder:text-wm_text-dim focus:outline-none focus:border-centurion-vigil/50 focus:ring-1 focus:ring-centurion-vigil/20 transition-all"
+                className="w-full bg-wm-bg border border-wm-border rounded-lg px-4 py-2.5 text-sm text-wm_text-primary placeholder:text-wm_text-dim focus:outline-none focus:border-agent-reviewer/50 focus:ring-1 focus:ring-agent-reviewer/20 transition-all"
                 placeholder="Enter username"
                 disabled={loading}
                 autoFocus
@@ -65,7 +65,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-wm-bg border border-wm-border rounded-lg px-4 py-2.5 text-sm text-wm_text-primary placeholder:text-wm_text-dim focus:outline-none focus:border-centurion-vigil/50 focus:ring-1 focus:ring-centurion-vigil/20 transition-all"
+                className="w-full bg-wm-bg border border-wm-border rounded-lg px-4 py-2.5 text-sm text-wm_text-primary placeholder:text-wm_text-dim focus:outline-none focus:border-agent-reviewer/50 focus:ring-1 focus:ring-agent-reviewer/20 transition-all"
                 placeholder="Enter password"
                 disabled={loading}
               />
@@ -80,7 +80,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
             <button
               type="submit"
               disabled={loading || !username || !password}
-              className="w-full px-4 py-2.5 bg-centurion-vigil text-white rounded-lg text-sm font-medium hover:bg-centurion-vigil/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              className="w-full px-4 py-2.5 bg-agent-reviewer text-white rounded-lg text-sm font-medium hover:bg-agent-reviewer/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">

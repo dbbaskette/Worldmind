@@ -11,15 +11,15 @@
 
 ## 1. Summary
 
-Integrate Worldmind with Nexus (MCP Gateway) to give Core graph nodes and Centurion agents access to four MCP servers: Archive (knowledge graph memory), Xandar (GitHub), Brave Search, and Datacore (PostgreSQL). Nexus manages all server lifecycle and access control externally. Worldmind's responsibility is limited to: connecting to Nexus with the right credentials per consumer, and injecting MCP tools into the right execution contexts.
+Integrate Worldmind with Nexus (MCP Gateway) to give Core graph nodes and Agent agents access to four MCP servers: Archive (knowledge graph memory), Xandar (GitHub), Brave Search, and Datacore (PostgreSQL). Nexus manages all server lifecycle and access control externally. Worldmind's responsibility is limited to: connecting to Nexus with the right credentials per consumer, and injecting MCP tools into the right execution contexts.
 
 ---
 
 ## 2. Goals
 
-- Connect 12 Worldmind consumers (7 Core graph nodes + 5 Centurion types) to Nexus via Streamable HTTP
+- Connect 12 Worldmind consumers (7 Core graph nodes + 5 Agent types) to Nexus via Streamable HTTP
 - Make the Nexus gateway fully configurable via `.env` — no hardcoded URLs or credentials
-- Push Nexus config to the modules that need it: Core nodes get tools via Spring AI MCP Client, Centurions get credentials passed into Starblaster containers
+- Push Nexus config to the modules that need it: Core nodes get tools via Spring AI MCP Client, Agents get credentials passed into Sandbox containers
 - Zero MCP server management in Worldmind — Nexus owns everything upstream
 
 ## 3. Non-Goals
@@ -51,17 +51,17 @@ Integrate Worldmind with Nexus (MCP Gateway) to give Core graph nodes and Centur
 | 3 | `worldmind-plan` | Core | 👁️ | — | 👁️ | — |
 | 4 | `worldmind-schedule` | Core | — | — | — | — |
 | 5 | `worldmind-converge` | Core | — | — | — | 👁️ |
-| 6 | `worldmind-seal` | Core | ✏️ | — | — | — |
+| 6 | `worldmind-quality_gate` | Core | ✏️ | — | — | — |
 | 7 | `worldmind-postmission` | Core | ✏️ | ✏️ | — | — |
-| 8 | `worldmind-forge` | Centurion | — | — | — | 👁️ |
-| 9 | `worldmind-gauntlet` | Centurion | — | — | — | 👁️ |
-| 10 | `worldmind-prism` | Centurion | — | — | — | — |
-| 11 | `worldmind-vigil` | Centurion | — | — | — | — |
-| 12 | `worldmind-pulse` | Centurion | — | — | 👁️ | 👁️ |
+| 8 | `worldmind-coder` | Agent | — | — | — | 👁️ |
+| 9 | `worldmind-tester` | Agent | — | — | — | 👁️ |
+| 10 | `worldmind-refactorer` | Agent | — | — | — | — |
+| 11 | `worldmind-reviewer` | Agent | — | — | — | — |
+| 12 | `worldmind-researcher` | Agent | — | — | 👁️ | 👁️ |
 
 👁️ = read-only tools exposed · ✏️ = read/write tools exposed · — = no access
 
-**Note:** `worldmind-upload`, `worldmind-schedule`, `worldmind-prism`, and `worldmind-vigil` have zero MCP server access. Upload and Schedule are pure orchestration. Prism and Vigil rely entirely on Goose's native file and git capabilities.
+**Note:** `worldmind-upload`, `worldmind-schedule`, `worldmind-refactorer`, and `worldmind-reviewer` have zero MCP server access. Upload and Schedule are pure orchestration. Refactorer and Reviewer rely entirely on Goose's native file and git capabilities.
 
 ---
 
@@ -88,22 +88,22 @@ NEXUS_CORE_UPLOAD_TOKEN=
 NEXUS_CORE_PLAN_TOKEN=
 NEXUS_CORE_SCHEDULE_TOKEN=
 NEXUS_CORE_CONVERGE_TOKEN=
-NEXUS_CORE_SEAL_TOKEN=
+NEXUS_CORE_QUALITY_GATE_TOKEN=
 NEXUS_CORE_POSTMISSION_TOKEN=
 
-# --- Centurion Type Tokens ---
-# Injected into Starblaster containers at dispatch time.
-# Centurions with no MCP access (prism, vigil) still get tokens
+# --- Agent Type Tokens ---
+# Injected into Sandbox containers at dispatch time.
+# Agents with no MCP access (refactorer, reviewer) still get tokens
 # for future extensibility.
-NEXUS_CENTURION_FORGE_TOKEN=
-NEXUS_CENTURION_GAUNTLET_TOKEN=
-NEXUS_CENTURION_PRISM_TOKEN=
-NEXUS_CENTURION_VIGIL_TOKEN=
-NEXUS_CENTURION_PULSE_TOKEN=
+NEXUS_AGENT_CODER_TOKEN=
+NEXUS_AGENT_TESTER_TOKEN=
+NEXUS_AGENT_REFACTORER_TOKEN=
+NEXUS_AGENT_REVIEWER_TOKEN=
+NEXUS_AGENT_RESEARCHER_TOKEN=
 
 # --- Feature Flag ---
 # Master switch to enable/disable all MCP integration.
-# When false, graph nodes run without tools, centurions
+# When false, graph nodes run without tools, agents
 # launch without Nexus connection.
 NEXUS_ENABLED=true
 ```
@@ -126,7 +126,7 @@ Spring Boot `@ConfigurationProperties` class that binds the `.env` values.
 worldmind.nexus.enabled       → boolean (default: false)
 worldmind.nexus.url            → string
 worldmind.nexus.core.*         → map of node name → token
-worldmind.nexus.centurions.*   → map of centurion type → token
+worldmind.nexus.agents.*   → map of agent type → token
 ```
 
 **Acceptance criteria:**
@@ -144,14 +144,14 @@ Central factory that creates and caches `McpSyncClient` instances per consumer.
 - Creates one `McpSyncClient` per Core graph node using Streamable HTTP transport
 - Each client authenticates to Nexus using its node-specific token
 - Clients are created lazily and cached (ConcurrentHashMap)
-- Provides `getCenturionToken(CenturionType)` for Starblaster dispatch
+- Provides `getAgentToken(AgentType)` for Sandbox dispatch
 - Graceful shutdown: closes all cached clients on `@PreDestroy`
 
 **Acceptance criteria:**
 - `getClient("plan")` returns a client authenticated as `worldmind-plan`
 - `getClient("plan")` called twice returns the same cached instance
 - `getClient("schedule")` returns a client that reports zero tools (by Nexus design)
-- `getCenturionToken(CenturionType.FORGE)` returns the forge token string
+- `getAgentToken(AgentType.CODER)` returns the coder token string
 - All clients are closed on application shutdown
 - When `NEXUS_ENABLED=false`, `getClient()` returns null (or throws a clear exception)
 
@@ -183,7 +183,7 @@ Each graph node that has MCP access injects `NovaForceToolProvider` and passes t
 | Classify | `ClassifyNode.java` | Archive (read), Brave Search | Inject `NovaForceToolProvider`, add tools to prompt |
 | Plan | `PlanNode.java` | Archive (read), Brave Search | Inject `NovaForceToolProvider`, add tools to prompt |
 | Converge | `ConvergeNode.java` | Datacore (read) | Inject `NovaForceToolProvider`, add tools to prompt |
-| Seal | `SealNode.java` | Archive (read/write) | Inject `NovaForceToolProvider`, add tools to prompt |
+| QualityGate | `QualityGateNode.java` | Archive (read/write) | Inject `NovaForceToolProvider`, add tools to prompt |
 | PostMission | `PostMissionNode.java` | Xandar (read/write), Archive (read/write) | Inject `NovaForceToolProvider`, add tools to prompt |
 
 **Nodes with NO changes:**
@@ -214,7 +214,7 @@ public class PlanNode implements NodeAction<WorldmindState> {
 - Node works identically when `NEXUS_ENABLED=false` (no tools, same logic)
 - Node discovers and uses tools when `NEXUS_ENABLED=true`
 - Node's system prompt describes what tools are available and when to use them
-- Tool calls are logged with mission context (missionId, directiveId, node name)
+- Tool calls are logged with mission context (missionId, taskId, node name)
 
 ### 7.5 Modify: System Prompts
 
@@ -223,9 +223,9 @@ Each MCP-enabled node needs an updated system prompt that tells the LLM what too
 | Node | Tool Guidance to Add |
 |------|---------------------|
 | **Classify** | "You have access to mission history (Archive) and web search. Check Archive for similar past missions before classifying. If the mission references unfamiliar technology, search for it to understand the domain before routing." |
-| **Plan** | "You have access to mission history (Archive) and web search. Before decomposing, check Archive for patterns from similar past missions. If the mission involves unfamiliar libraries or frameworks, search for them to understand constraints and best practices before generating directives." |
-| **Converge** | "You have access to the project database (Datacore). Use it to check mission checkpoint state and verify that centurion outputs align with the directive requirements." |
-| **Seal** | "You have access to the mission Archive with write permission. After evaluating results: if APPROVED, record what patterns worked. If REJECTED, record what failed and why. The Worldmind learns from every mission." |
+| **Plan** | "You have access to mission history (Archive) and web search. Before decomposing, check Archive for patterns from similar past missions. If the mission involves unfamiliar libraries or frameworks, search for them to understand constraints and best practices before generating tasks." |
+| **Converge** | "You have access to the project database (Datacore). Use it to check mission checkpoint state and verify that agent outputs align with the task requirements." |
+| **QualityGate** | "You have access to the mission Archive with write permission. After evaluating results: if APPROVED, record what patterns worked. If REJECTED, record what failed and why. The Worldmind learns from every mission." |
 | **PostMission** | "You have access to GitHub (Xandar) and the mission Archive. Create a pull request with a clear title and description summarizing all changes. Record the mission outcome and PR link in the Archive." |
 
 **Acceptance criteria:**
@@ -239,14 +239,14 @@ Each MCP-enabled node needs an updated system prompt that tells the LLM what too
 Currently generates Goose `profiles.json` with potentially multiple MCP server entries. Simplify to a single Nexus entry when MCP is enabled, or no MCP entry when disabled.
 
 **Changes:**
-- When `NEXUS_ENABLED=true`: Generate a single `nexus` MCP server entry with the centurion-type-specific token
+- When `NEXUS_ENABLED=true`: Generate a single `nexus` MCP server entry with the agent-type-specific token
 - When `NEXUS_ENABLED=false`: Generate profiles.json with no MCP servers (existing behavior)
 
 **Generated config when enabled:**
 
 ```json
 {
-  "profile": "forge",
+  "profile": "coder",
   "provider": "openai",
   "model": "qwen2.5-coder-32b",
   "mcpServers": {
@@ -262,37 +262,37 @@ Currently generates Goose `profiles.json` with potentially multiple MCP server e
 ```
 
 **Acceptance criteria:**
-- Forge/Gauntlet containers connect to Nexus and see Datacore tools
-- Pulse containers connect to Nexus and see Brave Search + Datacore tools
-- Prism/Vigil containers connect to Nexus and see zero tools (Nexus returns empty)
+- Coder/Tester containers connect to Nexus and see Datacore tools
+- Researcher containers connect to Nexus and see Brave Search + Datacore tools
+- Refactorer/Reviewer containers connect to Nexus and see zero tools (Nexus returns empty)
 - When `NEXUS_ENABLED=false`, no Nexus entry in profiles.json
 
-### 7.7 Modify: StarblasterBridge / DockerStarblasterProvider
+### 7.7 Modify: AgentDispatcher / DockerSandboxProvider
 
-**File:** `DockerStarblasterProvider.java` (or equivalent)
+**File:** `DockerSandboxProvider.java` (or equivalent)
 
-Pass Nexus environment variables into Starblaster containers at launch time.
+Pass Nexus environment variables into Sandbox containers at launch time.
 
 **Changes:**
 - Add `NEXUS_URL` and `NEXUS_TOKEN` to the container environment variables
-- `NEXUS_TOKEN` is the centurion-type-specific token from `NexusClientFactory.getCenturionToken()`
+- `NEXUS_TOKEN` is the agent-type-specific token from `NexusClientFactory.getAgentToken()`
 - Only set these when `NEXUS_ENABLED=true`
 
 ```java
 if (nexusProperties.isEnabled()) {
     env.add("NEXUS_URL=" + nexusProperties.getUrl());
-    env.add("NEXUS_TOKEN=" + nexusClientFactory.getCenturionToken(type));
+    env.add("NEXUS_TOKEN=" + nexusClientFactory.getAgentToken(type));
 }
 ```
 
 **Acceptance criteria:**
 - Container environment includes `NEXUS_URL` and `NEXUS_TOKEN` when enabled
 - Container environment does not include Nexus variables when disabled
-- Token is specific to the centurion type being launched
+- Token is specific to the agent type being launched
 
-### 7.8 Modify: Centurion Entrypoint
+### 7.8 Modify: Agent Entrypoint
 
-**File:** `entrypoint.sh` (in Starblaster Docker image)
+**File:** `entrypoint.sh` (in Sandbox Docker image)
 
 Update the entrypoint to conditionally include the Nexus MCP server in Goose config.
 
@@ -365,21 +365,21 @@ worldmind:
         token: ${NEXUS_CORE_SCHEDULE_TOKEN:}
       converge:
         token: ${NEXUS_CORE_CONVERGE_TOKEN:}
-      seal:
-        token: ${NEXUS_CORE_SEAL_TOKEN:}
+      quality_gate:
+        token: ${NEXUS_CORE_QUALITY_GATE_TOKEN:}
       postmission:
         token: ${NEXUS_CORE_POSTMISSION_TOKEN:}
-    centurions:
-      forge:
-        token: ${NEXUS_CENTURION_FORGE_TOKEN:}
-      gauntlet:
-        token: ${NEXUS_CENTURION_GAUNTLET_TOKEN:}
-      prism:
-        token: ${NEXUS_CENTURION_PRISM_TOKEN:}
-      vigil:
-        token: ${NEXUS_CENTURION_VIGIL_TOKEN:}
-      pulse:
-        token: ${NEXUS_CENTURION_PULSE_TOKEN:}
+    agents:
+      coder:
+        token: ${NEXUS_AGENT_CODER_TOKEN:}
+      tester:
+        token: ${NEXUS_AGENT_TESTER_TOKEN:}
+      refactorer:
+        token: ${NEXUS_AGENT_REFACTORER_TOKEN:}
+      reviewer:
+        token: ${NEXUS_AGENT_REVIEWER_TOKEN:}
+      researcher:
+        token: ${NEXUS_AGENT_RESEARCHER_TOKEN:}
 ```
 
 ---
@@ -391,7 +391,7 @@ worldmind:
 All MCP tool calls through Nexus are logged with MDC context:
 
 ```
-missionId, directiveId, nexusUser, tool, duration_ms, status
+missionId, taskId, nexusUser, tool, duration_ms, status
 ```
 
 ### 10.2 Health Check
@@ -464,16 +464,16 @@ Nexus is optional — when `NEXUS_ENABLED=false`, Worldmind starts without it an
 |------|----------|
 | `NexusConnectionTest` | Spring Boot starts, connects to Nexus, lists tools per user |
 | `GraphNodeToolInjectionTest` | Each modified node receives correct tools and executes with them |
-| `StarblasterNexusTest` | Container launches with Nexus env vars, Goose connects |
+| `SandboxNexusTest` | Container launches with Nexus env vars, Goose connects |
 | `DisabledModeTest` | Everything works when `NEXUS_ENABLED=false` — no Nexus dependency |
 
 ### 12.3 End-to-End Test
 
 Run a full mission with Nexus enabled. Verify:
 - Classify checks Archive and searches for unfamiliar tech
-- Plan uses Archive patterns and search results to generate better directives
-- Forge connects to Nexus and uses Datacore to check schemas
-- Seal writes lessons learned to Archive
+- Plan uses Archive patterns and search results to generate better tasks
+- Coder connects to Nexus and uses Datacore to check schemas
+- QualityGate writes lessons learned to Archive
 - PostMission creates a GitHub PR via Xandar and records it in Archive
 - All tool calls appear in logs with correct MDC context
 
@@ -500,10 +500,10 @@ Run a full mission with Nexus enabled. Verify:
 | `ClassifyNode.java` | Inject tools, update system prompt |
 | `PlanNode.java` | Inject tools, update system prompt |
 | `ConvergeNode.java` | Inject tools, update system prompt |
-| `SealNode.java` | Inject tools, update system prompt |
+| `QualityGateNode.java` | Inject tools, update system prompt |
 | `PostMissionNode.java` | Inject tools, update system prompt |
 | `InstructionBuilder.java` | Simplify to single Nexus MCP entry |
-| `DockerStarblasterProvider.java` | Pass Nexus env vars to containers |
+| `DockerSandboxProvider.java` | Pass Nexus env vars to containers |
 | `entrypoint.sh` | Conditional Nexus config in Goose profiles |
 | `docker-compose.yml` | Add Nexus service, update Worldmind env |
 
@@ -515,7 +515,7 @@ Run a full mission with Nexus enabled. Verify:
 |-------|-------|----------|
 | **1. Config & Plumbing** | NexusProperties, NexusClientFactory, NovaForceToolProvider, .env, application.yml, pom.xml | 2 days |
 | **2. Core Node Wiring** | Modify 5 graph nodes, update system prompts, add health check | 2-3 days |
-| **3. Centurion Wiring** | InstructionBuilder, StarblasterBridge, entrypoint.sh | 1-2 days |
+| **3. Agent Wiring** | InstructionBuilder, AgentDispatcher, entrypoint.sh | 1-2 days |
 | **4. Docker Compose** | Nexus service, dependency wiring, .env.example | 0.5 day |
 | **5. Testing** | Unit, integration, E2E mission | 2-3 days |
 

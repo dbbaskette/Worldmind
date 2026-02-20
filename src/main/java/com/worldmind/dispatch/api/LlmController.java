@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.worldmind.core.llm.LlmProperties;
 import com.worldmind.core.llm.ModelCatalog;
 import com.worldmind.core.llm.ModelCatalog.ModelInfo;
-import com.worldmind.starblaster.StarblasterProperties;
+import com.worldmind.sandbox.SandboxProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -23,11 +23,11 @@ public class LlmController {
     private static final String SESSION_MODEL_KEY = "worldmind_llm_model";
 
     private final LlmProperties llmProperties;
-    private final StarblasterProperties starblasterProperties;
+    private final SandboxProperties sandboxProperties;
 
-    public LlmController(LlmProperties llmProperties, StarblasterProperties starblasterProperties) {
+    public LlmController(LlmProperties llmProperties, SandboxProperties sandboxProperties) {
         this.llmProperties = llmProperties;
-        this.starblasterProperties = starblasterProperties;
+        this.sandboxProperties = sandboxProperties;
     }
 
     @GetMapping("/providers")
@@ -199,7 +199,7 @@ public class LlmController {
             return null;
         }
         try {
-            String serviceName = starblasterProperties.getGooseServiceName();
+            String serviceName = sandboxProperties.getGooseServiceName();
             if (serviceName == null || serviceName.isBlank()) {
                 return null;
             }

@@ -19,8 +19,8 @@ const REASONING_LEVELS = [
 ]
 
 const EXECUTION_STRATEGIES = [
-  { value: 'SEQUENTIAL', label: 'Sequential', description: 'One directive at a time — safest, no conflicts' },
-  { value: 'PARALLEL', label: 'Parallel', description: 'Multiple directives at once — faster, auto-detects conflicts' },
+  { value: 'SEQUENTIAL', label: 'Sequential', description: 'One task at a time — safest, no conflicts' },
+  { value: 'PARALLEL', label: 'Parallel', description: 'Multiple tasks at once — faster, auto-detects conflicts' },
 ]
 
 export function MissionForm({ onSubmit, submitting, error, showSettings, onToggleSettings, username, onLogout }: MissionFormProps) {
@@ -62,7 +62,7 @@ export function MissionForm({ onSubmit, submitting, error, showSettings, onToggl
               value={request}
               onChange={(e) => setRequest(e.target.value)}
               placeholder="Describe your mission..."
-              className="w-full bg-wm-bg border border-wm-border rounded-lg px-4 py-2 text-sm text-wm_text-primary placeholder:text-wm_text-dim focus:outline-none focus:border-centurion-vigil/50 focus:ring-1 focus:ring-centurion-vigil/20 transition-all"
+              className="w-full bg-wm-bg border border-wm-border rounded-lg px-4 py-2 text-sm text-wm_text-primary placeholder:text-wm_text-dim focus:outline-none focus:border-agent-reviewer/50 focus:ring-1 focus:ring-agent-reviewer/20 transition-all"
               disabled={submitting}
             />
           </div>
@@ -71,7 +71,7 @@ export function MissionForm({ onSubmit, submitting, error, showSettings, onToggl
           <select
             value={mode}
             onChange={(e) => setMode(e.target.value)}
-            className="bg-wm-bg border border-wm-border rounded-lg px-3 py-2 text-xs font-mono text-wm_text-secondary focus:outline-none focus:border-centurion-vigil/50 shrink-0"
+            className="bg-wm-bg border border-wm-border rounded-lg px-3 py-2 text-xs font-mono text-wm_text-secondary focus:outline-none focus:border-agent-reviewer/50 shrink-0"
             disabled={submitting}
           >
             {INTERACTION_MODES.map(m => (
@@ -85,7 +85,7 @@ export function MissionForm({ onSubmit, submitting, error, showSettings, onToggl
             onClick={() => setShowOptions(!showOptions)}
             className={`p-2 rounded-lg border transition-colors shrink-0 ${
               showOptions
-                ? 'bg-centurion-vigil/10 border-centurion-vigil/30 text-centurion-vigil'
+                ? 'bg-agent-reviewer/10 border-agent-reviewer/30 text-agent-reviewer'
                 : 'bg-wm-bg border-wm-border text-wm_text-muted hover:text-wm_text-secondary'
             }`}
             title="Mission options"
@@ -102,7 +102,7 @@ export function MissionForm({ onSubmit, submitting, error, showSettings, onToggl
               onClick={onToggleSettings}
               className={`p-2 rounded-lg border transition-colors shrink-0 ${
                 showSettings
-                  ? 'bg-centurion-vigil/10 border-centurion-vigil/30 text-centurion-vigil'
+                  ? 'bg-agent-reviewer/10 border-agent-reviewer/30 text-agent-reviewer'
                   : 'bg-wm-bg border-wm-border text-wm_text-muted hover:text-wm_text-secondary'
               }`}
               title="Settings"
@@ -118,7 +118,7 @@ export function MissionForm({ onSubmit, submitting, error, showSettings, onToggl
           <button
             type="submit"
             disabled={submitting || !request.trim()}
-            className="px-4 py-2 bg-centurion-vigil text-white rounded-lg text-sm font-medium hover:bg-centurion-vigil/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all shrink-0"
+            className="px-4 py-2 bg-agent-reviewer text-white rounded-lg text-sm font-medium hover:bg-agent-reviewer/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all shrink-0"
           >
             {submitting ? (
               <span className="flex items-center gap-2">
@@ -168,7 +168,7 @@ export function MissionForm({ onSubmit, submitting, error, showSettings, onToggl
                     disabled={submitting}
                     className={`flex-1 px-3 py-1.5 rounded border text-xs transition-all ${
                       reasoningLevel === level.value
-                        ? 'bg-centurion-vigil/20 border-centurion-vigil/50 text-centurion-vigil'
+                        ? 'bg-agent-reviewer/20 border-agent-reviewer/50 text-agent-reviewer'
                         : 'bg-wm-bg border-wm-border text-wm_text-muted hover:border-wm_text-muted/50'
                     }`}
                     title={level.description}
@@ -196,7 +196,7 @@ export function MissionForm({ onSubmit, submitting, error, showSettings, onToggl
                     disabled={submitting}
                     className={`flex-1 px-3 py-1.5 rounded border text-xs transition-all ${
                       executionStrategy === strategy.value
-                        ? 'bg-centurion-forge/20 border-centurion-forge/50 text-centurion-forge'
+                        ? 'bg-agent-coder/20 border-agent-coder/50 text-agent-coder'
                         : 'bg-wm-bg border-wm-border text-wm_text-muted hover:border-wm_text-muted/50'
                     }`}
                     title={strategy.description}
@@ -218,7 +218,7 @@ export function MissionForm({ onSubmit, submitting, error, showSettings, onToggl
                 checked={createCfDeployment}
                 onChange={(e) => setCreateCfDeployment(e.target.checked)}
                 disabled={submitting}
-                className="w-4 h-4 rounded border-wm-border bg-wm-bg text-centurion-forge focus:ring-centurion-forge/50 focus:ring-offset-0"
+                className="w-4 h-4 rounded border-wm-border bg-wm-bg text-agent-coder focus:ring-agent-coder/50 focus:ring-offset-0"
               />
               <label htmlFor="createCfDeployment" className="text-xs text-wm_text-secondary cursor-pointer">
                 Create Cloud Foundry deployment artifacts
@@ -237,7 +237,7 @@ export function MissionForm({ onSubmit, submitting, error, showSettings, onToggl
                   value={projectPath}
                   onChange={(e) => setProjectPath(e.target.value)}
                   placeholder="/path/to/project"
-                  className="w-full bg-wm-bg border border-wm-border rounded px-3 py-1.5 text-xs font-mono text-wm_text-secondary placeholder:text-wm_text-dim focus:outline-none focus:border-centurion-vigil/50"
+                  className="w-full bg-wm-bg border border-wm-border rounded px-3 py-1.5 text-xs font-mono text-wm_text-secondary placeholder:text-wm_text-dim focus:outline-none focus:border-agent-reviewer/50"
                   disabled={submitting}
                 />
               </div>
@@ -250,7 +250,7 @@ export function MissionForm({ onSubmit, submitting, error, showSettings, onToggl
                   value={gitRemoteUrl}
                   onChange={(e) => setGitRemoteUrl(e.target.value)}
                   placeholder="https://github.com/..."
-                  className="w-full bg-wm-bg border border-wm-border rounded px-3 py-1.5 text-xs font-mono text-wm_text-secondary placeholder:text-wm_text-dim focus:outline-none focus:border-centurion-vigil/50"
+                  className="w-full bg-wm-bg border border-wm-border rounded px-3 py-1.5 text-xs font-mono text-wm_text-secondary placeholder:text-wm_text-dim focus:outline-none focus:border-agent-reviewer/50"
                   disabled={submitting}
                 />
               </div>

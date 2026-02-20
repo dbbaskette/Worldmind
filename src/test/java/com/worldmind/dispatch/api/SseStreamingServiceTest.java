@@ -71,8 +71,8 @@ class SseStreamingServiceTest {
 
             // Publish an event
             var event = new WorldmindEvent(
-                    "directive.started", "M-001", "DIR-001",
-                    Map.of("centurion", "FORGE"), Instant.now()
+                    "task.started", "M-001", "TASK-001",
+                    Map.of("agent", "CODER"), Instant.now()
             );
             eventBus.publish(event);
 
@@ -89,7 +89,7 @@ class SseStreamingServiceTest {
 
             // Publish event for M-001 only — should not affect M-002 subscriptions
             var event = new WorldmindEvent(
-                    "directive.started", "M-001", "DIR-001",
+                    "task.started", "M-001", "TASK-001",
                     Map.of(), Instant.now()
             );
             eventBus.publish(event);

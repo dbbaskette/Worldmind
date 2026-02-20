@@ -4,7 +4,7 @@
 
 **Goal:** Build an agentic code assistant that accepts natural language requests and autonomously plans, implements, tests, and reviews code using a LangGraph4j control plane (on Spring Boot) orchestrating Goose worker agents in Docker containers.
 
-**Architecture:** A hybrid system where LangGraph4j (Java) manages state, planning, routing, and persistence (the "nervous system") while Goose instances running in Docker containers (Starblasters) perform actual code generation and file manipulation via MCP tools (the "hands"). Spring AI provides Anthropic Claude integration with structured output. Spring Boot provides REST API, DI, and observability.
+**Architecture:** A hybrid system where LangGraph4j (Java) manages state, planning, routing, and persistence (the "nervous system") while Goose instances running in Docker containers (Sandboxes) perform actual code generation and file manipulation via MCP tools (the "hands"). Spring AI provides Anthropic Claude integration with structured output. Spring Boot provides REST API, DI, and observability.
 
 **Tech Stack:** Java 21, Maven, Spring Boot 3.4, Spring AI 1.1, LangGraph4j 1.8, Goose CLI (headless), picocli, PostgreSQL, Docker, MCP servers, Anthropic Claude, Micrometer.
 
@@ -18,9 +18,9 @@
 |-------|------|-----------------|----------|
 | **0** | Project Scaffold | `./mvnw worldmind:help` or `java -jar worldmind.jar --help` prints CLI with all command stubs | 2-3 days |
 | **1** | Brain Without Hands | `worldmind mission "add a hello endpoint"` classifies the request, gathers context, produces a mission plan, and displays it — no code generation yet | 1.5 weeks |
-| **2** | First Centurion | `worldmind mission "create a hello.py"` spins up a Docker container with Goose, generates the file, and writes it to your project | 2 weeks |
-| **3** | The Loop | After code generation, tests run automatically; if they fail, Forge gets feedback and retries; Vigil reviews and grants/denies the Seal | 2 weeks |
-| **4** | Fan-Out | Multi-directive missions execute in parallel — 3 Forge containers spinning up simultaneously for independent files | 1.5 weeks |
+| **2** | First Agent | `worldmind mission "create a hello.py"` spins up a Docker container with Goose, generates the file, and writes it to your project | 2 weeks |
+| **3** | The Loop | After code generation, tests run automatically; if they fail, Coder gets feedback and retries; Reviewer reviews and grants/denies the QualityGate | 2 weeks |
+| **4** | Fan-Out | Multi-task missions execute in parallel — 3 Coder containers spinning up simultaneously for independent files | 1.5 weeks |
 | **5** | Full Dispatch | REST API with SSE streaming, `--watch` mode, timeline inspection, mission history — the full operator experience | 1.5 weeks |
 | **6** | Hardening & Observability | Security (MCP auth, command allowlists, path restrictions), Micrometer metrics, structured event logging, error recovery | 2 weeks |
 
@@ -97,7 +97,7 @@ spring:
 worldmind:
   goose:
     model: ${GOOSE_MODEL:claude-sonnet-4-5-20250929}
-  starblaster:
+  sandbox:
     max-parallel: 10
     timeout-seconds: 300
     memory-limit: 4g
@@ -116,17 +116,17 @@ After creating all files: `./mvnw clean package -DskipTests` should produce a ru
 
 **Files:**
 - Create: `src/main/java/com/worldmind/core/model/MissionStatus.java`
-- Create: `src/main/java/com/worldmind/core/model/DirectiveStatus.java`
+- Create: `src/main/java/com/worldmind/core/model/TaskStatus.java`
 - Create: `src/main/java/com/worldmind/core/model/ExecutionStrategy.java`
 - Create: `src/main/java/com/worldmind/core/model/InteractionMode.java`
 - Create: `src/main/java/com/worldmind/core/model/FailureStrategy.java`
 - Create: `src/main/java/com/worldmind/core/model/Classification.java`
 - Create: `src/main/java/com/worldmind/core/model/ProjectContext.java`
-- Create: `src/main/java/com/worldmind/core/model/Directive.java`
+- Create: `src/main/java/com/worldmind/core/model/Task.java`
 - Create: `src/main/java/com/worldmind/core/model/FileRecord.java`
 - Create: `src/main/java/com/worldmind/core/model/TestResult.java`
 - Create: `src/main/java/com/worldmind/core/model/ReviewFeedback.java`
-- Create: `src/main/java/com/worldmind/core/model/StarblasterInfo.java`
+- Create: `src/main/java/com/worldmind/core/model/SandboxInfo.java`
 - Create: `src/main/java/com/worldmind/core/model/MissionMetrics.java`
 - Create: `src/main/java/com/worldmind/core/state/WorldmindState.java`
 - Test: `src/test/java/com/worldmind/core/model/ModelTest.java`
@@ -146,14 +146,14 @@ public record Classification(
     String planningStrategy
 ) {}
 
-public record Directive(
+public record Task(
     String id,
-    String centurion,
+    String agent,
     String description,
     String inputContext,
     String successCriteria,
     List<String> dependencies,
-    DirectiveStatus status,
+    TaskStatus status,
     int iteration,
     int maxIterations,
     FailureStrategy onFailure,
@@ -201,13 +201,13 @@ public record Directive(
 
 **Files:**
 - Create: `docker-compose.yml`
-- Create: `docker/centurion-base/Dockerfile`
+- Create: `docker/agent-base/Dockerfile`
 
 **docker-compose.yml:** PostgreSQL 16 with healthcheck. Same as before — the database layer is language-agnostic.
 
-**Centurion base Dockerfile:** Placeholder with Python 3.12 base + Goose CLI + Node.js (for MCP servers). The Goose worker containers are language-agnostic — they don't run Java.
+**Agent base Dockerfile:** Placeholder with Python 3.12 base + Goose CLI + Node.js (for MCP servers). The Goose worker containers are language-agnostic — they don't run Java.
 
-**Commit:** `feat: Docker Compose with PostgreSQL and base Centurion Dockerfile`
+**Commit:** `feat: Docker Compose with PostgreSQL and base Agent Dockerfile`
 
 ---
 
@@ -228,18 +228,18 @@ MISSION WMND-2026-0001
 Objective: Add REST endpoint for user profiles with validation
 Strategy: parallel
 
-DIRECTIVES:
-  1. [FORGE]    Implement UserProfile model and schema
-  2. [FORGE]    Implement UserProfileController
-  3. [FORGE]    Implement UserProfileService
-  4. [GAUNTLET] Write unit + integration tests
-  5. [VIGIL]    Final code review
+TASKS:
+  1. [CODER]    Implement UserProfile model and schema
+  2. [CODER]    Implement UserProfileController
+  3. [CODER]    Implement UserProfileService
+  4. [TESTER] Write unit + integration tests
+  5. [REVIEWER]    Final code review
 
 Proceed? [Y/n/edit] n
 Mission cancelled.
 ```
 
-The system classifies the request, scans the project, generates a mission plan with directives, and asks for approval. No code is actually generated yet, but the entire planning pipeline is live and persisted to PostgreSQL.
+The system classifies the request, scans the project, generates a mission plan with tasks, and asks for approval. No code is actually generated yet, but the entire planning pipeline is live and persisted to PostgreSQL.
 
 ---
 
@@ -347,11 +347,11 @@ public class LlmService {
 
 **Key design:**
 - Uses `LlmService.structuredCall()` with `MissionPlan` output type
-- System prompt describes Centurion roster, planning rules, directive ordering
-- Converts `MissionPlan` (LLM output) into `List<Directive>` records
-- Returns directives + execution_strategy + status
+- System prompt describes Agent roster, planning rules, task ordering
+- Converts `MissionPlan` (LLM output) into `List<Task>` records
+- Returns tasks + execution_strategy + status
 
-**Commit:** `feat: plan_mission node with LLM-powered directive generation`
+**Commit:** `feat: plan_mission node with LLM-powered task generation`
 
 ---
 
@@ -391,7 +391,7 @@ public class LlmService {
 - `MissionCommand` calls `MissionEngine.runMission()` and uses `ConsoleOutput` to display:
   - Classification results
   - Project context summary
-  - Directive table
+  - Task table
   - Approval prompt (interactive mode)
 - `ConsoleOutput` uses picocli ANSI colors for the Worldmind-themed display
 
@@ -401,7 +401,7 @@ public class LlmService {
 
 ---
 
-## Phase 2: First Centurion
+## Phase 2: First Agent
 
 ### Runnable Milestone
 ```bash
@@ -410,16 +410,16 @@ $ java -jar target/worldmind.jar mission "Create a hello.py that prints hello wo
 ✶ WORLDMIND v1.0
 ──────────────────────────────────
 MISSION WMND-2026-A1B2
-DIRECTIVES:
-  1. [FORGE] Create hello.py
+TASKS:
+  1. [CODER] Create hello.py
 
 Proceed? [Y/n] y
 
-[STARBLASTER] Opening for Centurion Forge...
-[CENTURION FORGE] Directive 001: Create hello.py
-[STARBLASTER] Container starblaster-forge-001 running
-[CENTURION FORGE] Directive complete. 1 file created.
-[STARBLASTER] Torn down.
+[SANDBOX] Opening for Agent Coder...
+[AGENT CODER] Task 001: Create hello.py
+[SANDBOX] Container sandbox-coder-001 running
+[AGENT CODER] Task complete. 1 file created.
+[SANDBOX] Torn down.
 
 ✓ Mission complete. 1 file created.
 
@@ -429,86 +429,86 @@ print("Hello, World!")
 
 ---
 
-### Task 2.1: Build Centurion Forge Docker Image
+### Task 2.1: Build Agent Coder Docker Image
 
 **Files:**
-- Modify: `docker/centurion-base/Dockerfile` — install Goose CLI, Node.js, MCP filesystem server
-- Create: `docker/centurion-forge/Dockerfile` — extends base with Forge-specific config
-- Create: `docker/centurion-forge/goose-config.yaml`
+- Modify: `docker/agent-base/Dockerfile` — install Goose CLI, Node.js, MCP filesystem server
+- Create: `docker/agent-coder/Dockerfile` — extends base with Coder-specific config
+- Create: `docker/agent-coder/goose-config.yaml`
 
-**Commit:** `feat: Centurion Forge Docker image with Goose CLI`
+**Commit:** `feat: Agent Coder Docker image with Goose CLI`
 
 ---
 
-### Task 2.2: Starblaster Manager (Docker Java Client)
+### Task 2.2: Sandbox Manager (Docker Java Client)
 
 **Files:**
-- Create: `src/main/java/com/worldmind/starblaster/StarblasterManager.java`
-- Create: `src/main/java/com/worldmind/starblaster/StarblasterBridge.java`
-- Create: `src/main/java/com/worldmind/starblaster/InstructionBuilder.java`
-- Test: `src/test/java/com/worldmind/starblaster/StarblasterManagerTest.java`
+- Create: `src/main/java/com/worldmind/sandbox/SandboxManager.java`
+- Create: `src/main/java/com/worldmind/sandbox/AgentDispatcher.java`
+- Create: `src/main/java/com/worldmind/sandbox/InstructionBuilder.java`
+- Test: `src/test/java/com/worldmind/sandbox/SandboxManagerTest.java`
 
 **Key design:**
-- `StarblasterManager` is a Spring `@Service` using Docker Java client
-- `InstructionBuilder` constructs Goose instruction markdown from a `Directive` record
-- `StarblasterBridge` orchestrates: build instruction → open starblaster → wait → capture → teardown
+- `SandboxManager` is a Spring `@Service` using Docker Java client
+- `InstructionBuilder` constructs Goose instruction markdown from a `Task` record
+- `AgentDispatcher` orchestrates: build instruction → open sandbox → wait → capture → teardown
 - File change detection: snapshot before/after to find created/modified files
 
-**Commit:** `feat: Starblaster Manager and Bridge for Docker-based Goose execution`
+**Commit:** `feat: Sandbox Manager and Bridge for Docker-based Goose execution`
 
 ---
 
-### Task 2.3: Dispatch Centurion Node
+### Task 2.3: Dispatch Agent Node
 
 **Files:**
-- Create: `src/main/java/com/worldmind/core/nodes/DispatchCenturionNode.java`
+- Create: `src/main/java/com/worldmind/core/nodes/DispatchAgentNode.java`
 - Modify: `src/main/java/com/worldmind/core/graph/WorldmindGraph.java`
-- Test: `src/test/java/com/worldmind/core/nodes/DispatchCenturionNodeTest.java`
+- Test: `src/test/java/com/worldmind/core/nodes/DispatchAgentNodeTest.java`
 
 **Key design:**
-- Node finds next pending directive, calls `StarblasterBridge.executeDirective()`
-- Updates directive status and files_created in state
-- Graph wired: execute_directives → dispatch_centurion → conditional (more pending? loop : END)
+- Node finds next pending task, calls `AgentDispatcher.executeTask()`
+- Updates task status and files_created in state
+- Graph wired: execute_tasks → dispatch_agent → conditional (more pending? loop : END)
 
-**Commit:** `feat: dispatch_centurion node with Starblaster Bridge integration`
+**Commit:** `feat: dispatch_agent node with Sandbox Bridge integration`
 
 ---
 
-### Task 2.4: End-to-End Single Centurion Test
+### Task 2.4: End-to-End Single Agent Test
 
 **Files:**
-- Test: `src/test/java/com/worldmind/integration/ForgeIntegrationTest.java`
+- Test: `src/test/java/com/worldmind/integration/CoderIntegrationTest.java`
 
 Full pipeline integration test (requires Docker + API key): mission → classify → plan → dispatch → file created.
 
-**Commit:** `test: end-to-end Centurion Forge integration test`
+**Commit:** `test: end-to-end Agent Coder integration test`
 
 ---
 
 ## Phase 3: The Loop
 
 ### Runnable Milestone
-Build-test-fix cycle working: Vigil denies seal → feedback routes to Forge → Forge fixes → Gauntlet re-runs tests → Vigil approves.
+Build-test-fix cycle working: Reviewer denies quality_gate → feedback routes to Coder → Coder fixes → Tester re-runs tests → Reviewer approves.
 
 ---
 
-### Task 3.1: Centurion Gauntlet (Tester) Image & Config
+### Task 3.1: Agent Tester (Tester) Image & Config
 Build Docker image, instruction template for test generation/execution, parse test output into `TestResult`.
 
-### Task 3.2: Centurion Vigil (Reviewer) Image & Config
+### Task 3.2: Agent Reviewer (Reviewer) Image & Config
 Build Docker image, instruction template for code review, parse output into `ReviewFeedback`.
 
-### Task 3.3: Evaluate Seal Node
-Quality gate logic: check test results + review feedback → grant/deny seal → apply failure strategy (retry/replan/escalate/skip).
+### Task 3.3: Evaluate QualityGate Node
+Quality gate logic: check test results + review feedback → grant/deny quality_gate → apply failure strategy (retry/replan/escalate/skip).
 
 ### Task 3.4: Wire Iterative Cycle into Graph
-dispatch → evaluate_seal → conditional routing back to dispatch for retries. Cyclic graph edges.
+dispatch → evaluate_quality_gate → conditional routing back to dispatch for retries. Cyclic graph edges.
 
 ### Task 3.5: Converge Results Node
-Aggregate all directive outcomes, merge file changes, compute metrics, determine mission success/failure.
+Aggregate all task outcomes, merge file changes, compute metrics, determine mission success/failure.
 
 ### Task 3.6: Force::Spark (Shell MCP) Configuration
-MCP shell server with command allowlists per centurion type.
+MCP shell server with command allowlists per agent type.
 
 ### Task 3.7: Force::Chronicle (Git MCP) Configuration
 MCP git server. Auto-commit to `worldmind/<mission-id>` branch at convergence.
@@ -518,32 +518,32 @@ MCP git server. Auto-commit to `worldmind/<mission-id>` branch at convergence.
 ## Phase 4: Fan-Out ✅
 
 ### Runnable Milestone
-Multiple Goose containers running simultaneously for independent directives. Wave-based parallel execution with dependency-aware scheduling visible in CLI output.
+Multiple Goose containers running simultaneously for independent tasks. Wave-based parallel execution with dependency-aware scheduling visible in CLI output.
 
 **Status: COMPLETE** — 295 unit tests pass, JAR builds.
 
 ---
 
 ### Task 4.1: Wave Execution State Channels ✅
-Added 4 new state channels to `WorldmindState`: `completedDirectiveIds` (appender), `waveDirectiveIds` (base), `waveCount` (base), `waveDispatchResults` (base). Created `WaveDispatchResult` record for per-directive dispatch results.
+Added 4 new state channels to `WorldmindState`: `completedTaskIds` (appender), `waveTaskIds` (base), `waveCount` (base), `waveDispatchResults` (base). Created `WaveDispatchResult` record for per-task dispatch results.
 
-### Task 4.2: DirectiveScheduler Service ✅
-Dependency-aware `DirectiveScheduler.computeNextWave()` — filters directives by completion status and dependency satisfaction, respects `ExecutionStrategy` (SEQUENTIAL caps wave to 1), bounded by `maxParallel`. 10 unit tests covering diamond deps, linear chains, and edge cases.
+### Task 4.2: TaskScheduler Service ✅
+Dependency-aware `TaskScheduler.computeNextWave()` — filters tasks by completion status and dependency satisfaction, respects `ExecutionStrategy` (SEQUENTIAL caps wave to 1), bounded by `maxParallel`. 10 unit tests covering diamond deps, linear chains, and edge cases.
 
 ### Task 4.3: ScheduleWaveNode ✅
-Graph node that calls `DirectiveScheduler`, writes `waveDirectiveIds` and increments `waveCount`. Empty wave signals all directives complete (routes to converge).
+Graph node that calls `TaskScheduler`, writes `waveTaskIds` and increments `waveCount`. Empty wave signals all tasks complete (routes to converge).
 
 ### Task 4.4: ParallelDispatchNode ✅
-Dispatches all directives in a wave concurrently via `CompletableFuture.supplyAsync()` on `Executors.newVirtualThreadPerTaskExecutor()`. Bounded by `Semaphore(maxParallel)`. Applies retry context augmentation. Collects `WaveDispatchResult`, `StarblasterInfo`, and errors.
+Dispatches all tasks in a wave concurrently via `CompletableFuture.supplyAsync()` on `Executors.newVirtualThreadPerTaskExecutor()`. Bounded by `Semaphore(maxParallel)`. Applies retry context augmentation. Collects `WaveDispatchResult`, `SandboxInfo`, and errors.
 
 ### Task 4.5: EvaluateWaveNode ✅
-Batch seal evaluation for all directives in a wave. Non-FORGE directives auto-pass. FORGE directives run GAUNTLET + VIGIL through `SealEvaluationService`. Handles RETRY (re-enter next wave), SKIP (mark complete), ESCALATE (mission failed). 9 unit tests.
+Batch quality_gate evaluation for all tasks in a wave. Non-CODER tasks auto-pass. CODER tasks run TESTER + REVIEWER through `QualityGateEvaluationService`. Handles RETRY (re-enter next wave), SKIP (mark complete), ESCALATE (mission failed). 9 unit tests.
 
 ### Task 4.6: Rewire WorldmindGraph ✅
-Replaced `dispatch_centurion → evaluate_seal` index-based loop with wave-based loop: `schedule_wave → parallel_dispatch → evaluate_wave → schedule_wave`. New routing: `routeAfterSchedule` (empty wave → converge), `routeAfterWaveEval` (all done or failed → converge, else → next wave). Updated GraphTest, CheckpointerTest, MissionEngineTest.
+Replaced `dispatch_agent → evaluate_quality_gate` index-based loop with wave-based loop: `schedule_wave → parallel_dispatch → evaluate_wave → schedule_wave`. New routing: `routeAfterSchedule` (empty wave → converge), `routeAfterWaveEval` (all done or failed → converge, else → next wave). Updated GraphTest, CheckpointerTest, MissionEngineTest.
 
-### Task 4.7: Centurion Pulse Docker Image ✅
-Created `docker/centurion-pulse/Dockerfile` (FROM centurion-base). Added `InstructionBuilder.buildPulseInstruction()` with read-only constraints. Works through existing StarblasterBridge infrastructure.
+### Task 4.7: Agent Researcher Docker Image ✅
+Created `docker/agent-researcher/Dockerfile` (FROM agent-base). Added `InstructionBuilder.buildResearcherInstruction()` with read-only constraints. Works through existing AgentDispatcher infrastructure.
 
 ### Task 4.8: CLI Output & Metrics ✅
 Added `wavesExecuted` and `aggregateDurationMs` to `MissionMetrics`. Added `wave()`, `parallelProgress()`, `waveComplete()` to `ConsoleOutput`. Updated `ConvergeResultsNode` to compute wave metrics. Updated `MissionCommand` for wave-aware display.
@@ -567,7 +567,7 @@ Spring `@RestController` implementing all endpoints from Spec Section 7.2. Missi
 `worldmind status --watch <id>` connects to SSE endpoint and renders live progress with picocli ANSI output.
 
 ### Task 5.4: CLI History, Timeline, Inspect
-Query PostgreSQL checkpoints for mission history and timeline. Retrieve directive logs for inspect.
+Query PostgreSQL checkpoints for mission history and timeline. Retrieve task logs for inspect.
 
 ### Task 5.5: `worldmind serve` Command
 Starts embedded Spring Boot web server. `worldmind serve --port 8000`.
@@ -582,28 +582,28 @@ Full production health checks, MCP auth, command allowlists, Prometheus-compatib
 ---
 
 ### Task 6.1: MCP Authentication & Token Scoping
-Mission-scoped JWT tokens for MCP servers. Token includes mission ID, directive ID, centurion type, expiration.
+Mission-scoped JWT tokens for MCP servers. Token includes mission ID, task ID, agent type, expiration.
 
 ### Task 6.2: Command Allowlisting for Force::Spark
-Per-centurion command allowlists configured in `application.yml`.
+Per-agent command allowlists configured in `application.yml`.
 
 ### Task 6.3: Path Restrictions for Force::Terrain
-Per-centurion filesystem path restrictions. Gauntlet: test dirs only. Vigil: read-only.
+Per-agent filesystem path restrictions. Tester: test dirs only. Reviewer: read-only.
 
 ### Task 6.4: Structured Logging
-SLF4J/Logback with structured JSON output using Worldmind vocabulary. MDC for mission/directive context.
+SLF4J/Logback with structured JSON output using Worldmind vocabulary. MDC for mission/task context.
 
 ### Task 6.5: Micrometer Metrics
 Spring Boot Actuator + Micrometer counters/histograms for all metrics in Spec Section 9.3. `/actuator/prometheus` endpoint.
 
-### Task 6.6: Centurion Prism (Refactorer) Image
-Last centurion type. Runs tests before/after to verify behavioral equivalence.
+### Task 6.6: Agent Refactorer (Refactorer) Image
+Last agent type. Runs tests before/after to verify behavioral equivalence.
 
 ### Task 6.7: Oscillation Detection
 Monitor iterative cycles for alternating patterns. Escalate early if detected.
 
 ### Task 6.8: Health Command (Real Implementation)
-Check PostgreSQL, Docker, MCP servers, starblaster pool status. Display with ANSI colors.
+Check PostgreSQL, Docker, MCP servers, sandbox pool status. Display with ANSI colors.
 
 ---
 
@@ -620,12 +620,12 @@ worldmind/
 ├── docs/plans/
 │   └── 2026-02-05-worldmind-development-plan.md
 ├── docker/
-│   ├── centurion-base/Dockerfile
-│   ├── centurion-forge/
-│   ├── centurion-gauntlet/
-│   ├── centurion-vigil/
-│   ├── centurion-pulse/
-│   ├── centurion-prism/
+│   ├── agent-base/Dockerfile
+│   ├── agent-coder/
+│   ├── agent-tester/
+│   ├── agent-reviewer/
+│   ├── agent-researcher/
+│   ├── agent-refactorer/
 │   └── mcp-servers/
 │       ├── spark/
 │       └── chronicle/
@@ -634,7 +634,7 @@ worldmind/
 │   │   ├── java/com/worldmind/
 │   │   │   ├── WorldmindApplication.java
 │   │   │   ├── core/
-│   │   │   │   ├── model/          # Java records (Classification, Directive, etc.)
+│   │   │   │   ├── model/          # Java records (Classification, Task, etc.)
 │   │   │   │   ├── state/          # WorldmindState (AgentState subclass)
 │   │   │   │   ├── graph/          # WorldmindGraph, GraphConfig
 │   │   │   │   ├── nodes/          # ClassifyRequest, UploadContext, PlanMission, etc.
@@ -642,12 +642,12 @@ worldmind/
 │   │   │   │   ├── llm/            # LlmService (Spring AI ChatClient wrapper)
 │   │   │   │   ├── persistence/    # CheckpointerConfig
 │   │   │   │   ├── scanner/        # ProjectScanner
-│   │   │   │   ├── scheduler/      # DirectiveScheduler
+│   │   │   │   ├── scheduler/      # TaskScheduler
 │   │   │   │   ├── events/         # EventBus, WorldmindEvent
 │   │   │   │   └── oscillation/    # OscillationDetector
-│   │   │   ├── starblaster/
-│   │   │   │   ├── StarblasterManager.java
-│   │   │   │   ├── StarblasterBridge.java
+│   │   │   ├── sandbox/
+│   │   │   │   ├── SandboxManager.java
+│   │   │   │   ├── AgentDispatcher.java
 │   │   │   │   └── InstructionBuilder.java
 │   │   │   ├── dispatch/
 │   │   │   │   ├── cli/            # picocli commands
@@ -669,10 +669,10 @@ worldmind/
 │           │   ├── engine/MissionEngineTest.java
 │           │   ├── scanner/ProjectScannerTest.java
 │           │   └── persistence/CheckpointerTest.java
-│           ├── starblaster/StarblasterManagerTest.java
+│           ├── sandbox/SandboxManagerTest.java
 │           ├── dispatch/cli/CliTest.java
 │           ├── dispatch/api/ApiTest.java
-│           └── integration/ForgeIntegrationTest.java
+│           └── integration/CoderIntegrationTest.java
 ```
 
 ---
@@ -686,7 +686,7 @@ Phase 0 (Scaffold)
 Phase 1 (Brain Without Hands)  ← Can demo planning pipeline
     │
     ▼
-Phase 2 (First Centurion)      ← Can demo actual code generation
+Phase 2 (First Agent)      ← Can demo actual code generation
     │
     ▼
 Phase 3 (The Loop)             ← Can demo build-test-fix cycle

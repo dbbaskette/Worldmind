@@ -7,31 +7,31 @@ import java.util.List;
  * Structured output from the LLM representing a complete mission plan.
  * <p>
  * The LLM generates this plan based on a classified request and project context.
- * Each {@link DirectivePlan} maps to a {@link Directive} that will be executed
- * by a Centurion worker.
+ * Each {@link TaskPlan} maps to a {@link Task} that will be executed
+ * by a Agent worker.
  *
  * @param objective         high-level description of the mission goal
  * @param executionStrategy one of "sequential" or "parallel"
- * @param directives        ordered list of directive plans to execute
+ * @param tasks        ordered list of task plans to execute
  */
 public record MissionPlan(
     String objective,
     String executionStrategy,
-    List<DirectivePlan> directives
+    List<TaskPlan> tasks
 ) implements Serializable {
 
     /**
-     * A single planned directive within the mission.
+     * A single planned task within the mission.
      *
-     * @param centurion       the Centurion type: FORGE, GAUNTLET, VIGIL, PULSE, or PRISM
-     * @param description     what this directive should accomplish
-     * @param inputContext    contextual information the Centurion needs
-     * @param successCriteria how to determine if the directive succeeded
-     * @param dependencies    IDs of directives this one depends on (e.g. "DIR-001")
-     * @param targetFiles     files this directive intends to create or modify (for conflict detection)
+     * @param agent       the Agent type: CODER, TESTER, REVIEWER, RESEARCHER, or REFACTORER
+     * @param description     what this task should accomplish
+     * @param inputContext    contextual information the Agent needs
+     * @param successCriteria how to determine if the task succeeded
+     * @param dependencies    IDs of tasks this one depends on (e.g. "TASK-001")
+     * @param targetFiles     files this task intends to create or modify (for conflict detection)
      */
-    public record DirectivePlan(
-        String centurion,
+    public record TaskPlan(
+        String agent,
         String description,
         String inputContext,
         String successCriteria,

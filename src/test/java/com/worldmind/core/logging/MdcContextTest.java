@@ -22,12 +22,12 @@ class MdcContextTest {
     }
 
     @Test
-    @DisplayName("setDirective puts missionId, directiveId, and centurionType in MDC")
-    void setDirective() {
-        MdcContext.setDirective("WMND-2026-0001", "DIR-001", "FORGE");
+    @DisplayName("setTask puts missionId, taskId, and agentType in MDC")
+    void setTask() {
+        MdcContext.setTask("WMND-2026-0001", "TASK-001", "CODER");
         assertEquals("WMND-2026-0001", MDC.get("missionId"));
-        assertEquals("DIR-001", MDC.get("directiveId"));
-        assertEquals("FORGE", MDC.get("centurionType"));
+        assertEquals("TASK-001", MDC.get("taskId"));
+        assertEquals("CODER", MDC.get("agentType"));
     }
 
     @Test
@@ -41,12 +41,12 @@ class MdcContextTest {
     @Test
     @DisplayName("clear removes all worldmind MDC keys")
     void clear() {
-        MdcContext.setDirective("WMND-2026-0001", "DIR-001", "FORGE");
+        MdcContext.setTask("WMND-2026-0001", "TASK-001", "CODER");
         MdcContext.setWave("WMND-2026-0001", 2);
         MdcContext.clear();
         assertNull(MDC.get("missionId"));
-        assertNull(MDC.get("directiveId"));
-        assertNull(MDC.get("centurionType"));
+        assertNull(MDC.get("taskId"));
+        assertNull(MDC.get("agentType"));
         assertNull(MDC.get("waveNumber"));
     }
 }

@@ -9,9 +9,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * @param mode                interaction mode (FULL_AUTO, APPROVE_PLAN, STEP_BY_STEP); nullable — defaults to APPROVE_PLAN
  * @param projectPath         absolute path to the project directory
  * @param gitRemoteUrl        git remote URL for CF workspace coordination; nullable — falls back to config
- * @param reasoningLevel      reasoning depth for centurions (low, medium, high, max); nullable — defaults to medium
+ * @param reasoningLevel      reasoning depth for agents (low, medium, high, max); nullable — defaults to medium
  * @param executionStrategy   SEQUENTIAL or PARALLEL; nullable — defaults to planner decision (typically PARALLEL)
- * @param createCfDeployment  if true, append a final directive to create CF deployment artifacts (manifest.yml, etc.)
+ * @param createCfDeployment  if true, append a final task to create CF deployment artifacts (manifest.yml, etc.)
  */
 public record MissionRequest(
     String request,

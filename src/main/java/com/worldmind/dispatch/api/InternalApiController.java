@@ -1,7 +1,7 @@
 package com.worldmind.dispatch.api;
 
-import com.worldmind.starblaster.InstructionStore;
-import com.worldmind.starblaster.OutputStore;
+import com.worldmind.sandbox.InstructionStore;
+import com.worldmind.sandbox.OutputStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
  * Internal API endpoints used by CF task containers.
  *
  * <p>CF task commands are limited to 4096 characters, so instruction text
- * is stored on the orchestrator and fetched via HTTP by the centurion tasks.
+ * is stored on the orchestrator and fetched via HTTP by the agent tasks.
  *
  * <p>CF tasks also POST their Goose output back here, since the CF API v3
  * does not expose task stdout/stderr.

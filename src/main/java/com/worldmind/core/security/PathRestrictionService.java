@@ -16,16 +16,16 @@ public class PathRestrictionService {
         this.securityProperties = securityProperties;
     }
 
-    public boolean isPathWritable(String centurionType, String relativePath) {
-        SecurityProperties.PathRule rule = securityProperties.getPathRestrictions().get(centurionType);
+    public boolean isPathWritable(String agentType, String relativePath) {
+        SecurityProperties.PathRule rule = securityProperties.getPathRestrictions().get(agentType);
         if (rule == null) {
             return false;
         }
         return matchesAny(rule.getWritable(), relativePath);
     }
 
-    public boolean isPathReadable(String centurionType, String relativePath) {
-        SecurityProperties.PathRule rule = securityProperties.getPathRestrictions().get(centurionType);
+    public boolean isPathReadable(String agentType, String relativePath) {
+        SecurityProperties.PathRule rule = securityProperties.getPathRestrictions().get(agentType);
         if (rule == null) {
             return false;
         }

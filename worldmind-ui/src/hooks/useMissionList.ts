@@ -39,8 +39,8 @@ export function useMissionList() {
         classification: null,
         product_spec: null,
         clarifying_questions: null,
-        directives: [],
-        seal_granted: false,
+        tasks: [],
+        quality_gate_granted: false,
         metrics: null,
         errors: [],
         wave_count: 0

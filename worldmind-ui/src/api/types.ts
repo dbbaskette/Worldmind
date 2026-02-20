@@ -7,8 +7,8 @@ export interface MissionResponse {
   classification: Classification | null
   product_spec: ProductSpec | null
   clarifying_questions: ClarifyingQuestions | null
-  directives: DirectiveResponse[]
-  seal_granted: boolean
+  tasks: TaskResponse[]
+  quality_gate_granted: boolean
   metrics: MissionMetrics | null
   errors: string[]
   wave_count: number
@@ -49,9 +49,9 @@ export interface ComponentSpec {
   integrationPoints: string[]
 }
 
-export interface DirectiveResponse {
+export interface TaskResponse {
   id: string
-  centurion: string
+  agent: string
   description: string
   status: string
   iteration: number
@@ -80,8 +80,8 @@ export interface Classification {
 
 export interface MissionMetrics {
   totalDurationMs: number
-  directivesCompleted: number
-  directivesFailed: number
+  tasksCompleted: number
+  tasksFailed: number
   totalIterations: number
   filesCreated: number
   filesModified: number
@@ -94,7 +94,7 @@ export interface MissionMetrics {
 export interface WorldmindEvent {
   eventType: string
   missionId: string
-  directiveId?: string
+  taskId?: string
   payload: Record<string, any>
   timestamp: string
 }
@@ -117,7 +117,7 @@ export type MissionStatus =
   | 'COMPLETED'
   | 'FAILED'
 
-export type DirectiveStatus =
+export type TaskStatus =
   | 'PENDING'
   | 'EXECUTING'
   | 'VERIFYING'

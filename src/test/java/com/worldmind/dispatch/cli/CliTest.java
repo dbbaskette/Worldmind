@@ -54,9 +54,9 @@ class CliTest {
                 "classification", new Classification("feature", 3, List.of("api"), "sequential", "java"),
                 "projectContext", new ProjectContext(".", List.of(), "java", "spring", Map.of(), 42, "test project"),
                 "executionStrategy", ExecutionStrategy.SEQUENTIAL.name(),
-                "directives", List.of(
-                        new Directive("DIR-001", "FORGE", "Implement feature", "", "Works", List.of(),
-                                DirectiveStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of(), List.of(), null)
+                "tasks", List.of(
+                        new Task("TASK-001", "CODER", "Implement feature", "", "Works", List.of(),
+                                TaskStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of(), List.of(), null)
                 )
         ));
         when(mockEngine.runMission(anyString(), any(InteractionMode.class))).thenReturn(state);
@@ -93,21 +93,21 @@ class CliTest {
                 "request", "Add logging to all services",
                 "status", MissionStatus.COMPLETED.name(),
                 "executionStrategy", ExecutionStrategy.SEQUENTIAL.name(),
-                "sealGranted", true,
-                "directives", List.of(
-                        new Directive("DIR-001", "FORGE", "Implement logging", "", "Works", List.of(),
-                                DirectiveStatus.PASSED, 1, 3, FailureStrategy.RETRY, List.of(),
+                "quality_gateGranted", true,
+                "tasks", List.of(
+                        new Task("TASK-001", "CODER", "Implement logging", "", "Works", List.of(),
+                                TaskStatus.PASSED, 1, 3, FailureStrategy.RETRY, List.of(),
                                 List.of(new FileRecord("src/Logger.java", "created", 50)), 1500L),
-                        new Directive("DIR-002", "VIGIL", "Review code", "", "Quality ok", List.of("DIR-001"),
-                                DirectiveStatus.PASSED, 1, 3, FailureStrategy.RETRY, List.of(), List.of(), 800L)
+                        new Task("TASK-002", "REVIEWER", "Review code", "", "Quality ok", List.of("TASK-001"),
+                                TaskStatus.PASSED, 1, 3, FailureStrategy.RETRY, List.of(), List.of(), 800L)
                 ),
                 "testResults", List.of(
-                        new TestResult("DIR-001", true, 5, 0, "All tests passed", 200L)
+                        new TestResult("TASK-001", true, 5, 0, "All tests passed", 200L)
                 ),
                 "reviewFeedback", List.of(
-                        new ReviewFeedback("DIR-001", true, "Excellent code quality", List.of(), List.of(), 9)
+                        new ReviewFeedback("TASK-001", true, "Excellent code quality", List.of(), List.of(), 9)
                 ),
-                "completedDirectiveIds", List.of("DIR-001", "DIR-002"),
+                "completedTaskIds", List.of("TASK-001", "TASK-002"),
                 "waveCount", 2
         ));
         when(mockService.getLatestState("WMND-2025-0001")).thenReturn(Optional.of(state1));
@@ -157,7 +157,7 @@ class CliTest {
                             new HealthStatus("graph", mockGraph != null ? HealthStatus.Status.UP : HealthStatus.Status.DOWN,
                                     mockGraph != null ? "Graph compiled and available" : "Graph not available", Map.of()),
                             new HealthStatus("database", HealthStatus.Status.DOWN, "No DataSource configured", Map.of()),
-                            new HealthStatus("docker", HealthStatus.Status.DOWN, "No StarblasterProvider configured", Map.of())
+                            new HealthStatus("docker", HealthStatus.Status.DOWN, "No SandboxProvider configured", Map.of())
                     ));
                     return (K) new HealthCommand(mockHealth);
                 }
@@ -310,7 +310,7 @@ class CliTest {
             CliResult result = execute("inspect", "--help");
             assertEquals(0, result.exitCode());
             String output = result.output();
-            assertTrue(output.contains("Inspect a directive within a mission"),
+            assertTrue(output.contains("Inspect a task within a mission"),
                     "Inspect help should show description");
         }
 
@@ -362,12 +362,12 @@ class CliTest {
                     "Output should contain mission ID");
             assertTrue(output.contains("Objective: Add logging to all services"),
                     "Output should echo the request");
-            assertTrue(output.contains("DIRECTIVES"),
-                    "Output should list directives");
-            assertTrue(output.contains("DIR-001"),
-                    "Output should contain directive ID");
-            assertTrue(output.contains("FORGE"),
-                    "Output should contain centurion name");
+            assertTrue(output.contains("TASKS"),
+                    "Output should list tasks");
+            assertTrue(output.contains("TASK-001"),
+                    "Output should contain task ID");
+            assertTrue(output.contains("CODER"),
+                    "Output should contain agent name");
         }
 
         @Test
@@ -405,10 +405,10 @@ class CliTest {
                     "Status should show objective");
             assertTrue(output.contains("COMPLETED"),
                     "Status should show status");
-            assertTrue(output.contains("DIR-001"),
-                    "Status should show directives");
-            assertTrue(output.contains("FORGE"),
-                    "Status should show centurion type");
+            assertTrue(output.contains("TASK-001"),
+                    "Status should show tasks");
+            assertTrue(output.contains("CODER"),
+                    "Status should show agent type");
         }
 
         @Test
@@ -556,16 +556,16 @@ class CliTest {
     class InspectTests {
 
         @Test
-        @DisplayName("inspect shows directive details")
-        void inspectShowsDirectiveDetails() {
+        @DisplayName("inspect shows task details")
+        void inspectShowsTaskDetails() {
             var queryService = createPopulatedQueryService();
-            CliResult result = execute(null, null, queryService, "inspect", "WMND-2025-0001", "DIR-001");
+            CliResult result = execute(null, null, queryService, "inspect", "WMND-2025-0001", "TASK-001");
             assertEquals(0, result.exitCode());
             String output = result.output();
-            assertTrue(output.contains("DIRECTIVE DIR-001"),
-                    "Inspect should show directive ID");
-            assertTrue(output.contains("FORGE"),
-                    "Inspect should show centurion type");
+            assertTrue(output.contains("TASK TASK-001"),
+                    "Inspect should show task ID");
+            assertTrue(output.contains("CODER"),
+                    "Inspect should show agent type");
             assertTrue(output.contains("PASSED"),
                     "Inspect should show status");
             assertTrue(output.contains("Implement logging"),
@@ -575,20 +575,20 @@ class CliTest {
         }
 
         @Test
-        @DisplayName("inspect shows error for unknown directive")
-        void inspectUnknownDirective() {
+        @DisplayName("inspect shows error for unknown task")
+        void inspectUnknownTask() {
             var queryService = createPopulatedQueryService();
-            CliResult result = execute(null, null, queryService, "inspect", "WMND-2025-0001", "DIR-999");
+            CliResult result = execute(null, null, queryService, "inspect", "WMND-2025-0001", "TASK-999");
             assertEquals(0, result.exitCode());
-            assertTrue(result.output().contains("Directive DIR-999 not found"),
-                    "Inspect should show directive not found");
+            assertTrue(result.output().contains("Task TASK-999 not found"),
+                    "Inspect should show task not found");
         }
 
         @Test
         @DisplayName("inspect shows error for unknown mission")
         void inspectUnknownMission() {
             var queryService = createPopulatedQueryService();
-            CliResult result = execute(null, null, queryService, "inspect", "WMND-UNKNOWN", "DIR-001");
+            CliResult result = execute(null, null, queryService, "inspect", "WMND-UNKNOWN", "TASK-001");
             assertEquals(0, result.exitCode());
             assertTrue(result.output().contains("Mission not found"),
                     "Inspect should show mission not found");
@@ -720,7 +720,7 @@ class CliTest {
         }
 
         @Test
-        @DisplayName("wave outputs wave number and directive count")
+        @DisplayName("wave outputs wave number and task count")
         void waveOutputsWaveInfo() {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             PrintStream originalOut = System.out;
@@ -730,26 +730,26 @@ class CliTest {
                 String output = out.toString();
                 assertTrue(output.contains("WAVE 2"),
                         "Wave should contain wave number");
-                assertTrue(output.contains("3 directives"),
-                        "Wave should contain directive count");
+                assertTrue(output.contains("3 tasks"),
+                        "Wave should contain task count");
             } finally {
                 System.setOut(originalOut);
             }
         }
 
         @Test
-        @DisplayName("parallelProgress outputs directive status")
+        @DisplayName("parallelProgress outputs task status")
         void parallelProgressOutputsStatus() {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             PrintStream originalOut = System.out;
             System.setOut(new PrintStream(out));
             try {
-                ConsoleOutput.parallelProgress("DIR-001", "PASSED");
+                ConsoleOutput.parallelProgress("TASK-001", "PASSED");
                 String output = out.toString();
                 assertTrue(output.contains("PASSED"),
                         "Progress should contain status");
-                assertTrue(output.contains("DIR-001"),
-                        "Progress should contain directive ID");
+                assertTrue(output.contains("TASK-001"),
+                        "Progress should contain task ID");
             } finally {
                 System.setOut(originalOut);
             }

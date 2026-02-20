@@ -6,9 +6,9 @@ import com.worldmind.core.logging.MdcContext;
 import com.worldmind.core.metrics.WorldmindMetrics;
 import com.worldmind.core.model.*;
 import com.worldmind.core.state.WorldmindState;
-import com.worldmind.starblaster.StarblasterBridge;
-import com.worldmind.starblaster.StarblasterProperties;
-import com.worldmind.starblaster.WorktreeExecutionContext;
+import com.worldmind.sandbox.AgentDispatcher;
+import com.worldmind.sandbox.SandboxProperties;
+import com.worldmind.sandbox.WorktreeExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,19 +20,19 @@ import java.util.*;
 import java.util.concurrent.*;
 
 /**
- * Dispatches all directives in the current wave concurrently using virtual threads.
- * Bounded by a semaphore at maxParallel. Collects per-directive results into
- * {@code waveDispatchResults} and appends starblaster infos and errors.
+ * Dispatches all tasks in the current wave concurrently using virtual threads.
+ * Bounded by a semaphore at maxParallel. Collects per-task results into
+ * {@code waveDispatchResults} and appends sandbox infos and errors.
  *
  * <p>Optionally integrates with {@link WorktreeExecutionContext} for worktree-based
- * parallel execution, providing each directive with an isolated working directory.
+ * parallel execution, providing each task with an isolated working directory.
  */
 @Component
 public class ParallelDispatchNode {
 
     private static final Logger log = LoggerFactory.getLogger(ParallelDispatchNode.class);
 
-    private final StarblasterBridge bridge;
+    private final AgentDispatcher bridge;
     private final int maxParallel;
     private final EventBus eventBus;
     private final WorldmindMetrics metrics;
@@ -40,17 +40,17 @@ public class ParallelDispatchNode {
     private final boolean worktreesEnabled;
 
     @Autowired
-    public ParallelDispatchNode(StarblasterBridge bridge, StarblasterProperties properties,
+    public ParallelDispatchNode(AgentDispatcher bridge, SandboxProperties properties,
                                 EventBus eventBus, WorldmindMetrics metrics,
                                 @Autowired(required = false) WorktreeExecutionContext worktreeContext) {
         this(bridge, properties.getMaxParallel(), eventBus, metrics, worktreeContext, properties.isWorktreesEnabled());
     }
 
-    ParallelDispatchNode(StarblasterBridge bridge, int maxParallel) {
+    ParallelDispatchNode(AgentDispatcher bridge, int maxParallel) {
         this(bridge, maxParallel, new EventBus(), null, null, false);
     }
 
-    ParallelDispatchNode(StarblasterBridge bridge, int maxParallel, EventBus eventBus, WorldmindMetrics metrics,
+    ParallelDispatchNode(AgentDispatcher bridge, int maxParallel, EventBus eventBus, WorldmindMetrics metrics,
                         WorktreeExecutionContext worktreeContext, boolean worktreesEnabled) {
         this.bridge = bridge;
         this.maxParallel = maxParallel;
@@ -61,11 +61,11 @@ public class ParallelDispatchNode {
     }
 
     public Map<String, Object> apply(WorldmindState state) {
-        var waveIds = state.waveDirectiveIds();
-        var directives = state.directives();
+        var waveIds = state.waveTaskIds();
+        var tasks = state.tasks();
         String retryContext = state.retryContext();
         var projectContext = state.projectContext().orElse(null);
-        // Use the original user-supplied host path for centurion bind mounts.
+        // Use the original user-supplied host path for agent bind mounts.
         // projectContext.rootPath() may be /workspace (container-internal) when running in Docker.
         String userPath = state.projectPath();
         String projectPath = (userPath != null && !userPath.isBlank())
@@ -76,7 +76,7 @@ public class ParallelDispatchNode {
         if (waveIds.isEmpty()) {
             return Map.of(
                     "waveDispatchResults", List.of(),
-                    "starblasters", List.of(),
+                    "sandboxes", List.of(),
                     "status", MissionStatus.EXECUTING.name()
             );
         }
@@ -94,10 +94,10 @@ public class ParallelDispatchNode {
             }
         }
 
-        // Build a lookup map for directive IDs
-        var directiveMap = new HashMap<String, Directive>();
-        for (var d : directives) {
-            directiveMap.put(d.id(), d);
+        // Build a lookup map for task IDs
+        var taskMap = new HashMap<String, Task>();
+        for (var d : tasks) {
+            taskMap.put(d.id(), d);
         }
 
         var semaphore = new Semaphore(maxParallel);
@@ -105,27 +105,27 @@ public class ParallelDispatchNode {
 
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             for (var id : waveIds) {
-                var directive = directiveMap.get(id);
-                if (directive == null) {
-                    log.warn("Directive {} not found in directives list, skipping", id);
+                var task = taskMap.get(id);
+                if (task == null) {
+                    log.warn("Task {} not found in tasks list, skipping", id);
                     continue;
                 }
 
-                var directiveToDispatch = applyRetryContext(directive, retryContext);
+                var taskToDispatch = applyRetryContext(task, retryContext);
 
                 futures.add(CompletableFuture.supplyAsync(() -> {
-                    MdcContext.setDirective(missionId, directiveToDispatch.id(),
-                            directiveToDispatch.centurion());
+                    MdcContext.setTask(missionId, taskToDispatch.id(),
+                            taskToDispatch.agent());
                     
-                    // Acquire worktree for this directive if enabled
+                    // Acquire worktree for this task if enabled
                     Path effectiveProjectPath = Path.of(projectPath);
                     if (worktreesEnabled) {
-                        Path worktreePath = worktreeContext.acquireWorktree(missionId, directiveToDispatch.id(), "main");
+                        Path worktreePath = worktreeContext.acquireWorktree(missionId, taskToDispatch.id(), "main");
                         if (worktreePath != null) {
                             effectiveProjectPath = worktreePath;
-                            log.info("Using worktree {} for directive {}", worktreePath, directiveToDispatch.id());
+                            log.info("Using worktree {} for task {}", worktreePath, taskToDispatch.id());
                         } else {
-                            log.warn("Could not acquire worktree for {} — using shared project path", directiveToDispatch.id());
+                            log.warn("Could not acquire worktree for {} — using shared project path", taskToDispatch.id());
                         }
                     }
                     
@@ -134,57 +134,57 @@ public class ParallelDispatchNode {
                     try {
                         semaphore.acquire();
                         try {
-                            log.info("Dispatching directive {} [{}]: {}",
-                                    directiveToDispatch.id(), directiveToDispatch.centurion(),
-                                    directiveToDispatch.description());
+                            log.info("Dispatching task {} [{}]: {}",
+                                    taskToDispatch.id(), taskToDispatch.agent(),
+                                    taskToDispatch.description());
 
-                            eventBus.publish(new WorldmindEvent("directive.started",
-                                    missionId, directiveToDispatch.id(),
-                                    Map.of("centurion", directiveToDispatch.centurion(),
-                                           "description", directiveToDispatch.description()),
+                            eventBus.publish(new WorldmindEvent("task.started",
+                                    missionId, taskToDispatch.id(),
+                                    Map.of("agent", taskToDispatch.agent(),
+                                           "description", taskToDispatch.description()),
                                     Instant.now()));
 
                             long startMs = System.currentTimeMillis();
-                            var result = bridge.executeDirective(
-                                    directiveToDispatch, projectContext, finalProjectPath, state.gitRemoteUrl(), state.runtimeTag(), state.reasoningLevel());
+                            var result = bridge.executeTask(
+                                    taskToDispatch, projectContext, finalProjectPath, state.gitRemoteUrl(), state.runtimeTag(), state.reasoningLevel());
                             long elapsedMs = System.currentTimeMillis() - startMs;
                             
-                            // Commit and push worktree changes if enabled and directive succeeded
-                            if (worktreesEnabled && result.directive().status() != DirectiveStatus.FAILED) {
-                                boolean pushed = worktreeContext.commitAndPush(directiveToDispatch.id());
+                            // Commit and push worktree changes if enabled and task succeeded
+                            if (worktreesEnabled && result.task().status() != TaskStatus.FAILED) {
+                                boolean pushed = worktreeContext.commitAndPush(taskToDispatch.id());
                                 if (pushed) {
-                                    log.info("Committed and pushed changes for directive {}", directiveToDispatch.id());
+                                    log.info("Committed and pushed changes for task {}", taskToDispatch.id());
                                 }
                             }
                             if (metrics != null) {
-                                metrics.recordDirectiveExecution(directiveToDispatch.centurion(), elapsedMs);
+                                metrics.recordTaskExecution(taskToDispatch.agent(), elapsedMs);
                             }
 
                             eventBus.publish(new WorldmindEvent(
-                                    result.directive().status() == DirectiveStatus.FAILED
-                                            ? "directive.progress" : "directive.fulfilled",
-                                    missionId, directive.id(),
-                                    Map.of("status", result.directive().status().name(),
-                                           "centurion", directiveToDispatch.centurion()),
+                                    result.task().status() == TaskStatus.FAILED
+                                            ? "task.progress" : "task.fulfilled",
+                                    missionId, task.id(),
+                                    Map.of("status", result.task().status().name(),
+                                           "agent", taskToDispatch.agent()),
                                     Instant.now()));
 
-                            if (result.starblasterInfo() != null) {
-                                eventBus.publish(new WorldmindEvent("starblaster.opened",
-                                        missionId, directive.id(),
-                                        Map.of("containerId", result.starblasterInfo().containerId(),
-                                               "centurion", directiveToDispatch.centurion()),
+                            if (result.sandboxInfo() != null) {
+                                eventBus.publish(new WorldmindEvent("sandbox.opened",
+                                        missionId, task.id(),
+                                        Map.of("containerId", result.sandboxInfo().containerId(),
+                                               "agent", taskToDispatch.agent()),
                                         Instant.now()));
                             }
 
                             return new DispatchOutcome(
                                     new WaveDispatchResult(
-                                            directive.id(), result.directive().status(),
-                                            result.directive().filesAffected(),
+                                            task.id(), result.task().status(),
+                                            result.task().filesAffected(),
                                             result.output(),
-                                            result.directive().elapsedMs() != null ? result.directive().elapsedMs() : 0L),
-                                    result.starblasterInfo(),
-                                    result.directive().status() == DirectiveStatus.FAILED
-                                            ? "Directive " + directive.id() + " failed: " + result.output()
+                                            result.task().elapsedMs() != null ? result.task().elapsedMs() : 0L),
+                                    result.sandboxInfo(),
+                                    result.task().status() == TaskStatus.FAILED
+                                            ? "Task " + task.id() + " failed: " + result.output()
                                             : null
                             );
                         } finally {
@@ -192,11 +192,11 @@ public class ParallelDispatchNode {
                         }
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
-                        return errorOutcome(directive.id(), "Interrupted: " + e.getMessage());
+                        return errorOutcome(task.id(), "Interrupted: " + e.getMessage());
                     } catch (Exception e) {
-                        log.error("Infrastructure error dispatching directive {}: {}",
-                                directive.id(), e.getMessage());
-                        return errorOutcome(directive.id(), e.getMessage());
+                        log.error("Infrastructure error dispatching task {}: {}",
+                                task.id(), e.getMessage());
+                        return errorOutcome(task.id(), e.getMessage());
                     } finally {
                         MdcContext.clear();
                     }
@@ -205,15 +205,15 @@ public class ParallelDispatchNode {
 
             // Collect all results
             var waveResults = new ArrayList<WaveDispatchResult>();
-            var starblasterInfos = new ArrayList<StarblasterInfo>();
+            var sandboxInfos = new ArrayList<SandboxInfo>();
             var errors = new ArrayList<String>();
 
             for (var future : futures) {
                 try {
                     var outcome = future.join();
                     waveResults.add(outcome.result);
-                    if (outcome.starblasterInfo != null) {
-                        starblasterInfos.add(outcome.starblasterInfo);
+                    if (outcome.sandboxInfo != null) {
+                        sandboxInfos.add(outcome.sandboxInfo);
                     }
                     if (outcome.error != null) {
                         errors.add(outcome.error);
@@ -225,7 +225,7 @@ public class ParallelDispatchNode {
 
             var updates = new HashMap<String, Object>();
             updates.put("waveDispatchResults", waveResults);
-            updates.put("starblasters", starblasterInfos);
+            updates.put("sandboxes", sandboxInfos);
             updates.put("status", MissionStatus.EXECUTING.name());
             if (!errors.isEmpty()) {
                 updates.put("errors", errors);
@@ -238,25 +238,25 @@ public class ParallelDispatchNode {
         }
     }
 
-    private Directive applyRetryContext(Directive directive, String retryContext) {
-        if (retryContext == null || retryContext.isEmpty()) return directive;
-        String augmentedContext = (directive.inputContext() != null ? directive.inputContext() + "\n\n" : "") +
+    private Task applyRetryContext(Task task, String retryContext) {
+        if (retryContext == null || retryContext.isEmpty()) return task;
+        String augmentedContext = (task.inputContext() != null ? task.inputContext() + "\n\n" : "") +
                 "## Retry Context (from previous attempt)\n\n" + retryContext;
-        return new Directive(
-                directive.id(), directive.centurion(), directive.description(),
-                augmentedContext, directive.successCriteria(), directive.dependencies(),
-                DirectiveStatus.PENDING, directive.iteration(), directive.maxIterations(),
-                directive.onFailure(), directive.targetFiles(), directive.filesAffected(), directive.elapsedMs()
+        return new Task(
+                task.id(), task.agent(), task.description(),
+                augmentedContext, task.successCriteria(), task.dependencies(),
+                TaskStatus.PENDING, task.iteration(), task.maxIterations(),
+                task.onFailure(), task.targetFiles(), task.filesAffected(), task.elapsedMs()
         );
     }
 
-    private DispatchOutcome errorOutcome(String directiveId, String errorMsg) {
+    private DispatchOutcome errorOutcome(String taskId, String errorMsg) {
         return new DispatchOutcome(
-                new WaveDispatchResult(directiveId, DirectiveStatus.FAILED, List.of(), errorMsg, 0L),
+                new WaveDispatchResult(taskId, TaskStatus.FAILED, List.of(), errorMsg, 0L),
                 null,
-                "Directive " + directiveId + " infrastructure error: " + errorMsg
+                "Task " + taskId + " infrastructure error: " + errorMsg
         );
     }
 
-    private record DispatchOutcome(WaveDispatchResult result, StarblasterInfo starblasterInfo, String error) {}
+    private record DispatchOutcome(WaveDispatchResult result, SandboxInfo sandboxInfo, String error) {}
 }

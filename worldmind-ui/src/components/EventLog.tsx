@@ -17,7 +17,7 @@ export function EventLog({ events, connectionStatus }: EventLogProps) {
   const statusIndicator = {
     connected: 'bg-emerald-500',
     disconnected: 'bg-red-500',
-    reconnecting: 'bg-amber-500 animate-pulse',
+    reconnecting: 'bg-amber-500 animate-researcher',
   }[connectionStatus]
 
   return (
@@ -47,8 +47,8 @@ export function EventLog({ events, connectionStatus }: EventLogProps) {
             <div key={idx} className="flex gap-2 py-0.5 hover:bg-wm-surface/50 px-1 rounded">
               <span className="text-wm_text-muted shrink-0">{time}</span>
               <span className={`shrink-0 ${color}`}>{event.eventType}</span>
-              {event.directiveId && (
-                <span className="text-wm_text-muted">{event.directiveId}</span>
+              {event.taskId && (
+                <span className="text-wm_text-muted">{event.taskId}</span>
               )}
               {event.payload && Object.keys(event.payload).length > 0 && (
                 <span className="text-wm_text-muted truncate">

@@ -36,7 +36,7 @@ export function MissionList({ missions, selectedMissionId, onSelect }: MissionLi
             onClick={() => onSelect(mission.mission_id)}
             className={`w-full text-left px-3 py-3 transition-all ${
               isSelected
-                ? 'bg-centurion-vigil/10 border-l-2 border-centurion-vigil'
+                ? 'bg-agent-reviewer/10 border-l-2 border-agent-reviewer'
                 : 'hover:bg-wm-elevated border-l-2 border-transparent'
             }`}
           >
@@ -49,8 +49,8 @@ export function MissionList({ missions, selectedMissionId, onSelect }: MissionLi
             </p>
             <div className="flex items-center justify-between text-[10px] text-wm_text-muted">
               <span className="font-mono">{mission.interaction_mode.replace(/_/g, ' ').toLowerCase()}</span>
-              {mission.directives.length > 0 && (
-                <span>{mission.directives.length} dir</span>
+              {mission.tasks.length > 0 && (
+                <span>{mission.tasks.length} dir</span>
               )}
             </div>
           </button>

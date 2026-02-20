@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { MissionResponse } from '../api/types'
 import { apiClient } from '../api/client'
-import { CENTURION_ACCENT } from '../utils/constants'
+import { AGENT_ACCENT } from '../utils/constants'
 
 interface ApprovalPanelProps {
   mission: MissionResponse
@@ -44,7 +44,7 @@ export function ApprovalPanel({ mission, onRefresh }: ApprovalPanelProps) {
   return (
     <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-4 mb-5 animate-fade-in">
       <div className="flex items-center gap-2 mb-3">
-        <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+        <div className="w-2 h-2 rounded-full bg-amber-500 animate-researcher" />
         <h3 className="text-sm font-semibold text-amber-400">Awaiting Approval</h3>
       </div>
 
@@ -79,7 +79,7 @@ export function ApprovalPanel({ mission, onRefresh }: ApprovalPanelProps) {
           <button
             type="button"
             onClick={() => setShowSpec(!showSpec)}
-            className="flex items-center gap-2 text-xs text-centurion-pulse hover:text-centurion-pulse/80 transition-colors"
+            className="flex items-center gap-2 text-xs text-agent-researcher hover:text-agent-researcher/80 transition-colors"
           >
             <svg className={`w-3 h-3 transition-transform ${showSpec ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -153,11 +153,11 @@ export function ApprovalPanel({ mission, onRefresh }: ApprovalPanelProps) {
 
       <div className="bg-wm-surface rounded-lg p-3 mb-4 border border-wm-border">
         <div className="text-[10px] font-mono uppercase tracking-wider text-wm_text-muted mb-2">
-          Execution Plan ({mission.directives.length} directives)
+          Execution Plan ({mission.tasks.length} tasks)
         </div>
         <div className="space-y-1.5">
-          {mission.directives.map((d, idx) => {
-            const accent = CENTURION_ACCENT[d.centurion] || '#6B7280'
+          {mission.tasks.map((d, idx) => {
+            const accent = AGENT_ACCENT[d.agent] || '#6B7280'
             return (
               <div key={d.id} className="flex items-start gap-2 text-xs">
                 <span className="font-mono text-wm_text-muted w-4 shrink-0 text-right">{idx + 1}.</span>
@@ -165,7 +165,7 @@ export function ApprovalPanel({ mission, onRefresh }: ApprovalPanelProps) {
                   className="font-mono text-[10px] px-1 py-0.5 rounded shrink-0"
                   style={{ backgroundColor: `${accent}20`, color: accent }}
                 >
-                  {d.centurion}
+                  {d.agent}
                 </span>
                 <span className="text-wm_text-secondary">{d.description}</span>
               </div>

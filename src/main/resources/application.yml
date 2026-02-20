@@ -73,22 +73,22 @@ worldmind:
     model: ${GOOSE_MODEL:qwen2.5-coder-32b}
     service-name: ${GENAI_SERVICE_NAME:}
     lm-studio-url: ${LM_STUDIO_URL:http://host.docker.internal:1234/v1}
-  starblaster:
-    provider: ${STARBLASTER_PROVIDER:docker}
+  sandbox:
+    provider: ${SANDBOX_PROVIDER:docker}
     max-parallel: 1
     timeout-seconds: 300
     wave-cooldown-seconds: ${WAVE_COOLDOWN_SECONDS:60}
     memory-limit-mb: 4096
     cpu-count: 2
-    image-registry: ${CENTURION_IMAGE_REGISTRY:ghcr.io/dbbaskette}
-    image-prefix: ${STARBLASTER_IMAGE_PREFIX:starblaster}
-    image: ${CENTURION_IMAGE_REGISTRY:ghcr.io/dbbaskette}/centurion-forge:latest
+    image-registry: ${AGENT_IMAGE_REGISTRY:ghcr.io/dbbaskette}
+    image-prefix: ${SANDBOX_IMAGE_PREFIX:sandbox}
+    image: ${AGENT_IMAGE_REGISTRY:ghcr.io/dbbaskette}/agent-coder:latest
   security:
     jwt:
       secret: ${WORLDMIND_JWT_SECRET:worldmind-dev-secret-change-in-production}
       expiration-seconds: 600
     command-allowlists:
-      FORGE:
+      CODER:
         - "mvn *"
         - "gradle *"
         - "npm *"
@@ -99,7 +99,7 @@ worldmind:
         - "cargo *"
         - "go *"
         - "make *"
-      GAUNTLET:
+      TESTER:
         - "mvn test*"
         - "gradle test*"
         - "npm test*"
@@ -108,7 +108,7 @@ worldmind:
         - "java -jar *"
         - "go test*"
         - "cargo test*"
-      VIGIL:
+      REVIEWER:
         - "find *"
         - "grep *"
         - "cat *"
@@ -117,14 +117,14 @@ worldmind:
         - "wc *"
         - "ls *"
         - "tree *"
-      PULSE:
+      RESEARCHER:
         - "find *"
         - "grep *"
         - "cat *"
         - "head *"
         - "tail *"
         - "ls *"
-      PRISM:
+      REFACTORER:
         - "mvn *"
         - "gradle *"
         - "npm *"
@@ -132,7 +132,7 @@ worldmind:
         - "python -m pytest*"
         - "go test*"
     path-restrictions:
-      FORGE:
+      CODER:
         writable:
           - "src/**"
           - "lib/**"
@@ -140,7 +140,7 @@ worldmind:
           - "pkg/**"
         read-only:
           - "**"
-      GAUNTLET:
+      TESTER:
         writable:
           - "src/test/**"
           - "test/**"
@@ -148,15 +148,15 @@ worldmind:
           - "spec/**"
         read-only:
           - "**"
-      VIGIL:
+      REVIEWER:
         writable: []
         read-only:
           - "**"
-      PULSE:
+      RESEARCHER:
         writable: []
         read-only:
           - "**"
-      PRISM:
+      REFACTORER:
         writable:
           - "src/**"
           - "lib/**"
@@ -175,12 +175,12 @@ worldmind:
           classify: ${NEXUS_MCP_TOKEN_CLASSIFY:}
           upload: ${NEXUS_MCP_TOKEN_UPLOAD:}
           plan: ${NEXUS_MCP_TOKEN_PLAN:}
-          seal: ${NEXUS_MCP_TOKEN_SEAL:}
-          # Centurions
-          forge: ${NEXUS_MCP_TOKEN_FORGE:}
-          gauntlet: ${NEXUS_MCP_TOKEN_GAUNTLET:}
-          vigil: ${NEXUS_MCP_TOKEN_VIGIL:}
-          pulse: ${NEXUS_MCP_TOKEN_PULSE:}
-          prism: ${NEXUS_MCP_TOKEN_PRISM:}
+          quality_gate: ${NEXUS_MCP_TOKEN_QUALITY_GATE:}
+          # Agents
+          coder: ${NEXUS_MCP_TOKEN_CODER:}
+          tester: ${NEXUS_MCP_TOKEN_TESTER:}
+          reviewer: ${NEXUS_MCP_TOKEN_REVIEWER:}
+          researcher: ${NEXUS_MCP_TOKEN_RESEARCHER:}
+          refactorer: ${NEXUS_MCP_TOKEN_REFACTORER:}
   health:
     timeout-seconds: 5

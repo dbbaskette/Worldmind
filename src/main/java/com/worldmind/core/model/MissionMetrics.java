@@ -7,8 +7,8 @@ import java.io.Serializable;
  */
 public record MissionMetrics(
     long totalDurationMs,
-    int directivesCompleted,
-    int directivesFailed,
+    int tasksCompleted,
+    int tasksFailed,
     int totalIterations,
     int filesCreated,
     int filesModified,
@@ -19,10 +19,10 @@ public record MissionMetrics(
 ) implements Serializable {
 
     /** Backward-compatible constructor for existing code. */
-    public MissionMetrics(long totalDurationMs, int directivesCompleted, int directivesFailed,
+    public MissionMetrics(long totalDurationMs, int tasksCompleted, int tasksFailed,
                           int totalIterations, int filesCreated, int filesModified,
                           int testsRun, int testsPassed) {
-        this(totalDurationMs, directivesCompleted, directivesFailed, totalIterations,
+        this(totalDurationMs, tasksCompleted, tasksFailed, totalIterations,
                 filesCreated, filesModified, testsRun, testsPassed, 0, 0L);
     }
 }

@@ -31,8 +31,8 @@ public class WorldmindState extends AgentState {
         Map.entry("classification",        Channels.base((Reducer<Classification>) null)),
         Map.entry("projectContext",        Channels.base((Reducer<ProjectContext>) null)),
         Map.entry("executionStrategy",     Channels.base(() -> ExecutionStrategy.SEQUENTIAL.name())),
-        Map.entry("currentDirectiveIndex", Channels.base(() -> 0)),
-        Map.entry("sealGranted",           Channels.base(() -> false)),
+        Map.entry("currentTaskIndex", Channels.base(() -> 0)),
+        Map.entry("quality_gateGranted",           Channels.base(() -> false)),
         Map.entry("retryContext",          Channels.base(() -> "")),
         Map.entry("metrics",               Channels.base((Reducer<MissionMetrics>) null)),
         Map.entry("productSpec",            Channels.base((Reducer<ProductSpec>) null)),
@@ -40,20 +40,20 @@ public class WorldmindState extends AgentState {
         Map.entry("gitRemoteUrl",          Channels.base(() -> "")),
         Map.entry("reasoningLevel",        Channels.base(() -> "medium")),
         Map.entry("userExecutionStrategy", Channels.base(() -> "")),  // User override for execution strategy
-        Map.entry("createCfDeployment",   Channels.base(() -> false)),  // If true, append CF deployment directive
+        Map.entry("createCfDeployment",   Channels.base(() -> false)),  // If true, append CF deployment task
         Map.entry("clarifyingQuestions",  Channels.base((Reducer<ClarifyingQuestions>) null)),  // Questions for user
         Map.entry("clarifyingAnswers",    Channels.base(() -> "")),  // User's answers as JSON
 
         // ── Wave execution channels (Phase 4) ────────────────────────
-        Map.entry("waveDirectiveIds",      Channels.base((Supplier<List<String>>) List::of)),
+        Map.entry("waveTaskIds",      Channels.base((Supplier<List<String>>) List::of)),
         Map.entry("waveCount",             Channels.base(() -> 0)),
         Map.entry("waveDispatchResults",   Channels.base((Supplier<List<WaveDispatchResult>>) List::of)),
 
         // ── Appender channels (list accumulation) ────────────────────
-        Map.entry("directives",            Channels.appender(ArrayList::new)),
-        Map.entry("completedDirectiveIds", Channels.appender(ArrayList::new)),  // Must accumulate across waves!
-        Map.entry("retryingDirectiveIds", Channels.appender(ArrayList::new)),
-        Map.entry("starblasters",             Channels.appender(ArrayList::new)),
+        Map.entry("tasks",            Channels.appender(ArrayList::new)),
+        Map.entry("completedTaskIds", Channels.appender(ArrayList::new)),  // Must accumulate across waves!
+        Map.entry("retryingTaskIds", Channels.appender(ArrayList::new)),
+        Map.entry("sandboxes",             Channels.appender(ArrayList::new)),
         Map.entry("testResults",           Channels.appender(ArrayList::new)),
         Map.entry("reviewFeedback",        Channels.appender(ArrayList::new)),
         Map.entry("errors",                Channels.appender(ArrayList::new))
@@ -165,12 +165,12 @@ public class WorldmindState extends AgentState {
         return ExecutionStrategy.valueOf(raw);
     }
 
-    public int currentDirectiveIndex() {
-        return this.<Integer>value("currentDirectiveIndex").orElse(0);
+    public int currentTaskIndex() {
+        return this.<Integer>value("currentTaskIndex").orElse(0);
     }
 
-    public boolean sealGranted() {
-        return this.<Boolean>value("sealGranted").orElse(false);
+    public boolean quality_gateGranted() {
+        return this.<Boolean>value("quality_gateGranted").orElse(false);
     }
 
     public String retryContext() {
@@ -241,8 +241,8 @@ public class WorldmindState extends AgentState {
                 var map = (Map<String, Object>) m;
                 return new MissionMetrics(
                         numLong(map.get("totalDurationMs")),
-                        numInt(map.get("directivesCompleted")),
-                        numInt(map.get("directivesFailed")),
+                        numInt(map.get("tasksCompleted")),
+                        numInt(map.get("tasksFailed")),
                         numInt(map.get("totalIterations")),
                         numInt(map.get("filesCreated")),
                         numInt(map.get("filesModified")),
@@ -258,8 +258,8 @@ public class WorldmindState extends AgentState {
     // ── Wave execution accessors (Phase 4) ────────────────────────────
 
     @SuppressWarnings("unchecked")
-    public List<String> waveDirectiveIds() {
-        return this.<List<String>>value("waveDirectiveIds").orElse(List.of());
+    public List<String> waveTaskIds() {
+        return this.<List<String>>value("waveTaskIds").orElse(List.of());
     }
 
     public int waveCount() {
@@ -280,47 +280,47 @@ public class WorldmindState extends AgentState {
     // ── List accessors (appender channels) ───────────────────────────
 
     @SuppressWarnings("unchecked")
-    public List<String> completedDirectiveIds() {
-        var completed = this.<List<String>>value("completedDirectiveIds").orElse(List.of());
-        var retrying = retryingDirectiveIds();
+    public List<String> completedTaskIds() {
+        var completed = this.<List<String>>value("completedTaskIds").orElse(List.of());
+        var retrying = retryingTaskIds();
         if (retrying.isEmpty()) return completed;
         // Exclude any IDs that are pending retry (merge conflict reset)
         return completed.stream().filter(id -> !retrying.contains(id)).toList();
     }
     
     @SuppressWarnings("unchecked")
-    public List<String> retryingDirectiveIds() {
-        return this.<List<String>>value("retryingDirectiveIds").orElse(List.of());
+    public List<String> retryingTaskIds() {
+        return this.<List<String>>value("retryingTaskIds").orElse(List.of());
     }
 
     @SuppressWarnings("unchecked")
-    public List<Directive> directives() {
-        List<?> raw = this.<List<?>>value("directives").orElse(List.of());
+    public List<Task> tasks() {
+        List<?> raw = this.<List<?>>value("tasks").orElse(List.of());
         if (raw.isEmpty()) return List.of();
-        List<Directive> all;
-        if (raw.getFirst() instanceof Directive) {
-            all = (List<Directive>) raw;
+        List<Task> all;
+        if (raw.getFirst() instanceof Task) {
+            all = (List<Task>) raw;
         } else {
             // Checkpoint deserialization may produce raw Maps instead of records
             all = raw.stream()
-                    .map(item -> item instanceof Map<?, ?> m ? directiveFromMap((Map<String, Object>) m) : (Directive) item)
+                    .map(item -> item instanceof Map<?, ?> m ? taskFromMap((Map<String, Object>) m) : (Task) item)
                     .toList();
         }
         // Appender channel may accumulate duplicates across graph re-invocations.
-        // Keep only the last occurrence of each directive ID (from the latest planning run).
-        var seen = new java.util.LinkedHashMap<String, Directive>();
+        // Keep only the last occurrence of each task ID (from the latest planning run).
+        var seen = new java.util.LinkedHashMap<String, Task>();
         for (var d : all) seen.put(d.id(), d);
         return List.copyOf(seen.values());
     }
 
     @SuppressWarnings("unchecked")
-    public List<StarblasterInfo> starblasters() {
-        List<?> raw = this.<List<?>>value("starblasters").orElse(List.of());
+    public List<SandboxInfo> sandboxes() {
+        List<?> raw = this.<List<?>>value("sandboxes").orElse(List.of());
         if (raw.isEmpty()) return List.of();
         return raw.stream()
-                .map(item -> item instanceof StarblasterInfo si ? si
-                        : item instanceof Map<?, ?> m ? starblasterInfoFromMap((Map<String, Object>) m)
-                        : (StarblasterInfo) item)
+                .map(item -> item instanceof SandboxInfo si ? si
+                        : item instanceof Map<?, ?> m ? sandboxInfoFromMap((Map<String, Object>) m)
+                        : (SandboxInfo) item)
                 .toList();
     }
 
@@ -354,7 +354,7 @@ public class WorldmindState extends AgentState {
     // ── Map-to-record converters (checkpoint deserialization) ──────
 
     @SuppressWarnings("unchecked")
-    private static Directive directiveFromMap(Map<String, Object> m) {
+    private static Task taskFromMap(Map<String, Object> m) {
         List<FileRecord> files = Collections.emptyList();
         Object rawFiles = m.get("filesAffected");
         if (rawFiles instanceof List<?> fl && !fl.isEmpty()) {
@@ -363,14 +363,14 @@ public class WorldmindState extends AgentState {
                     .toList();
         }
         List<String> targetFiles = m.get("targetFiles") instanceof List<?> tf ? (List<String>) tf : List.of();
-        return new Directive(
+        return new Task(
                 (String) m.get("id"),
-                (String) m.get("centurion"),
+                (String) m.get("agent"),
                 (String) m.get("description"),
                 (String) m.get("inputContext"),
                 (String) m.get("successCriteria"),
                 m.get("dependencies") instanceof List<?> deps ? (List<String>) deps : List.of(),
-                enumOrNull(DirectiveStatus.class, m.get("status")),
+                enumOrNull(TaskStatus.class, m.get("status")),
                 m.get("iteration") instanceof Number n ? n.intValue() : 0,
                 m.get("maxIterations") instanceof Number n ? n.intValue() : 3,
                 enumOrNull(FailureStrategy.class, m.get("onFailure")),
@@ -380,11 +380,11 @@ public class WorldmindState extends AgentState {
         );
     }
 
-    private static StarblasterInfo starblasterInfoFromMap(Map<String, Object> m) {
-        return new StarblasterInfo(
+    private static SandboxInfo sandboxInfoFromMap(Map<String, Object> m) {
+        return new SandboxInfo(
                 (String) m.get("containerId"),
-                (String) m.get("centurionType"),
-                (String) m.get("directiveId"),
+                (String) m.get("agentType"),
+                (String) m.get("taskId"),
                 (String) m.get("status"),
                 instantOrNull(m.get("startedAt")),
                 instantOrNull(m.get("completedAt"))
@@ -401,7 +401,7 @@ public class WorldmindState extends AgentState {
 
     private static TestResult testResultFromMap(Map<String, Object> m) {
         return new TestResult(
-                (String) m.get("directiveId"),
+                (String) m.get("taskId"),
                 Boolean.TRUE.equals(m.get("passed")),
                 numInt(m.get("totalTests")),
                 numInt(m.get("failedTests")),
@@ -413,7 +413,7 @@ public class WorldmindState extends AgentState {
     @SuppressWarnings("unchecked")
     private static ReviewFeedback reviewFeedbackFromMap(Map<String, Object> m) {
         return new ReviewFeedback(
-                (String) m.get("directiveId"),
+                (String) m.get("taskId"),
                 Boolean.TRUE.equals(m.get("approved")),
                 (String) m.get("summary"),
                 m.get("issues") instanceof List<?> l ? (List<String>) l : List.of(),
@@ -432,8 +432,8 @@ public class WorldmindState extends AgentState {
                     .toList();
         }
         return new WaveDispatchResult(
-                (String) m.get("directiveId"),
-                enumOrNull(DirectiveStatus.class, m.get("status")),
+                (String) m.get("taskId"),
+                enumOrNull(TaskStatus.class, m.get("status")),
                 files,
                 (String) m.get("output"),
                 numLong(m.get("elapsedMs"))

@@ -10,8 +10,8 @@ export function MetricsPanel({ metrics }: MetricsPanelProps) {
 
   const items = [
     { label: 'Duration', value: formatDuration(metrics.totalDurationMs) },
-    { label: 'Completed', value: formatNumber(metrics.directivesCompleted) },
-    { label: 'Failed', value: formatNumber(metrics.directivesFailed), warn: metrics.directivesFailed > 0 },
+    { label: 'Completed', value: formatNumber(metrics.tasksCompleted) },
+    { label: 'Failed', value: formatNumber(metrics.tasksFailed), warn: metrics.tasksFailed > 0 },
     { label: 'Iterations', value: formatNumber(metrics.totalIterations) },
     { label: 'Files', value: formatNumber(metrics.filesCreated + metrics.filesModified) },
     { label: 'Tests', value: `${formatNumber(metrics.testsPassed)}/${formatNumber(metrics.testsRun)}` },

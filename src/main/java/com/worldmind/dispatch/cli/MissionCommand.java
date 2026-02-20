@@ -81,12 +81,12 @@ public class MissionCommand implements Runnable {
         System.out.println("Strategy: " + finalState.executionStrategy());
         System.out.println();
 
-        // Display directives
-        var directives = finalState.directives();
-        if (!directives.isEmpty()) {
-            System.out.println("DIRECTIVES:");
-            for (var d : directives) {
-                System.out.printf("  %s. [%-8s] %s%n", d.id(), d.centurion(), d.description());
+        // Display tasks
+        var tasks = finalState.tasks();
+        if (!tasks.isEmpty()) {
+            System.out.println("TASKS:");
+            for (var d : tasks) {
+                System.out.printf("  %s. [%-8s] %s%n", d.id(), d.agent(), d.description());
             }
         }
 
@@ -98,18 +98,18 @@ public class MissionCommand implements Runnable {
         }
 
         // Display execution results
-        var starblasters = finalState.starblasters();
-        if (!starblasters.isEmpty()) {
+        var sandboxes = finalState.sandboxes();
+        if (!sandboxes.isEmpty()) {
             System.out.println();
-            for (var sg : starblasters) {
-                ConsoleOutput.starblaster(String.format(
-                    "Centurion %s — %s (%s)",
-                    sg.centurionType(), sg.directiveId(), sg.status()));
+            for (var sg : sandboxes) {
+                ConsoleOutput.sandbox(String.format(
+                    "Agent %s — %s (%s)",
+                    sg.agentType(), sg.taskId(), sg.status()));
             }
         }
 
-        // Display file changes from directives
-        for (var d : directives) {
+        // Display file changes from tasks
+        for (var d : tasks) {
             if (d.filesAffected() != null) {
                 for (var f : d.filesAffected()) {
                     ConsoleOutput.fileChange(f.action(), f.path());
@@ -127,9 +127,9 @@ public class MissionCommand implements Runnable {
             ConsoleOutput.reviewFeedback(rf);
         }
 
-        // Seal status
-        ConsoleOutput.seal(finalState.sealGranted(),
-            finalState.sealGranted() ? "Quality gate passed" : "Quality gate failed");
+        // QualityGate status
+        ConsoleOutput.quality_gate(finalState.quality_gateGranted(),
+            finalState.quality_gateGranted() ? "Quality gate passed" : "Quality gate failed");
 
         // Mission metrics
         finalState.metrics().ifPresent(ConsoleOutput::metrics);

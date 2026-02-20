@@ -18,107 +18,107 @@ class CommandAllowlistServiceTest {
     void setUp() {
         SecurityProperties props = new SecurityProperties();
         props.setCommandAllowlists(Map.of(
-                "FORGE", List.of("mvn *", "gradle *", "npm *", "python *", "java *", "go *"),
-                "GAUNTLET", List.of("mvn test*", "gradle test*", "npm test*", "pytest*", "go test*"),
-                "VIGIL", List.of("find *", "grep *", "cat *", "head *", "tail *", "wc *", "ls *"),
-                "PULSE", List.of("find *", "grep *", "cat *", "ls *")
+                "CODER", List.of("mvn *", "gradle *", "npm *", "python *", "java *", "go *"),
+                "TESTER", List.of("mvn test*", "gradle test*", "npm test*", "pytest*", "go test*"),
+                "REVIEWER", List.of("find *", "grep *", "cat *", "head *", "tail *", "wc *", "ls *"),
+                "RESEARCHER", List.of("find *", "grep *", "cat *", "ls *")
         ));
         service = new CommandAllowlistService(props);
     }
 
     @Nested
-    @DisplayName("FORGE centurion")
-    class ForgeTests {
+    @DisplayName("CODER agent")
+    class CoderTests {
 
         @Test
         @DisplayName("allows 'mvn compile'")
         void allowsMvnCompile() {
-            assertTrue(service.isCommandAllowed("FORGE", "mvn compile"));
+            assertTrue(service.isCommandAllowed("CODER", "mvn compile"));
         }
 
         @Test
         @DisplayName("allows 'gradle build'")
         void allowsGradleBuild() {
-            assertTrue(service.isCommandAllowed("FORGE", "gradle build"));
+            assertTrue(service.isCommandAllowed("CODER", "gradle build"));
         }
 
         @Test
         @DisplayName("allows 'npm install'")
         void allowsNpmInstall() {
-            assertTrue(service.isCommandAllowed("FORGE", "npm install"));
+            assertTrue(service.isCommandAllowed("CODER", "npm install"));
         }
 
         @Test
         @DisplayName("denies 'rm -rf /'")
         void deniesRmRf() {
-            assertFalse(service.isCommandAllowed("FORGE", "rm -rf /"));
+            assertFalse(service.isCommandAllowed("CODER", "rm -rf /"));
         }
     }
 
     @Nested
-    @DisplayName("GAUNTLET centurion")
-    class GauntletTests {
+    @DisplayName("TESTER agent")
+    class TesterTests {
 
         @Test
         @DisplayName("allows 'mvn test'")
         void allowsMvnTest() {
-            assertTrue(service.isCommandAllowed("GAUNTLET", "mvn test"));
+            assertTrue(service.isCommandAllowed("TESTER", "mvn test"));
         }
 
         @Test
         @DisplayName("allows 'mvn test -Dtest=FooTest'")
         void allowsMvnTestWithArgs() {
-            assertTrue(service.isCommandAllowed("GAUNTLET", "mvn test -Dtest=FooTest"));
+            assertTrue(service.isCommandAllowed("TESTER", "mvn test -Dtest=FooTest"));
         }
 
         @Test
         @DisplayName("denies 'mvn deploy'")
         void deniesMvnDeploy() {
-            assertFalse(service.isCommandAllowed("GAUNTLET", "mvn deploy"));
+            assertFalse(service.isCommandAllowed("TESTER", "mvn deploy"));
         }
 
         @Test
         @DisplayName("denies 'mvn compile'")
         void deniesMvnCompile() {
-            assertFalse(service.isCommandAllowed("GAUNTLET", "mvn compile"));
+            assertFalse(service.isCommandAllowed("TESTER", "mvn compile"));
         }
     }
 
     @Nested
-    @DisplayName("VIGIL centurion")
-    class VigilTests {
+    @DisplayName("REVIEWER agent")
+    class ReviewerTests {
 
         @Test
         @DisplayName("allows 'grep foo'")
         void allowsGrepFoo() {
-            assertTrue(service.isCommandAllowed("VIGIL", "grep foo"));
+            assertTrue(service.isCommandAllowed("REVIEWER", "grep foo"));
         }
 
         @Test
         @DisplayName("allows 'cat README.md'")
         void allowsCat() {
-            assertTrue(service.isCommandAllowed("VIGIL", "cat README.md"));
+            assertTrue(service.isCommandAllowed("REVIEWER", "cat README.md"));
         }
 
         @Test
         @DisplayName("denies 'rm -rf /'")
         void deniesRmRf() {
-            assertFalse(service.isCommandAllowed("VIGIL", "rm -rf /"));
+            assertFalse(service.isCommandAllowed("REVIEWER", "rm -rf /"));
         }
 
         @Test
         @DisplayName("denies 'mvn compile'")
         void deniesMvnCompile() {
-            assertFalse(service.isCommandAllowed("VIGIL", "mvn compile"));
+            assertFalse(service.isCommandAllowed("REVIEWER", "mvn compile"));
         }
     }
 
     @Nested
-    @DisplayName("unknown centurion type")
+    @DisplayName("unknown agent type")
     class UnknownTypeTests {
 
         @Test
-        @DisplayName("denies all commands for unknown centurion type")
+        @DisplayName("denies all commands for unknown agent type")
         void deniesAllForUnknown() {
             assertFalse(service.isCommandAllowed("UNKNOWN", "mvn compile"));
             assertFalse(service.isCommandAllowed("UNKNOWN", "ls"));

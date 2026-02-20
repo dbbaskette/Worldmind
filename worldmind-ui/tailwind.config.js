@@ -21,12 +21,12 @@ export default {
           muted: '#94A3B8',
           dim: '#64748B',
         },
-        centurion: {
-          forge: '#FF6B35',
-          gauntlet: '#C084FC',
-          vigil: '#818CF8',
-          pulse: '#22D3EE',
-          prism: '#F472B6',
+        agent: {
+          coder: '#FF6B35',
+          tester: '#C084FC',
+          reviewer: '#818CF8',
+          researcher: '#22D3EE',
+          refactorer: '#F472B6',
         },
         status: {
           success: '#10B981',

@@ -12,7 +12,7 @@ import java.util.List;
 /**
  * Provides MCP tools to LLM calls, scoped per consumer.
  * <p>
- * Each consumer (e.g. "classify", "plan", "seal") gets tools via its own
+ * Each consumer (e.g. "classify", "plan", "quality_gate") gets tools via its own
  * authenticated MCP client, ensuring Nexus-side permission scoping.
  */
 @Component
@@ -32,7 +32,7 @@ public class McpToolProvider {
      * The consumer name determines which auth token is used,
      * which controls tool visibility in Nexus.
      *
-     * @param consumer the consumer name (e.g. "classify", "plan", "seal", "forge")
+     * @param consumer the consumer name (e.g. "classify", "plan", "quality_gate", "coder")
      */
     public ToolCallback[] getToolsFor(String consumer) {
         McpSyncClient client = clientManager.getClientFor(consumer);

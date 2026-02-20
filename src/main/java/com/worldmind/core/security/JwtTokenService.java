@@ -23,14 +23,14 @@ public class JwtTokenService {
         this.expirationSeconds = expirationSeconds;
     }
 
-    public String generateToken(String missionId, String directiveId, String centurionType) {
+    public String generateToken(String missionId, String taskId, String agentType) {
         Date now = new Date();
         Date expiration = new Date(now.getTime() + expirationSeconds * 1000L);
 
         return Jwts.builder()
                 .subject(missionId)
-                .claim("directiveId", directiveId)
-                .claim("centurionType", centurionType)
+                .claim("taskId", taskId)
+                .claim("agentType", agentType)
                 .issuedAt(now)
                 .expiration(expiration)
                 .signWith(signingKey)

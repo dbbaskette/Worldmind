@@ -13,7 +13,7 @@ import java.util.Collection;
  * CLI command: worldmind log &lt;mission-id&gt;
  * <p>
  * Shows a complete execution log for a mission by walking through all
- * checkpoints and displaying state transitions, directive completions,
+ * checkpoints and displaying state transitions, task completions,
  * test results, and errors.
  */
 @Command(name = "log", mixinStandardHelpOptions = true, description = "Show mission execution log")
@@ -56,14 +56,14 @@ public class LogCommand implements Runnable {
             // Show status transitions
             System.out.printf("       Status: %s%n", cpState.status());
 
-            // Show directives scheduled in this step
-            var waveIds = cpState.waveDirectiveIds();
+            // Show tasks scheduled in this step
+            var waveIds = cpState.waveTaskIds();
             if (!waveIds.isEmpty()) {
-                System.out.printf("       Wave directives: %s%n", String.join(", ", waveIds));
+                System.out.printf("       Wave tasks: %s%n", String.join(", ", waveIds));
             }
 
-            // Show completed directives
-            var completed = cpState.completedDirectiveIds();
+            // Show completed tasks
+            var completed = cpState.completedTaskIds();
             if (!completed.isEmpty()) {
                 System.out.printf("       Completed: %s%n", String.join(", ", completed));
             }
@@ -85,16 +85,16 @@ public class LogCommand implements Runnable {
             System.out.println();
             System.out.println("  " + "-".repeat(40));
             System.out.printf("  Final status: %s%n", finalState.status());
-            System.out.printf("  Directives: %d total, %d completed%n",
-                    finalState.directives().size(),
-                    finalState.completedDirectiveIds().size());
+            System.out.printf("  Tasks: %d total, %d completed%n",
+                    finalState.tasks().size(),
+                    finalState.completedTaskIds().size());
 
             if (finalState.waveCount() > 0) {
                 System.out.printf("  Waves: %d%n", finalState.waveCount());
             }
 
-            ConsoleOutput.seal(finalState.sealGranted(),
-                    finalState.sealGranted() ? "Quality gate passed" : "Quality gate not passed");
+            ConsoleOutput.quality_gate(finalState.quality_gateGranted(),
+                    finalState.quality_gateGranted() ? "Quality gate passed" : "Quality gate not passed");
         }
     }
 }

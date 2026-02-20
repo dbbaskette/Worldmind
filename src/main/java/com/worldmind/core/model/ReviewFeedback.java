@@ -4,10 +4,10 @@ import java.io.Serializable;
 import java.util.List;
 
 /**
- * AI-generated review feedback for code produced by a directive execution.
+ * AI-generated review feedback for code produced by a task execution.
  */
 public record ReviewFeedback(
-    String directiveId,
+    String taskId,
     boolean approved,
     String summary,
     List<String> issues,

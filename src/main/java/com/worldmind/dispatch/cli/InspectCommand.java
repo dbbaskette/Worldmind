@@ -1,6 +1,6 @@
 package com.worldmind.dispatch.cli;
 
-import com.worldmind.core.model.Directive;
+import com.worldmind.core.model.Task;
 import com.worldmind.core.persistence.CheckpointQueryService;
 import com.worldmind.core.state.WorldmindState;
 import org.springframework.stereotype.Component;
@@ -8,20 +8,20 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 
 /**
- * CLI command: worldmind inspect &lt;mission-id&gt; &lt;directive-id&gt;
+ * CLI command: worldmind inspect &lt;mission-id&gt; &lt;task-id&gt;
  * <p>
- * Shows detailed information about a specific directive within a mission,
- * including centurion type, status, files affected, elapsed time, and iteration count.
+ * Shows detailed information about a specific task within a mission,
+ * including agent type, status, files affected, elapsed time, and iteration count.
  */
-@Command(name = "inspect", mixinStandardHelpOptions = true, description = "Inspect a directive within a mission")
+@Command(name = "inspect", mixinStandardHelpOptions = true, description = "Inspect a task within a mission")
 @Component
 public class InspectCommand implements Runnable {
 
     @Parameters(index = "0", description = "Mission ID")
     private String missionId;
 
-    @Parameters(index = "1", description = "Directive ID")
-    private String directiveId;
+    @Parameters(index = "1", description = "Task ID")
+    private String taskId;
 
     private final CheckpointQueryService queryService;
 
@@ -40,23 +40,23 @@ public class InspectCommand implements Runnable {
         }
 
         WorldmindState state = stateOpt.get();
-        Directive found = null;
-        for (var d : state.directives()) {
-            if (d.id().equals(directiveId)) {
+        Task found = null;
+        for (var d : state.tasks()) {
+            if (d.id().equals(taskId)) {
                 found = d;
                 break;
             }
         }
 
         if (found == null) {
-            ConsoleOutput.error("Directive " + directiveId + " not found in mission " + missionId);
+            ConsoleOutput.error("Task " + taskId + " not found in mission " + missionId);
             return;
         }
 
         System.out.println();
-        System.out.println("DIRECTIVE " + found.id());
+        System.out.println("TASK " + found.id());
         System.out.println("──────────────────────────────────");
-        System.out.println("  Centurion:       " + found.centurion());
+        System.out.println("  Agent:       " + found.agent());
         System.out.println("  Status:          " + found.status());
         System.out.println("  Description:     " + found.description());
         System.out.println("  Success Criteria:" + (found.successCriteria() != null ? " " + found.successCriteria() : " -"));
@@ -82,28 +82,28 @@ public class InspectCommand implements Runnable {
             }
         }
 
-        // Test results for this directive
+        // Test results for this task
         var testResults = state.testResults();
-        var directiveTests = testResults.stream()
-                .filter(t -> directiveId.equals(t.directiveId()))
+        var taskTests = testResults.stream()
+                .filter(t -> taskId.equals(t.taskId()))
                 .toList();
-        if (!directiveTests.isEmpty()) {
+        if (!taskTests.isEmpty()) {
             System.out.println();
             System.out.println("  TEST RESULTS:");
-            for (var t : directiveTests) {
+            for (var t : taskTests) {
                 ConsoleOutput.testResult(t);
             }
         }
 
-        // Review feedback for this directive
+        // Review feedback for this task
         var reviews = state.reviewFeedback();
-        var directiveReviews = reviews.stream()
-                .filter(r -> directiveId.equals(r.directiveId()))
+        var taskReviews = reviews.stream()
+                .filter(r -> taskId.equals(r.taskId()))
                 .toList();
-        if (!directiveReviews.isEmpty()) {
+        if (!taskReviews.isEmpty()) {
             System.out.println();
             System.out.println("  REVIEW FEEDBACK:");
-            for (var r : directiveReviews) {
+            for (var r : taskReviews) {
                 ConsoleOutput.reviewFeedback(r);
             }
         }

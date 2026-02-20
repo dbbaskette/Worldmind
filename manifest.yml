@@ -13,18 +13,18 @@ applications:
       JBP_CONFIG_OPEN_JDK_JRE: '{ jre: { version: 21.+ }, memory_calculator: { stack_threads: 100 } }'
       JAVA_OPTS: '-XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=64m -XX:+UseG1GC -XX:MaxGCPauseMillis=200'
       SPRING_PROFILES_ACTIVE: cf
-      CENTURION_IMAGE_REGISTRY: ((centurion-image-registry))
+      AGENT_IMAGE_REGISTRY: ((agent-image-registry))
       CF_API_URL: ((cf-api-url))
       CF_ORG: ((cf-org))
       CF_SPACE: ((cf-space))
       CF_USERNAME: ((cf-username))
       CF_PASSWORD: ((cf-password))
       GIT_TOKEN: ((git-token))
-      CENTURION_FORGE_APP: ((centurion-forge-app))
-      CENTURION_GAUNTLET_APP: ((centurion-gauntlet-app))
-      CENTURION_VIGIL_APP: ((centurion-vigil-app))
-      CENTURION_PULSE_APP: ((centurion-pulse-app))
-      CENTURION_PRISM_APP: ((centurion-prism-app))
+      AGENT_CODER_APP: ((agent-coder-app))
+      AGENT_TESTER_APP: ((agent-tester-app))
+      AGENT_REVIEWER_APP: ((agent-reviewer-app))
+      AGENT_RESEARCHER_APP: ((agent-researcher-app))
+      AGENT_REFACTORER_APP: ((agent-refactorer-app))
       GOOSE_PROVIDER: ((goose-provider))
       GOOSE_MODEL: ((goose-model))
       ANTHROPIC_API_KEY: ((anthropic-api-key))
@@ -36,19 +36,19 @@ applications:
       NEXUS_MCP_TOKEN_CLASSIFY: ((nexus-mcp-token-classify))
       NEXUS_MCP_TOKEN_UPLOAD: ((nexus-mcp-token-upload))
       NEXUS_MCP_TOKEN_PLAN: ((nexus-mcp-token-plan))
-      NEXUS_MCP_TOKEN_SEAL: ((nexus-mcp-token-seal))
-      NEXUS_MCP_TOKEN_FORGE: ((nexus-mcp-token-forge))
-      NEXUS_MCP_TOKEN_GAUNTLET: ((nexus-mcp-token-gauntlet))
-      NEXUS_MCP_TOKEN_VIGIL: ((nexus-mcp-token-vigil))
-      NEXUS_MCP_TOKEN_PULSE: ((nexus-mcp-token-pulse))
-      NEXUS_MCP_TOKEN_PRISM: ((nexus-mcp-token-prism))
+      NEXUS_MCP_TOKEN_QUALITY_GATE: ((nexus-mcp-token-quality_gate))
+      NEXUS_MCP_TOKEN_CODER: ((nexus-mcp-token-coder))
+      NEXUS_MCP_TOKEN_TESTER: ((nexus-mcp-token-tester))
+      NEXUS_MCP_TOKEN_REVIEWER: ((nexus-mcp-token-reviewer))
+      NEXUS_MCP_TOKEN_RESEARCHER: ((nexus-mcp-token-researcher))
+      NEXUS_MCP_TOKEN_REFACTORER: ((nexus-mcp-token-refactorer))
     services:
       - worldmind-postgres
 
-  # --- Centurion: Forge (code generation) ---
-  - name: ((centurion-forge-app))
+  # --- Agent: Coder (code generation) ---
+  - name: ((agent-coder-app))
     docker:
-      image: ((centurion-image-registry))/centurion-forge:latest
+      image: ((agent-image-registry))/agent-coder:latest
       username: ((docker-username))
     memory: 2G
     disk_quota: 4G
@@ -60,10 +60,10 @@ applications:
       GOOSE_PROVIDER: openai
       GOOSE_MODEL: gpt-5-nano
 
-  # --- Centurion: Gauntlet (testing) ---
-  - name: ((centurion-gauntlet-app))
+  # --- Agent: Tester (testing) ---
+  - name: ((agent-tester-app))
     docker:
-      image: ((centurion-image-registry))/centurion-gauntlet:latest
+      image: ((agent-image-registry))/agent-tester:latest
       username: ((docker-username))
     memory: 2G
     disk_quota: 4G
@@ -75,10 +75,10 @@ applications:
       GOOSE_PROVIDER: openai
       GOOSE_MODEL: gpt-5-nano
 
-  # --- Centurion: Vigil (code review) ---
-  - name: ((centurion-vigil-app))
+  # --- Agent: Reviewer (code review) ---
+  - name: ((agent-reviewer-app))
     docker:
-      image: ((centurion-image-registry))/centurion-vigil:latest
+      image: ((agent-image-registry))/agent-reviewer:latest
       username: ((docker-username))
     memory: 2G
     disk_quota: 4G
@@ -90,10 +90,10 @@ applications:
       GOOSE_PROVIDER: openai
       GOOSE_MODEL: gpt-5-nano
 
-  # --- Centurion: Pulse (research, read-only) ---
-  - name: ((centurion-pulse-app))
+  # --- Agent: Researcher (research, read-only) ---
+  - name: ((agent-researcher-app))
     docker:
-      image: ((centurion-image-registry))/centurion-pulse:latest
+      image: ((agent-image-registry))/agent-researcher:latest
       username: ((docker-username))
     memory: 2G
     disk_quota: 4G
@@ -105,10 +105,10 @@ applications:
       GOOSE_PROVIDER: openai
       GOOSE_MODEL: gpt-5-nano
 
-  # --- Centurion: Prism (refactoring) ---
-  - name: ((centurion-prism-app))
+  # --- Agent: Refactorer (refactoring) ---
+  - name: ((agent-refactorer-app))
     docker:
-      image: ((centurion-image-registry))/centurion-prism:latest
+      image: ((agent-image-registry))/agent-refactorer:latest
       username: ((docker-username))
     memory: 2G
     disk_quota: 4G

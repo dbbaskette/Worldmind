@@ -1,4 +1,4 @@
-import { MissionResponse, DirectiveResponse, TimelineEntry, McpSettingsResponse, AuthStatusResponse, LlmProvidersResponse, LlmCurrentResponse } from './types'
+import { MissionResponse, TaskResponse, TimelineEntry, McpSettingsResponse, AuthStatusResponse, LlmProvidersResponse, LlmCurrentResponse } from './types'
 
 const API_BASE = '/api/v1'
 
@@ -115,11 +115,11 @@ class ApiClient {
     return response.json()
   }
 
-  async getDirective(missionId: string, directiveId: string): Promise<DirectiveResponse> {
-    const response = await fetch(`${API_BASE}/missions/${missionId}/directives/${directiveId}`)
+  async getTask(missionId: string, taskId: string): Promise<TaskResponse> {
+    const response = await fetch(`${API_BASE}/missions/${missionId}/tasks/${taskId}`)
 
     if (!response.ok) {
-      throw new Error('Failed to fetch directive')
+      throw new Error('Failed to fetch task')
     }
 
     return response.json()
@@ -135,12 +135,12 @@ class ApiClient {
     return response.json()
   }
 
-  async retryMission(id: string, directiveIds?: string[]): Promise<{ mission_id: string; status: string }> {
+  async retryMission(id: string, taskIds?: string[]): Promise<{ mission_id: string; status: string }> {
     const response = await fetch(`${API_BASE}/missions/${id}/retry`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(
-        directiveIds ? { directive_ids: directiveIds } : {}
+        taskIds ? { task_ids: taskIds } : {}
       )
     })
 

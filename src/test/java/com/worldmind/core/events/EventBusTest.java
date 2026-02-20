@@ -38,26 +38,26 @@ class EventBusTest {
         void createsEventWithAllFields() {
             Instant now = Instant.now();
             var event = new WorldmindEvent(
-                    "mission.created", "M-001", "DIR-001",
+                    "mission.created", "M-001", "TASK-001",
                     Map.of("key", "value"), now
             );
 
             assertEquals("mission.created", event.eventType());
             assertEquals("M-001", event.missionId());
-            assertEquals("DIR-001", event.directiveId());
+            assertEquals("TASK-001", event.taskId());
             assertEquals(Map.of("key", "value"), event.payload());
             assertEquals(now, event.timestamp());
         }
 
         @Test
-        @DisplayName("allows null directiveId")
-        void allowsNullDirectiveId() {
+        @DisplayName("allows null taskId")
+        void allowsNullTaskId() {
             var event = new WorldmindEvent(
                     "mission.created", "M-001", null,
                     Map.of(), Instant.now()
             );
 
-            assertNull(event.directiveId());
+            assertNull(event.taskId());
         }
     }
 
@@ -74,7 +74,7 @@ class EventBusTest {
             eventBus.subscribe("M-001", received::add);
 
             var event = new WorldmindEvent(
-                    "directive.started", "M-001", "DIR-001",
+                    "task.started", "M-001", "TASK-001",
                     Map.of(), Instant.now()
             );
             eventBus.publish(event);
@@ -90,7 +90,7 @@ class EventBusTest {
             eventBus.subscribe("M-002", received::add);
 
             var event = new WorldmindEvent(
-                    "directive.started", "M-001", "DIR-001",
+                    "task.started", "M-001", "TASK-001",
                     Map.of(), Instant.now()
             );
             eventBus.publish(event);
@@ -123,8 +123,8 @@ class EventBusTest {
             eventBus.subscribe("M-001", received::add);
 
             var event1 = new WorldmindEvent("mission.created", "M-001", null, Map.of(), Instant.now());
-            var event2 = new WorldmindEvent("directive.started", "M-001", "DIR-001", Map.of(), Instant.now());
-            var event3 = new WorldmindEvent("directive.completed", "M-001", "DIR-001", Map.of(), Instant.now());
+            var event2 = new WorldmindEvent("task.started", "M-001", "TASK-001", Map.of(), Instant.now());
+            var event3 = new WorldmindEvent("task.completed", "M-001", "TASK-001", Map.of(), Instant.now());
 
             eventBus.publish(event1);
             eventBus.publish(event2);
@@ -132,8 +132,8 @@ class EventBusTest {
 
             assertEquals(3, received.size());
             assertEquals("mission.created", received.get(0).eventType());
-            assertEquals("directive.started", received.get(1).eventType());
-            assertEquals("directive.completed", received.get(2).eventType());
+            assertEquals("task.started", received.get(1).eventType());
+            assertEquals("task.completed", received.get(2).eventType());
         }
     }
 
@@ -168,7 +168,7 @@ class EventBusTest {
             eventBus.subscribeAll(globalReceived::add);
             eventBus.subscribe("M-001", missionReceived::add);
 
-            var event = new WorldmindEvent("directive.started", "M-001", "DIR-001", Map.of(), Instant.now());
+            var event = new WorldmindEvent("task.started", "M-001", "TASK-001", Map.of(), Instant.now());
             eventBus.publish(event);
 
             assertEquals(1, globalReceived.size());
@@ -188,13 +188,13 @@ class EventBusTest {
             List<WorldmindEvent> received = new ArrayList<>();
             EventBus.Subscription subscription = eventBus.subscribe("M-001", received::add);
 
-            var event1 = new WorldmindEvent("directive.started", "M-001", "DIR-001", Map.of(), Instant.now());
+            var event1 = new WorldmindEvent("task.started", "M-001", "TASK-001", Map.of(), Instant.now());
             eventBus.publish(event1);
             assertEquals(1, received.size());
 
             subscription.unsubscribe();
 
-            var event2 = new WorldmindEvent("directive.completed", "M-001", "DIR-001", Map.of(), Instant.now());
+            var event2 = new WorldmindEvent("task.completed", "M-001", "TASK-001", Map.of(), Instant.now());
             eventBus.publish(event2);
             assertEquals(1, received.size()); // still 1, no new event
         }
@@ -226,7 +226,7 @@ class EventBusTest {
 
             sub1.unsubscribe();
 
-            var event = new WorldmindEvent("directive.started", "M-001", "DIR-001", Map.of(), Instant.now());
+            var event = new WorldmindEvent("task.started", "M-001", "TASK-001", Map.of(), Instant.now());
             eventBus.publish(event);
 
             assertTrue(received1.isEmpty());
@@ -292,7 +292,7 @@ class EventBusTest {
             });
             eventBus.subscribe("M-001", received::add);
 
-            var event = new WorldmindEvent("directive.started", "M-001", "DIR-001", Map.of(), Instant.now());
+            var event = new WorldmindEvent("task.started", "M-001", "TASK-001", Map.of(), Instant.now());
             eventBus.publish(event);
 
             assertEquals(1, received.size());

@@ -13,10 +13,10 @@ public final class MdcContext {
         MDC.put("missionId", missionId);
     }
 
-    public static void setDirective(String missionId, String directiveId, String centurionType) {
+    public static void setTask(String missionId, String taskId, String agentType) {
         MDC.put("missionId", missionId);
-        MDC.put("directiveId", directiveId);
-        MDC.put("centurionType", centurionType);
+        MDC.put("taskId", taskId);
+        MDC.put("agentType", agentType);
     }
 
     public static void setWave(String missionId, int waveNumber) {
@@ -26,8 +26,8 @@ public final class MdcContext {
 
     public static void clear() {
         MDC.remove("missionId");
-        MDC.remove("directiveId");
-        MDC.remove("centurionType");
+        MDC.remove("taskId");
+        MDC.remove("agentType");
         MDC.remove("waveNumber");
     }
 }

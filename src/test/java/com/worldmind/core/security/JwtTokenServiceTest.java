@@ -29,12 +29,12 @@ class JwtTokenServiceTest {
         @Test
         @DisplayName("generates token containing expected claims")
         void generatesTokenWithExpectedClaims() {
-            String token = service.generateToken("M-001", "DIR-001", "FORGE");
+            String token = service.generateToken("M-001", "TASK-001", "CODER");
 
             Claims claims = service.validateToken(token);
             assertEquals("M-001", claims.getSubject());
-            assertEquals("DIR-001", claims.get("directiveId", String.class));
-            assertEquals("FORGE", claims.get("centurionType", String.class));
+            assertEquals("TASK-001", claims.get("taskId", String.class));
+            assertEquals("CODER", claims.get("agentType", String.class));
             assertNotNull(claims.getIssuedAt());
             assertNotNull(claims.getExpiration());
         }
@@ -42,12 +42,12 @@ class JwtTokenServiceTest {
         @Test
         @DisplayName("round-trip: generate then validate returns consistent claims")
         void roundTripGenerateAndValidate() {
-            String token = service.generateToken("M-042", "DIR-099", "GAUNTLET");
+            String token = service.generateToken("M-042", "TASK-099", "TESTER");
 
             Claims claims = service.validateToken(token);
             assertEquals("M-042", claims.getSubject());
-            assertEquals("DIR-099", claims.get("directiveId", String.class));
-            assertEquals("GAUNTLET", claims.get("centurionType", String.class));
+            assertEquals("TASK-099", claims.get("taskId", String.class));
+            assertEquals("TESTER", claims.get("agentType", String.class));
         }
     }
 
@@ -60,7 +60,7 @@ class JwtTokenServiceTest {
         void throwsOnExpiredToken() {
             // Create a service with 0-second expiration to produce an already-expired token
             JwtTokenService shortLivedService = new JwtTokenService(SECRET, 0);
-            String token = shortLivedService.generateToken("M-001", "DIR-001", "FORGE");
+            String token = shortLivedService.generateToken("M-001", "TASK-001", "CODER");
 
             assertThrows(ExpiredJwtException.class, () -> service.validateToken(token));
         }
@@ -68,7 +68,7 @@ class JwtTokenServiceTest {
         @Test
         @DisplayName("throws on invalid signature")
         void throwsOnInvalidSignature() {
-            String token = service.generateToken("M-001", "DIR-001", "FORGE");
+            String token = service.generateToken("M-001", "TASK-001", "CODER");
 
             // Create a service with a different secret
             JwtTokenService otherService = new JwtTokenService(

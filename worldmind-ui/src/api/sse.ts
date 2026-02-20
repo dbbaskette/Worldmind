@@ -30,27 +30,27 @@ export class SseConnection {
     // Register all event type listeners
     const eventTypes = [
       'mission.created',
-      'directive.started',
-      'directive.fulfilled',
-      'directive.progress',
-      'directive.failed',
-      'starblaster.opened',
-      'seal.denied',
-      'seal.granted',
+      'task.started',
+      'task.fulfilled',
+      'task.progress',
+      'task.failed',
+      'sandbox.opened',
+      'quality_gate.denied',
+      'quality_gate.granted',
       'wave.scheduled',
       'wave.completed',
-      'directive.phase'
+      'task.phase'
     ]
 
     eventTypes.forEach(eventType => {
       this.eventSource?.addEventListener(eventType, (e: MessageEvent) => {
         try {
           const data = JSON.parse(e.data)
-          // The backend sends a flat object: { missionId, directiveId, ...payload, timestamp }
+          // The backend sends a flat object: { missionId, taskId, ...payload, timestamp }
           // Reconstruct the structured WorldmindEvent that components expect:
-          // { eventType, missionId, directiveId, payload: {...}, timestamp }
-          const { missionId, directiveId, timestamp, ...payload } = data
-          const event: WorldmindEvent = { eventType, missionId, directiveId, payload, timestamp }
+          // { eventType, missionId, taskId, payload: {...}, timestamp }
+          const { missionId, taskId, timestamp, ...payload } = data
+          const event: WorldmindEvent = { eventType, missionId, taskId, payload, timestamp }
           const handler = this.handlers[eventType]
           if (handler) {
             handler(event)

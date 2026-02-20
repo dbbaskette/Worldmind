@@ -51,15 +51,15 @@ class MissionControllerTest {
     private com.worldmind.core.events.EventBus eventBus;
 
     @MockitoBean
-    private com.worldmind.starblaster.InstructionStore instructionStore;
+    private com.worldmind.sandbox.InstructionStore instructionStore;
 
     // Optional CF dependencies — provided as mocks so Spring can inject them.
     // In production these are null when CF is not active.
     @MockitoBean(enforceOverride = false)
-    private com.worldmind.starblaster.cf.GitWorkspaceManager gitWorkspaceManager;
+    private com.worldmind.sandbox.cf.GitWorkspaceManager gitWorkspaceManager;
 
     @MockitoBean(enforceOverride = false)
-    private com.worldmind.starblaster.cf.CloudFoundryProperties cfProperties;
+    private com.worldmind.sandbox.cf.CloudFoundryProperties cfProperties;
 
     // ── POST /api/v1/missions ────────────────────────────────────────
 
@@ -246,12 +246,12 @@ class MissionControllerTest {
                 .andExpect(jsonPath("$", hasSize(0)));
     }
 
-    // ── GET /api/v1/missions/{id}/directives/{did} ───────────────────
+    // ── GET /api/v1/missions/{id}/tasks/{did} ───────────────────
 
     @Test
-    @DisplayName("GET /missions/{id}/directives/{did} returns 404 for unknown mission")
-    void directiveNotFound() throws Exception {
-        mockMvc.perform(get("/api/v1/missions/WMND-FAKE/directives/DIR-001"))
+    @DisplayName("GET /missions/{id}/tasks/{did} returns 404 for unknown mission")
+    void taskNotFound() throws Exception {
+        mockMvc.perform(get("/api/v1/missions/WMND-FAKE/tasks/TASK-001"))
                 .andExpect(status().isNotFound());
     }
 

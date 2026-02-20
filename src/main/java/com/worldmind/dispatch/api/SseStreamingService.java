@@ -169,8 +169,8 @@ public class SseStreamingService {
         try {
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("missionId", event.missionId());
-            if (event.directiveId() != null) {
-                data.put("directiveId", event.directiveId());
+            if (event.taskId() != null) {
+                data.put("taskId", event.taskId());
             }
             data.putAll(event.payload());
             data.put("timestamp", event.timestamp().toString());

@@ -2,8 +2,8 @@ package com.worldmind.core.nodes;
 
 import com.worldmind.core.llm.LlmService;
 import com.worldmind.core.model.Classification;
-import com.worldmind.core.model.Directive;
-import com.worldmind.core.model.DirectiveStatus;
+import com.worldmind.core.model.Task;
+import com.worldmind.core.model.TaskStatus;
 import com.worldmind.core.model.FailureStrategy;
 import com.worldmind.core.model.MissionPlan;
 import com.worldmind.core.model.MissionStatus;
@@ -28,16 +28,16 @@ import static org.mockito.Mockito.*;
 class PlanMissionNodeTest {
 
     @Test
-    @DisplayName("generates directives from LLM plan with correct IDs and fields")
-    void generatesDirectivesFromLlmPlan() {
+    @DisplayName("generates tasks from LLM plan with correct IDs and fields")
+    void generatesTasksFromLlmPlan() {
         var mockLlm = mock(LlmService.class);
         var plan = new MissionPlan(
                 "Add user endpoint",
                 "sequential",
                 List.of(
-                        new MissionPlan.DirectivePlan("PULSE", "Research API", "", "Done", List.of(), List.of()),
-                        new MissionPlan.DirectivePlan("FORGE", "Create model", "", "Model exists", List.of(), List.of()),
-                        new MissionPlan.DirectivePlan("FORGE", "Create controller", "", "Controller works", List.of(), List.of())
+                        new MissionPlan.TaskPlan("RESEARCHER", "Research API", "", "Done", List.of(), List.of()),
+                        new MissionPlan.TaskPlan("CODER", "Create model", "", "Model exists", List.of(), List.of()),
+                        new MissionPlan.TaskPlan("CODER", "Create controller", "", "Controller works", List.of(), List.of())
                 )
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
@@ -52,18 +52,18 @@ class PlanMissionNodeTest {
         var result = node.apply(state);
 
         @SuppressWarnings("unchecked")
-        var directives = (List<Directive>) result.get("directives");
-        assertEquals(3, directives.size());
-        assertEquals("DIR-001", directives.get(0).id());
-        assertEquals("PULSE", directives.get(0).centurion());
-        assertEquals(List.of(), directives.get(0).dependencies());
-        assertEquals("DIR-002", directives.get(1).id());
-        assertEquals("FORGE", directives.get(1).centurion());
-        // FORGE depends on preceding PULSE
-        assertEquals(List.of("DIR-001"), directives.get(1).dependencies());
-        assertEquals("DIR-003", directives.get(2).id());
-        assertEquals("FORGE", directives.get(2).centurion());
-        assertEquals(List.of("DIR-001"), directives.get(2).dependencies());
+        var tasks = (List<Task>) result.get("tasks");
+        assertEquals(3, tasks.size());
+        assertEquals("TASK-001", tasks.get(0).id());
+        assertEquals("RESEARCHER", tasks.get(0).agent());
+        assertEquals(List.of(), tasks.get(0).dependencies());
+        assertEquals("TASK-002", tasks.get(1).id());
+        assertEquals("CODER", tasks.get(1).agent());
+        // CODER depends on preceding RESEARCHER
+        assertEquals(List.of("TASK-001"), tasks.get(1).dependencies());
+        assertEquals("TASK-003", tasks.get(2).id());
+        assertEquals("CODER", tasks.get(2).agent());
+        assertEquals(List.of("TASK-001"), tasks.get(2).dependencies());
         assertEquals("SEQUENTIAL", result.get("executionStrategy"));
         assertEquals("AWAITING_APPROVAL", result.get("status"));
     }
@@ -76,8 +76,8 @@ class PlanMissionNodeTest {
                 "Refactor service layer",
                 "parallel",
                 List.of(
-                        new MissionPlan.DirectivePlan("PRISM", "Refactor service", "", "Service refactored", List.of(), List.of()),
-                        new MissionPlan.DirectivePlan("VIGIL", "Review changes", "", "Review passed", List.of("DIR-001"), List.of())
+                        new MissionPlan.TaskPlan("REFACTORER", "Refactor service", "", "Service refactored", List.of(), List.of()),
+                        new MissionPlan.TaskPlan("REVIEWER", "Review changes", "", "Review passed", List.of("TASK-001"), List.of())
                 )
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
@@ -94,14 +94,14 @@ class PlanMissionNodeTest {
     }
 
     @Test
-    @DisplayName("sets all directive defaults correctly (iteration, maxIterations, failureStrategy)")
-    void setsDirectiveDefaults() {
+    @DisplayName("sets all task defaults correctly (iteration, maxIterations, failureStrategy)")
+    void setsTaskDefaults() {
         var mockLlm = mock(LlmService.class);
         var plan = new MissionPlan(
                 "Write tests",
                 "sequential",
                 List.of(
-                        new MissionPlan.DirectivePlan("GAUNTLET", "Write unit tests", "context", "All pass", List.of(), List.of())
+                        new MissionPlan.TaskPlan("TESTER", "Write unit tests", "context", "All pass", List.of(), List.of())
                 )
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
@@ -116,15 +116,15 @@ class PlanMissionNodeTest {
         var result = node.apply(state);
 
         @SuppressWarnings("unchecked")
-        var directives = (List<Directive>) result.get("directives");
-        var directive = directives.get(0);
-        assertEquals(0, directive.iteration());
-        assertEquals(3, directive.maxIterations());
-        assertEquals(FailureStrategy.RETRY, directive.onFailure());
-        assertEquals(List.of(), directive.filesAffected());
-        assertNull(directive.elapsedMs());
-        assertEquals("context", directive.inputContext());
-        assertEquals("All pass", directive.successCriteria());
+        var tasks = (List<Task>) result.get("tasks");
+        var task = tasks.get(0);
+        assertEquals(0, task.iteration());
+        assertEquals(3, task.maxIterations());
+        assertEquals(FailureStrategy.RETRY, task.onFailure());
+        assertEquals(List.of(), task.filesAffected());
+        assertNull(task.elapsedMs());
+        assertEquals("context", task.inputContext());
+        assertEquals("All pass", task.successCriteria());
     }
 
     @Test
@@ -135,11 +135,11 @@ class PlanMissionNodeTest {
                 "Full feature",
                 "parallel",
                 List.of(
-                        // LLM dependencies are ignored — system builds them from centurion types
-                        new MissionPlan.DirectivePlan("PULSE", "Research API", "", "Research done", List.of(), List.of()),
-                        new MissionPlan.DirectivePlan("FORGE", "Implement feature", "", "Feature works", List.of("garbage_dep"), List.of()),
-                        new MissionPlan.DirectivePlan("GAUNTLET", "Write tests", "", "Tests pass", List.of("also_garbage"), List.of()),
-                        new MissionPlan.DirectivePlan("VIGIL", "Final review", "", "Approved", List.of("invalid_ref"), List.of())
+                        // LLM dependencies are ignored — system builds them from agent types
+                        new MissionPlan.TaskPlan("RESEARCHER", "Research API", "", "Research done", List.of(), List.of()),
+                        new MissionPlan.TaskPlan("CODER", "Implement feature", "", "Feature works", List.of("garbage_dep"), List.of()),
+                        new MissionPlan.TaskPlan("TESTER", "Write tests", "", "Tests pass", List.of("also_garbage"), List.of()),
+                        new MissionPlan.TaskPlan("REVIEWER", "Final review", "", "Approved", List.of("invalid_ref"), List.of())
                 )
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
@@ -154,15 +154,15 @@ class PlanMissionNodeTest {
         var result = node.apply(state);
 
         @SuppressWarnings("unchecked")
-        var directives = (List<Directive>) result.get("directives");
-        // PULSE: no deps
-        assertEquals(List.of(), directives.get(0).dependencies());
-        // FORGE: depends on preceding PULSE (DIR-001)
-        assertEquals(List.of("DIR-001"), directives.get(1).dependencies());
-        // GAUNTLET: depends on preceding FORGE (DIR-002)
-        assertEquals(List.of("DIR-002"), directives.get(2).dependencies());
-        // VIGIL: depends on preceding FORGE (DIR-002)
-        assertEquals(List.of("DIR-002"), directives.get(3).dependencies());
+        var tasks = (List<Task>) result.get("tasks");
+        // RESEARCHER: no deps
+        assertEquals(List.of(), tasks.get(0).dependencies());
+        // CODER: depends on preceding RESEARCHER (TASK-001)
+        assertEquals(List.of("TASK-001"), tasks.get(1).dependencies());
+        // TESTER: depends on preceding CODER (TASK-002)
+        assertEquals(List.of("TASK-002"), tasks.get(2).dependencies());
+        // REVIEWER: depends on preceding CODER (TASK-002)
+        assertEquals(List.of("TASK-002"), tasks.get(3).dependencies());
     }
 
     @Test
@@ -173,7 +173,7 @@ class PlanMissionNodeTest {
                 "Stub",
                 "sequential",
                 List.of(
-                        new MissionPlan.DirectivePlan("VIGIL", "Review", "", "Done", List.of(), List.of())
+                        new MissionPlan.TaskPlan("REVIEWER", "Review", "", "Done", List.of(), List.of())
                 )
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
@@ -228,14 +228,14 @@ class PlanMissionNodeTest {
     }
 
     @Test
-    @DisplayName("result map contains exactly directives, executionStrategy, and status keys")
+    @DisplayName("result map contains exactly tasks, executionStrategy, and status keys")
     void resultContainsExpectedKeys() {
         var mockLlm = mock(LlmService.class);
         var plan = new MissionPlan(
                 "Test objective",
                 "sequential",
                 List.of(
-                        new MissionPlan.DirectivePlan("VIGIL", "Review", "", "OK", List.of(), List.of())
+                        new MissionPlan.TaskPlan("REVIEWER", "Review", "", "OK", List.of(), List.of())
                 )
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
@@ -250,7 +250,7 @@ class PlanMissionNodeTest {
         var result = node.apply(state);
 
         assertEquals(3, result.size());
-        assertTrue(result.containsKey("directives"));
+        assertTrue(result.containsKey("tasks"));
         assertTrue(result.containsKey("executionStrategy"));
         assertTrue(result.containsKey("status"));
     }
@@ -263,7 +263,7 @@ class PlanMissionNodeTest {
                 "Stub",
                 "sequential",
                 List.of(
-                        new MissionPlan.DirectivePlan("VIGIL", "Review", "", "Done", List.of(), List.of())
+                        new MissionPlan.TaskPlan("REVIEWER", "Review", "", "Done", List.of(), List.of())
                 )
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
@@ -309,15 +309,15 @@ class PlanMissionNodeTest {
     }
 
     @Test
-    @DisplayName("injects FORGE directive when LLM plan contains only PULSE and VIGIL")
-    void injectsForgeWhenMissing() {
+    @DisplayName("injects CODER task when LLM plan contains only RESEARCHER and REVIEWER")
+    void injectsCoderWhenMissing() {
         var mockLlm = mock(LlmService.class);
         var plan = new MissionPlan(
                 "Build feature",
                 "sequential",
                 List.of(
-                        new MissionPlan.DirectivePlan("PULSE", "Research codebase", "", "Research done", List.of(), List.of()),
-                        new MissionPlan.DirectivePlan("VIGIL", "Review code", "", "Review done", List.of(), List.of())
+                        new MissionPlan.TaskPlan("RESEARCHER", "Research codebase", "", "Research done", List.of(), List.of()),
+                        new MissionPlan.TaskPlan("REVIEWER", "Review code", "", "Review done", List.of(), List.of())
                 )
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
@@ -332,16 +332,16 @@ class PlanMissionNodeTest {
         var result = node.apply(state);
 
         @SuppressWarnings("unchecked")
-        var directives = (List<Directive>) result.get("directives");
-        assertEquals(3, directives.size());
-        assertEquals("PULSE", directives.get(0).centurion());
-        assertEquals("FORGE", directives.get(1).centurion());
-        assertEquals("VIGIL", directives.get(2).centurion());
-        // PULSE: no deps
-        assertEquals(List.of(), directives.get(0).dependencies());
-        // FORGE: depends on preceding PULSE
-        assertEquals(List.of("DIR-001"), directives.get(1).dependencies());
-        // VIGIL: depends on preceding FORGE (DIR-003 is the injected FORGE)
-        assertEquals(List.of("DIR-003"), directives.get(2).dependencies());
+        var tasks = (List<Task>) result.get("tasks");
+        assertEquals(3, tasks.size());
+        assertEquals("RESEARCHER", tasks.get(0).agent());
+        assertEquals("CODER", tasks.get(1).agent());
+        assertEquals("REVIEWER", tasks.get(2).agent());
+        // RESEARCHER: no deps
+        assertEquals(List.of(), tasks.get(0).dependencies());
+        // CODER: depends on preceding RESEARCHER
+        assertEquals(List.of("TASK-001"), tasks.get(1).dependencies());
+        // REVIEWER: depends on preceding CODER (TASK-003 is the injected CODER)
+        assertEquals(List.of("TASK-003"), tasks.get(2).dependencies());
     }
 }

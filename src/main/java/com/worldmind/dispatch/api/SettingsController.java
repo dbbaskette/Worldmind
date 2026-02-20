@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.worldmind.mcp.McpClientManager;
 import com.worldmind.mcp.McpProperties;
-import com.worldmind.starblaster.StarblasterProperties;
+import com.worldmind.sandbox.SandboxProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -25,13 +25,13 @@ public class SettingsController {
 
     private final McpProperties mcpProperties;
     private final McpClientManager mcpClientManager;
-    private final StarblasterProperties starblasterProperties;
+    private final SandboxProperties sandboxProperties;
 
     public SettingsController(McpProperties mcpProperties, McpClientManager mcpClientManager,
-                              StarblasterProperties starblasterProperties) {
+                              SandboxProperties sandboxProperties) {
         this.mcpProperties = mcpProperties;
         this.mcpClientManager = mcpClientManager;
-        this.starblasterProperties = starblasterProperties;
+        this.sandboxProperties = sandboxProperties;
     }
 
     @GetMapping("/mcp")
@@ -39,13 +39,13 @@ public class SettingsController {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("enabled", mcpProperties.isEnabled());
 
-        String provider = starblasterProperties.getGooseProvider();
-        String model = starblasterProperties.getGooseModel();
+        String provider = sandboxProperties.getGooseProvider();
+        String model = sandboxProperties.getGooseModel();
 
         // When model is empty, resolve from VCAP_SERVICES so the UI shows the
         // actual model bound via CF service binding.
         if (model == null || model.isBlank()) {
-            var vcapResolved = resolveModelFromVcap(starblasterProperties.getGooseServiceName());
+            var vcapResolved = resolveModelFromVcap(sandboxProperties.getGooseServiceName());
             if (vcapResolved != null) {
                 provider = vcapResolved.getOrDefault("provider", provider);
                 model = vcapResolved.getOrDefault("model", model);

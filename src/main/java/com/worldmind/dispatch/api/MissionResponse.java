@@ -17,19 +17,19 @@ public record MissionResponse(
     Classification classification,
     @JsonProperty("product_spec") ProductSpec productSpec,
     @JsonProperty("clarifying_questions") ClarifyingQuestions clarifyingQuestions,
-    List<DirectiveResponse> directives,
-    @JsonProperty("seal_granted") boolean sealGranted,
+    List<TaskResponse> tasks,
+    @JsonProperty("quality_gate_granted") boolean quality_gateGranted,
     MissionMetrics metrics,
     List<String> errors,
     @JsonProperty("wave_count") int waveCount
 ) {
 
     /**
-     * Nested directive representation in the mission response.
+     * Nested task representation in the mission response.
      */
-    public record DirectiveResponse(
+    public record TaskResponse(
         String id,
-        String centurion,
+        String agent,
         String description,
         String status,
         int iteration,

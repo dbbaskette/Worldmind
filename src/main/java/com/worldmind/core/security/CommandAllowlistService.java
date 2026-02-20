@@ -13,8 +13,8 @@ public class CommandAllowlistService {
         this.securityProperties = securityProperties;
     }
 
-    public boolean isCommandAllowed(String centurionType, String command) {
-        List<String> allowlist = securityProperties.getCommandAllowlists().get(centurionType);
+    public boolean isCommandAllowed(String agentType, String command) {
+        List<String> allowlist = securityProperties.getCommandAllowlists().get(agentType);
         if (allowlist == null || allowlist.isEmpty()) {
             return false;
         }

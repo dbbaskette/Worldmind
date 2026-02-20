@@ -28,15 +28,15 @@ class WorldmindMetricsTest {
     }
 
     @Test
-    @DisplayName("recordSealResult increments correct counter")
-    void recordSealResult() {
-        metrics.recordSealResult(true);
-        metrics.recordSealResult(true);
-        metrics.recordSealResult(false);
+    @DisplayName("recordQualityGateResult increments correct counter")
+    void recordQualityGateResult() {
+        metrics.recordQualityGateResult(true);
+        metrics.recordQualityGateResult(true);
+        metrics.recordQualityGateResult(false);
 
-        var granted = registry.find("worldmind.seal.evaluations")
+        var granted = registry.find("worldmind.quality_gate.evaluations")
                 .tag("result", "granted").counter();
-        var denied = registry.find("worldmind.seal.evaluations")
+        var denied = registry.find("worldmind.quality_gate.evaluations")
                 .tag("result", "denied").counter();
 
         assertNotNull(granted);
@@ -46,20 +46,20 @@ class WorldmindMetricsTest {
     }
 
     @Test
-    @DisplayName("recordDirectiveExecution records by centurion tag")
-    void recordDirectiveExecution() {
-        metrics.recordDirectiveExecution("FORGE", 200);
-        metrics.recordDirectiveExecution("PULSE", 100);
+    @DisplayName("recordTaskExecution records by agent tag")
+    void recordTaskExecution() {
+        metrics.recordTaskExecution("CODER", 200);
+        metrics.recordTaskExecution("RESEARCHER", 100);
 
-        var forgeTimer = registry.find("worldmind.directive.duration")
-                .tag("centurion", "FORGE").timer();
-        var pulseTimer = registry.find("worldmind.directive.duration")
-                .tag("centurion", "PULSE").timer();
+        var coderTimer = registry.find("worldmind.task.duration")
+                .tag("agent", "CODER").timer();
+        var researcherTimer = registry.find("worldmind.task.duration")
+                .tag("agent", "RESEARCHER").timer();
 
-        assertNotNull(forgeTimer);
-        assertNotNull(pulseTimer);
-        assertEquals(1, forgeTimer.count());
-        assertEquals(1, pulseTimer.count());
+        assertNotNull(coderTimer);
+        assertNotNull(researcherTimer);
+        assertEquals(1, coderTimer.count());
+        assertEquals(1, researcherTimer.count());
     }
 
     @Test

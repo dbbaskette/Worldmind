@@ -18,8 +18,8 @@
         <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
             <encoder class="net.logstash.logback.encoder.LogstashEncoder">
                 <includeMdcKeyName>missionId</includeMdcKeyName>
-                <includeMdcKeyName>directiveId</includeMdcKeyName>
-                <includeMdcKeyName>centurionType</includeMdcKeyName>
+                <includeMdcKeyName>taskId</includeMdcKeyName>
+                <includeMdcKeyName>agentType</includeMdcKeyName>
                 <includeMdcKeyName>waveNumber</includeMdcKeyName>
             </encoder>
         </appender>

@@ -154,11 +154,11 @@ public class WorldmindGraph {
 
     /**
      * Routes after schedule_wave.
-     * Empty wave means all directives are done -> converge.
+     * Empty wave means all tasks are done -> converge.
      * Non-empty wave -> dispatch.
      */
     String routeAfterSchedule(WorldmindState state) {
-        if (state.waveDirectiveIds().isEmpty()) {
+        if (state.waveTaskIds().isEmpty()) {
             return "converge_results";
         }
         return "parallel_dispatch";
@@ -166,16 +166,16 @@ public class WorldmindGraph {
 
     /**
      * Routes after evaluate_wave.
-     * If mission FAILED or all directives completed -> converge.
+     * If mission FAILED or all tasks completed -> converge.
      * Otherwise -> schedule next wave.
      */
     String routeAfterWaveEval(WorldmindState state) {
         if (state.status() == MissionStatus.FAILED) {
             return "converge_results";
         }
-        // Check if all directives are in completedIds
-        var completedIds = state.completedDirectiveIds();
-        var allIds = state.directives().stream().map(d -> d.id()).toList();
+        // Check if all tasks are in completedIds
+        var completedIds = state.completedTaskIds();
+        var allIds = state.tasks().stream().map(d -> d.id()).toList();
         if (completedIds.containsAll(allIds)) {
             return "converge_results";
         }

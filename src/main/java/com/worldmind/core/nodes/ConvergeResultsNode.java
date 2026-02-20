@@ -2,7 +2,7 @@ package com.worldmind.core.nodes;
 
 import com.worldmind.core.events.EventBus;
 import com.worldmind.core.events.WorldmindEvent;
-import com.worldmind.core.model.DirectiveStatus;
+import com.worldmind.core.model.TaskStatus;
 import com.worldmind.core.model.MissionMetrics;
 import com.worldmind.core.model.MissionStatus;
 import com.worldmind.core.state.WorldmindState;
@@ -15,9 +15,9 @@ import java.time.Instant;
 import java.util.Map;
 
 /**
- * LangGraph4j node that aggregates all directive results into final mission metrics.
+ * LangGraph4j node that aggregates all task results into final mission metrics.
  *
- * <p>Reads {@code directives}, {@code testResults}, and {@code starblasters} from the
+ * <p>Reads {@code tasks}, {@code testResults}, and {@code sandboxes} from the
  * graph state, computes aggregate counts and durations, and returns state updates
  * including a {@link MissionMetrics} instance and the final {@link MissionStatus}.
  */
@@ -33,19 +33,19 @@ public class ConvergeResultsNode {
     }
 
     public Map<String, Object> apply(WorldmindState state) {
-        var directives = state.directives();
+        var tasks = state.tasks();
         var testResults = state.testResults();
 
-        // Count directives by status
+        // Count tasks by status
         int completed = 0;
         int failed = 0;
         int totalIterations = 0;
         int filesCreated = 0;
         int filesModified = 0;
 
-        for (var d : directives) {
-            if (d.status() == DirectiveStatus.PASSED) completed++;
-            else if (d.status() == DirectiveStatus.FAILED) failed++;
+        for (var d : tasks) {
+            if (d.status() == TaskStatus.PASSED) completed++;
+            else if (d.status() == TaskStatus.FAILED) failed++;
             totalIterations += d.iteration();
             if (d.filesAffected() != null) {
                 for (var f : d.filesAffected()) {
@@ -63,8 +63,8 @@ public class ConvergeResultsNode {
             testsPassed += tr.totalTests() - tr.failedTests();
         }
 
-        // Calculate total duration from starblasters
-        long totalDurationMs = state.starblasters().stream()
+        // Calculate total duration from sandboxes
+        long totalDurationMs = state.sandboxes().stream()
             .filter(s -> s.startedAt() != null && s.completedAt() != null)
             .mapToLong(s -> Duration.between(s.startedAt(), s.completedAt()).toMillis())
             .sum();
@@ -72,8 +72,8 @@ public class ConvergeResultsNode {
         // Wave metrics
         int wavesExecuted = state.waveCount();
 
-        // Aggregate duration: sum of all individual directive elapsed times
-        long aggregateDurationMs = directives.stream()
+        // Aggregate duration: sum of all individual task elapsed times
+        long aggregateDurationMs = tasks.stream()
                 .filter(d -> d.elapsedMs() != null)
                 .mapToLong(d -> d.elapsedMs())
                 .sum();
@@ -91,8 +91,8 @@ public class ConvergeResultsNode {
             aggregateDurationMs
         );
 
-        // COMPLETED if any directives passed or none exist; FAILED if all failed
-        MissionStatus finalStatus = (completed > 0 || directives.isEmpty())
+        // COMPLETED if any tasks passed or none exist; FAILED if all failed
+        MissionStatus finalStatus = (completed > 0 || tasks.isEmpty())
                 ? MissionStatus.COMPLETED
                 : MissionStatus.FAILED;
 
@@ -102,8 +102,8 @@ public class ConvergeResultsNode {
         eventBus.publish(new WorldmindEvent(
                 "mission.completed", state.missionId(), null,
                 Map.of("status", finalStatus.name(),
-                       "directivesCompleted", completed,
-                       "directivesFailed", failed),
+                       "tasksCompleted", completed,
+                       "tasksFailed", failed),
                 Instant.now()));
 
         return Map.of(

@@ -3,7 +3,7 @@ package com.worldmind.core.model;
 import java.io.Serializable;
 
 /**
- * Tracks a single file change made by a directive execution.
+ * Tracks a single file change made by a task execution.
  *
  * @param path         relative path within the project
  * @param action       one of "created", "modified", "deleted"

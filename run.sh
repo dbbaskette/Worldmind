@@ -53,7 +53,7 @@ usage() {
 # ---- CF push ----
 cf_push() {
   missing=""
-  for var in CF_DOCKER_PASSWORD CENTURION_IMAGE_REGISTRY DOCKER_USERNAME \
+  for var in CF_DOCKER_PASSWORD AGENT_IMAGE_REGISTRY DOCKER_USERNAME \
              CF_API_URL CF_ORG CF_SPACE CF_USERNAME CF_PASSWORD; do
     if [ -z "${!var:-}" ]; then missing="$missing $var"; fi
   done
@@ -64,7 +64,7 @@ cf_push() {
   fi
 
   # Detect if a direct API key is available for the selected provider.
-  # If so, centurions don't need the worldmind-model service binding —
+  # If so, agents don't need the worldmind-model service binding —
   # the orchestrator will forward the key via env vars in the CF task command.
   GOOSE_PROVIDER="${GOOSE_PROVIDER:-openai}"
   GOOSE_MODEL="${GOOSE_MODEL:-}"
@@ -80,13 +80,13 @@ cf_push() {
   MANIFEST_FILE="manifest.yml"
   trap "rm -f $VARS_FILE .cf-manifest-*.yml" EXIT
 
-  # If direct key provided, strip worldmind-model binding from centurion apps
+  # If direct key provided, strip worldmind-model binding from agent apps
   if [ -n "$DIRECT_KEY" ]; then
-    echo "Direct API key detected for $GOOSE_PROVIDER — centurions will skip model binding"
+    echo "Direct API key detected for $GOOSE_PROVIDER — agents will skip model binding"
     MANIFEST_FILE=$(mktemp .cf-manifest-XXXXXX.yml)
-    # Remove worldmind-model binding from centurion apps but keep it on the orchestrator.
-    # The orchestrator block ends before the first centurion block (line with "docker:").
-    # Centurion apps only bind worldmind-model, so remove both `services:` and the entry.
+    # Remove worldmind-model binding from agent apps but keep it on the orchestrator.
+    # The orchestrator block ends before the first agent block (line with "docker:").
+    # Agent apps only bind worldmind-model, so remove both `services:` and the entry.
     awk '
       /docker:/ { seen_docker=1 }
       seen_docker && /^[[:space:]]*services:[[:space:]]*$/ { next }
@@ -99,13 +99,13 @@ cf_push() {
 cf-api-url: ${CF_API_URL}
 cf-org: ${CF_ORG}
 cf-space: ${CF_SPACE}
-centurion-image-registry: ${CENTURION_IMAGE_REGISTRY}
+agent-image-registry: ${AGENT_IMAGE_REGISTRY}
 docker-username: ${DOCKER_USERNAME}
-centurion-forge-app: ${CENTURION_FORGE_APP:-centurion-forge}
-centurion-gauntlet-app: ${CENTURION_GAUNTLET_APP:-centurion-gauntlet}
-centurion-vigil-app: ${CENTURION_VIGIL_APP:-centurion-vigil}
-centurion-pulse-app: ${CENTURION_PULSE_APP:-centurion-pulse}
-centurion-prism-app: ${CENTURION_PRISM_APP:-centurion-prism}
+agent-coder-app: ${AGENT_CODER_APP:-agent-coder}
+agent-tester-app: ${AGENT_TESTER_APP:-agent-tester}
+agent-reviewer-app: ${AGENT_REVIEWER_APP:-agent-reviewer}
+agent-researcher-app: ${AGENT_RESEARCHER_APP:-agent-researcher}
+agent-refactorer-app: ${AGENT_REFACTORER_APP:-agent-refactorer}
 cf-username: ${CF_USERNAME}
 cf-password: ${CF_PASSWORD}
 git-token: ${GIT_TOKEN:-${CF_DOCKER_PASSWORD:-}}
@@ -120,12 +120,12 @@ nexus-mcp-token: ${NEXUS_MCP_TOKEN:-}
 nexus-mcp-token-classify: ${NEXUS_MCP_TOKEN_CLASSIFY:-}
 nexus-mcp-token-upload: ${NEXUS_MCP_TOKEN_UPLOAD:-}
 nexus-mcp-token-plan: ${NEXUS_MCP_TOKEN_PLAN:-}
-nexus-mcp-token-seal: ${NEXUS_MCP_TOKEN_SEAL:-}
-nexus-mcp-token-forge: ${NEXUS_MCP_TOKEN_FORGE:-}
-nexus-mcp-token-gauntlet: ${NEXUS_MCP_TOKEN_GAUNTLET:-}
-nexus-mcp-token-vigil: ${NEXUS_MCP_TOKEN_VIGIL:-}
-nexus-mcp-token-pulse: ${NEXUS_MCP_TOKEN_PULSE:-}
-nexus-mcp-token-prism: ${NEXUS_MCP_TOKEN_PRISM:-}
+nexus-mcp-token-quality_gate: ${NEXUS_MCP_TOKEN_QUALITY_GATE:-}
+nexus-mcp-token-coder: ${NEXUS_MCP_TOKEN_CODER:-}
+nexus-mcp-token-tester: ${NEXUS_MCP_TOKEN_TESTER:-}
+nexus-mcp-token-reviewer: ${NEXUS_MCP_TOKEN_REVIEWER:-}
+nexus-mcp-token-researcher: ${NEXUS_MCP_TOKEN_RESEARCHER:-}
+nexus-mcp-token-refactorer: ${NEXUS_MCP_TOKEN_REFACTORER:-}
 EOVARS
 
   echo "Building JAR..."
@@ -134,23 +134,23 @@ EOVARS
 
   # Remove stale dotted env vars from previous manifests (CF keeps old env vars across pushes)
   echo "Cleaning stale env vars..."
-  for old_var in worldmind.cf.centurion-apps.forge worldmind.cf.centurion-apps.gauntlet \
-                 worldmind.cf.centurion-apps.vigil worldmind.cf.centurion-apps.pulse \
-                 worldmind.cf.centurion-apps.prism worldmind.cf.api-url worldmind.cf.org \
-                 worldmind.cf.space worldmind.starblaster.provider \
-                 worldmind.starblaster.image-registry; do
+  for old_var in worldmind.cf.agent-apps.coder worldmind.cf.agent-apps.tester \
+                 worldmind.cf.agent-apps.reviewer worldmind.cf.agent-apps.researcher \
+                 worldmind.cf.agent-apps.refactorer worldmind.cf.api-url worldmind.cf.org \
+                 worldmind.cf.space worldmind.sandbox.provider \
+                 worldmind.sandbox.image-registry; do
     cf unset-env worldmind "$old_var" 2>/dev/null || true
   done
 
-  # Unbind worldmind-model from centurion apps when using a direct API key.
+  # Unbind worldmind-model from agent apps when using a direct API key.
   # CF preserves existing bindings even when removed from the manifest.
   if [ -n "$DIRECT_KEY" ]; then
-    echo "Unbinding worldmind-model from centurion apps..."
-    for app in "${CENTURION_FORGE_APP:-centurion-forge}" \
-               "${CENTURION_GAUNTLET_APP:-centurion-gauntlet}" \
-               "${CENTURION_VIGIL_APP:-centurion-vigil}" \
-               "${CENTURION_PULSE_APP:-centurion-pulse}" \
-               "${CENTURION_PRISM_APP:-centurion-prism}"; do
+    echo "Unbinding worldmind-model from agent apps..."
+    for app in "${AGENT_CODER_APP:-agent-coder}" \
+               "${AGENT_TESTER_APP:-agent-tester}" \
+               "${AGENT_REVIEWER_APP:-agent-reviewer}" \
+               "${AGENT_RESEARCHER_APP:-agent-researcher}" \
+               "${AGENT_REFACTORER_APP:-agent-refactorer}"; do
       cf unbind-service "$app" worldmind-model 2>/dev/null || true
     done
   fi

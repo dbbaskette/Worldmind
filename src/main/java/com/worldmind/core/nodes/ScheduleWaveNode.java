@@ -3,9 +3,9 @@ package com.worldmind.core.nodes;
 import com.worldmind.core.metrics.WorldmindMetrics;
 import com.worldmind.core.model.ExecutionStrategy;
 import com.worldmind.core.model.MissionStatus;
-import com.worldmind.core.scheduler.DirectiveScheduler;
+import com.worldmind.core.scheduler.TaskScheduler;
 import com.worldmind.core.state.WorldmindState;
-import com.worldmind.starblaster.StarblasterProperties;
+import com.worldmind.sandbox.SandboxProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,30 +15,30 @@ import java.util.HashSet;
 import java.util.Map;
 
 /**
- * Computes the next wave of eligible directives and writes the wave IDs to state.
- * An empty wave signals that all directives are done.
+ * Computes the next wave of eligible tasks and writes the wave IDs to state.
+ * An empty wave signals that all tasks are done.
  */
 @Component
 public class ScheduleWaveNode {
 
     private static final Logger log = LoggerFactory.getLogger(ScheduleWaveNode.class);
 
-    private final DirectiveScheduler scheduler;
+    private final TaskScheduler scheduler;
     private final int maxParallel;
     private final int waveCooldownSeconds;
     private final WorldmindMetrics metrics;
 
     @Autowired
-    public ScheduleWaveNode(DirectiveScheduler scheduler, StarblasterProperties properties, 
+    public ScheduleWaveNode(TaskScheduler scheduler, SandboxProperties properties, 
                            WorldmindMetrics metrics) {
         this(scheduler, properties.getMaxParallel(), properties.getWaveCooldownSeconds(), metrics);
     }
 
-    ScheduleWaveNode(DirectiveScheduler scheduler, int maxParallel) {
+    ScheduleWaveNode(TaskScheduler scheduler, int maxParallel) {
         this(scheduler, maxParallel, 0, null);
     }
 
-    ScheduleWaveNode(DirectiveScheduler scheduler, int maxParallel, int waveCooldownSeconds, 
+    ScheduleWaveNode(TaskScheduler scheduler, int maxParallel, int waveCooldownSeconds, 
                     WorldmindMetrics metrics) {
         this.scheduler = scheduler;
         this.maxParallel = maxParallel;
@@ -47,8 +47,8 @@ public class ScheduleWaveNode {
     }
 
     public Map<String, Object> apply(WorldmindState state) {
-        var directives = state.directives();
-        var completedIds = new HashSet<>(state.completedDirectiveIds());
+        var tasks = state.tasks();
+        var completedIds = new HashSet<>(state.completedTaskIds());
         var strategy = state.executionStrategy();
         int currentWaveCount = state.waveCount();
         
@@ -68,13 +68,13 @@ public class ScheduleWaveNode {
             }
         }
 
-        var waveIds = scheduler.computeNextWave(directives, completedIds, strategy, maxParallel);
+        var waveIds = scheduler.computeNextWave(tasks, completedIds, strategy, maxParallel);
         int nextWaveCount = currentWaveCount + 1;
 
         if (waveIds.isEmpty()) {
-            log.info("Wave {} — no eligible directives, all done", nextWaveCount);
+            log.info("Wave {} — no eligible tasks, all done", nextWaveCount);
         } else {
-            log.info("Wave {} — scheduling {} directives: {}", nextWaveCount, waveIds.size(), waveIds);
+            log.info("Wave {} — scheduling {} tasks: {}", nextWaveCount, waveIds.size(), waveIds);
             
             // Record wave execution metrics
             if (metrics != null) {
@@ -84,7 +84,7 @@ public class ScheduleWaveNode {
         }
 
         return Map.of(
-                "waveDirectiveIds", waveIds,
+                "waveTaskIds", waveIds,
                 "waveCount", nextWaveCount,
                 "status", MissionStatus.EXECUTING.name()
         );

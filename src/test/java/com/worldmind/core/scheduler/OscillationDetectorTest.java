@@ -18,62 +18,62 @@ class OscillationDetectorTest {
     @Test
     @DisplayName("No oscillation with zero failures")
     void noOscillationWithZeroFailures() {
-        assertFalse(detector.isOscillating("DIR-001"));
+        assertFalse(detector.isOscillating("TASK-001"));
     }
 
     @Test
     @DisplayName("No oscillation with one failure")
     void noOscillationWithOneFailure() {
-        detector.recordFailure("DIR-001", "Error A");
-        assertFalse(detector.isOscillating("DIR-001"));
+        detector.recordFailure("TASK-001", "Error A");
+        assertFalse(detector.isOscillating("TASK-001"));
     }
 
     @Test
     @DisplayName("No oscillation with two failures")
     void noOscillationWithTwoFailures() {
-        detector.recordFailure("DIR-001", "Error A");
-        detector.recordFailure("DIR-001", "Error B");
-        assertFalse(detector.isOscillating("DIR-001"));
+        detector.recordFailure("TASK-001", "Error A");
+        detector.recordFailure("TASK-001", "Error B");
+        assertFalse(detector.isOscillating("TASK-001"));
     }
 
     @Test
     @DisplayName("Oscillation detected with A-B-A pattern")
     void oscillationDetectedWithAlternatingPattern() {
-        detector.recordFailure("DIR-001", "Error A");
-        detector.recordFailure("DIR-001", "Error B");
-        detector.recordFailure("DIR-001", "Error A");
-        assertTrue(detector.isOscillating("DIR-001"));
+        detector.recordFailure("TASK-001", "Error A");
+        detector.recordFailure("TASK-001", "Error B");
+        detector.recordFailure("TASK-001", "Error A");
+        assertTrue(detector.isOscillating("TASK-001"));
     }
 
     @Test
     @DisplayName("No oscillation with consistent errors A-A-A")
     void noOscillationWithConsistentErrors() {
-        detector.recordFailure("DIR-001", "Error A");
-        detector.recordFailure("DIR-001", "Error A");
-        detector.recordFailure("DIR-001", "Error A");
-        assertFalse(detector.isOscillating("DIR-001"));
+        detector.recordFailure("TASK-001", "Error A");
+        detector.recordFailure("TASK-001", "Error A");
+        detector.recordFailure("TASK-001", "Error A");
+        assertFalse(detector.isOscillating("TASK-001"));
     }
 
     @Test
     @DisplayName("clearHistory resets tracking")
     void clearHistoryResetsTracking() {
-        detector.recordFailure("DIR-001", "Error A");
-        detector.recordFailure("DIR-001", "Error B");
-        detector.recordFailure("DIR-001", "Error A");
-        assertTrue(detector.isOscillating("DIR-001"));
+        detector.recordFailure("TASK-001", "Error A");
+        detector.recordFailure("TASK-001", "Error B");
+        detector.recordFailure("TASK-001", "Error A");
+        assertTrue(detector.isOscillating("TASK-001"));
 
-        detector.clearHistory("DIR-001");
-        assertFalse(detector.isOscillating("DIR-001"));
+        detector.clearHistory("TASK-001");
+        assertFalse(detector.isOscillating("TASK-001"));
     }
 
     @Test
-    @DisplayName("Different directives tracked independently")
-    void differentDirectivesTrackedIndependently() {
-        detector.recordFailure("DIR-001", "Error A");
-        detector.recordFailure("DIR-001", "Error B");
-        detector.recordFailure("DIR-001", "Error A");
+    @DisplayName("Different tasks tracked independently")
+    void differentTasksTrackedIndependently() {
+        detector.recordFailure("TASK-001", "Error A");
+        detector.recordFailure("TASK-001", "Error B");
+        detector.recordFailure("TASK-001", "Error A");
 
-        assertFalse(detector.isOscillating("DIR-002"));
-        assertTrue(detector.isOscillating("DIR-001"));
+        assertFalse(detector.isOscillating("TASK-002"));
+        assertTrue(detector.isOscillating("TASK-001"));
     }
 }

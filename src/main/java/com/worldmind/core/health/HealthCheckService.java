@@ -1,8 +1,8 @@
 package com.worldmind.core.health;
 
 import com.worldmind.core.graph.WorldmindGraph;
-import com.worldmind.starblaster.DockerStarblasterProvider;
-import com.worldmind.starblaster.StarblasterProvider;
+import com.worldmind.sandbox.DockerSandboxProvider;
+import com.worldmind.sandbox.SandboxProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,15 +19,15 @@ public class HealthCheckService {
     private static final Logger log = LoggerFactory.getLogger(HealthCheckService.class);
 
     private final WorldmindGraph worldmindGraph;
-    private final StarblasterProvider starblasterProvider;
+    private final SandboxProvider sandboxProvider;
     private final DataSource dataSource;
 
     public HealthCheckService(
             @Autowired(required = false) WorldmindGraph worldmindGraph,
-            @Autowired(required = false) StarblasterProvider starblasterProvider,
+            @Autowired(required = false) SandboxProvider sandboxProvider,
             @Autowired(required = false) DataSource dataSource) {
         this.worldmindGraph = worldmindGraph;
-        this.starblasterProvider = starblasterProvider;
+        this.sandboxProvider = sandboxProvider;
         this.dataSource = dataSource;
     }
 
@@ -68,13 +68,13 @@ public class HealthCheckService {
     }
 
     private HealthStatus checkDocker() {
-        if (starblasterProvider == null) {
+        if (sandboxProvider == null) {
             return new HealthStatus("docker", HealthStatus.Status.DOWN,
-                    "No StarblasterProvider configured", Map.of());
+                    "No SandboxProvider configured", Map.of());
         }
-        String detail = starblasterProvider instanceof DockerStarblasterProvider
+        String detail = sandboxProvider instanceof DockerSandboxProvider
                 ? "Docker provider available"
-                : "StarblasterProvider available (" + starblasterProvider.getClass().getSimpleName() + ")";
+                : "SandboxProvider available (" + sandboxProvider.getClass().getSimpleName() + ")";
         return new HealthStatus("docker", HealthStatus.Status.UP, detail, Map.of());
     }
 }

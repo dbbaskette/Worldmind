@@ -3,10 +3,10 @@ package com.worldmind.core.model;
 import java.io.Serializable;
 
 /**
- * Outcome of running tests after a directive completes.
+ * Outcome of running tests after a task completes.
  */
 public record TestResult(
-    String directiveId,
+    String taskId,
     boolean passed,
     int totalTests,
     int failedTests,

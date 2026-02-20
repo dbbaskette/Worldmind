@@ -38,9 +38,9 @@ class MissionEngineTest {
                         "Implement the requested feature",
                         "sequential",
                         List.of(
-                                new MissionPlan.DirectivePlan("FORGE", "Implement feature", "", "Feature works", List.of(), List.of()),
-                                new MissionPlan.DirectivePlan("GAUNTLET", "Write tests", "", "Tests pass", List.of("DIR-001"), List.of()),
-                                new MissionPlan.DirectivePlan("VIGIL", "Review code", "", "Code quality ok", List.of("DIR-002"), List.of())
+                                new MissionPlan.TaskPlan("CODER", "Implement feature", "", "Feature works", List.of(), List.of()),
+                                new MissionPlan.TaskPlan("TESTER", "Write tests", "", "Tests pass", List.of("TASK-001"), List.of()),
+                                new MissionPlan.TaskPlan("REVIEWER", "Review code", "", "Code quality ok", List.of("TASK-002"), List.of())
                         )
                 ));
         when(mockLlm.structuredCall(anyString(), anyString(), eq(ProductSpec.class)))
@@ -60,19 +60,19 @@ class MissionEngineTest {
         ScheduleWaveNode mockScheduleWave = mock(ScheduleWaveNode.class);
         when(mockScheduleWave.apply(any(WorldmindState.class))).thenAnswer(invocation -> {
             WorldmindState state = invocation.getArgument(0);
-            var completedIds = new HashSet<>(state.completedDirectiveIds());
-            var directives = state.directives();
-            for (var d : directives) {
+            var completedIds = new HashSet<>(state.completedTaskIds());
+            var tasks = state.tasks();
+            for (var d : tasks) {
                 if (!completedIds.contains(d.id())) {
                     return Map.of(
-                            "waveDirectiveIds", List.of(d.id()),
+                            "waveTaskIds", List.of(d.id()),
                             "waveCount", state.waveCount() + 1,
                             "status", MissionStatus.EXECUTING.name()
                     );
                 }
             }
             return Map.of(
-                    "waveDirectiveIds", List.of(),
+                    "waveTaskIds", List.of(),
                     "waveCount", state.waveCount() + 1,
                     "status", MissionStatus.EXECUTING.name()
             );
@@ -82,14 +82,14 @@ class MissionEngineTest {
         ParallelDispatchNode mockParallelDispatch = mock(ParallelDispatchNode.class);
         when(mockParallelDispatch.apply(any(WorldmindState.class))).thenAnswer(invocation -> {
             WorldmindState state = invocation.getArgument(0);
-            var waveIds = state.waveDirectiveIds();
+            var waveIds = state.waveTaskIds();
             var results = new ArrayList<WaveDispatchResult>();
             for (var id : waveIds) {
-                results.add(new WaveDispatchResult(id, DirectiveStatus.PASSED, List.of(), "OK", 100L));
+                results.add(new WaveDispatchResult(id, TaskStatus.PASSED, List.of(), "OK", 100L));
             }
             return Map.of(
                     "waveDispatchResults", results,
-                    "starblasters", List.of(),
+                    "sandboxes", List.of(),
                     "status", MissionStatus.EXECUTING.name()
             );
         });
@@ -98,8 +98,8 @@ class MissionEngineTest {
         EvaluateWaveNode mockEvaluateWave = mock(EvaluateWaveNode.class);
         when(mockEvaluateWave.apply(any(WorldmindState.class))).thenAnswer(invocation -> {
             WorldmindState state = invocation.getArgument(0);
-            var waveIds = state.waveDirectiveIds();
-            return Map.of("completedDirectiveIds", new ArrayList<>(waveIds));
+            var waveIds = state.waveTaskIds();
+            return Map.of("completedTaskIds", new ArrayList<>(waveIds));
         });
 
         ConvergeResultsNode mockConvergeNode = mock(ConvergeResultsNode.class);
@@ -152,7 +152,7 @@ class MissionEngineTest {
     // =================================================================
 
     @Test
-    @DisplayName("runMission returns state with missionId, classification, and directives")
+    @DisplayName("runMission returns state with missionId, classification, and tasks")
     void runMissionReturnsCompleteState() {
         WorldmindState state = engine.runMission("Add a REST endpoint", InteractionMode.APPROVE_PLAN);
 
@@ -165,10 +165,10 @@ class MissionEngineTest {
         assertTrue(state.projectContext().isPresent());
         assertEquals("java", state.projectContext().get().language());
         assertEquals("spring", state.projectContext().get().framework());
-        assertFalse(state.directives().isEmpty());
-        assertEquals(3, state.directives().size());
-        assertEquals("DIR-001", state.directives().get(0).id());
-        assertEquals("FORGE", state.directives().get(0).centurion());
+        assertFalse(state.tasks().isEmpty());
+        assertEquals(3, state.tasks().size());
+        assertEquals("TASK-001", state.tasks().get(0).id());
+        assertEquals("CODER", state.tasks().get(0).agent());
     }
 
     @Test
@@ -202,7 +202,7 @@ class MissionEngineTest {
         WorldmindState state = engine.runMission("Add logging", InteractionMode.FULL_AUTO);
         assertEquals(InteractionMode.FULL_AUTO, state.interactionMode());
         assertEquals(MissionStatus.COMPLETED, state.status());
-        assertFalse(state.directives().isEmpty());
+        assertFalse(state.tasks().isEmpty());
     }
 
     // =================================================================

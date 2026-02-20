@@ -111,7 +111,7 @@ export function SettingsPanel() {
                     disabled={!provider.available}
                     className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
                       selectedProvider === provider.id
-                        ? 'bg-centurion-vigil/20 border-centurion-vigil/50 text-centurion-vigil'
+                        ? 'bg-agent-reviewer/20 border-agent-reviewer/50 text-agent-reviewer'
                         : provider.available
                           ? 'bg-wm-bg border-wm-border text-wm_text-muted hover:border-wm_text-muted/50'
                           : 'bg-wm-bg border-wm-border/50 text-wm_text-dim cursor-not-allowed opacity-60'
@@ -156,7 +156,7 @@ export function SettingsPanel() {
                 <button
                   onClick={handleSaveModel}
                   disabled={saving}
-                  className="px-4 py-2 bg-centurion-vigil text-white rounded-lg text-xs font-medium hover:bg-centurion-vigil/90 disabled:opacity-50 transition-all"
+                  className="px-4 py-2 bg-agent-reviewer text-white rounded-lg text-xs font-medium hover:bg-agent-reviewer/90 disabled:opacity-50 transition-all"
                 >
                   {saving ? 'Saving...' : 'Save Selection'}
                 </button>
@@ -171,7 +171,7 @@ export function SettingsPanel() {
               <div className="bg-wm-card rounded-lg border border-wm-border p-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-centurion-forge/10 text-centurion-forge border border-centurion-forge/30">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-agent-coder/10 text-agent-coder border border-agent-coder/30">
                       {currentProvider?.name}
                     </span>
                     <span className="text-sm font-mono text-wm_text-secondary">{currentModel.name}</span>
@@ -237,7 +237,7 @@ export function SettingsPanel() {
 
 function ModelCard({ model, selected, onSelect, disabled = false }: { model: LlmModel; selected: boolean; onSelect: () => void; disabled?: boolean }) {
   const tierColors: Record<string, string> = {
-    flagship: 'bg-centurion-vigil/10 text-centurion-vigil border-centurion-vigil/30',
+    flagship: 'bg-agent-reviewer/10 text-agent-reviewer border-agent-reviewer/30',
     premium: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
     fast: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
     reasoning: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
@@ -251,7 +251,7 @@ function ModelCard({ model, selected, onSelect, disabled = false }: { model: Llm
         disabled
           ? 'bg-wm-card/50 border-wm-border/50 opacity-60 cursor-not-allowed'
           : selected
-            ? 'bg-centurion-vigil/10 border-centurion-vigil/40 cursor-pointer'
+            ? 'bg-agent-reviewer/10 border-agent-reviewer/40 cursor-pointer'
             : 'bg-wm-card border-wm-border hover:border-wm_text-muted/30 cursor-pointer'
       }`}
     >
@@ -336,7 +336,7 @@ function ConsumerRow({ consumer }: { consumer: McpConsumerInfo }) {
           )}
         </div>
         {consumer.tools.length > 0 && (
-          <span className="text-[10px] font-mono text-centurion-vigil/70">
+          <span className="text-[10px] font-mono text-agent-reviewer/70">
             {expanded ? '\u25BE' : '\u25B8'} {consumer.tools.length} tool{consumer.tools.length !== 1 ? 's' : ''}
           </span>
         )}

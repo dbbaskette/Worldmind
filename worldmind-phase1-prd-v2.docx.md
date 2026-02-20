@@ -5,7 +5,7 @@ Phase 1: Buildpack Migration \+ Agentic Loop
 
 Product Requirements Document
 
-Replacing Docker-based Centurion containers with
+Replacing Docker-based Agent containers with
 
 Cloud Foundry buildpack-staged droplets, CF Tasks,
 
@@ -22,21 +22,21 @@ and a closed-loop build/test/correct cycle
 
 **1\. Executive Summary**
 
-Worldmind is an agentic code assistant that accepts natural language development requests and autonomously plans, implements, tests, and reviews code. Its worker agents (Centurions) currently run as Docker containers managed by a DockerStarblasterProvider. On Cloud Foundry, the system uses CF Tasks with Docker images pushed to a container registry.
+Worldmind is an agentic code assistant that accepts natural language development requests and autonomously plans, implements, tests, and reviews code. Its worker agents (Agents) currently run as Docker containers managed by a DockerSandboxProvider. On Cloud Foundry, the system uses CF Tasks with Docker images pushed to a container registry.
 
 This PRD defines Phase 1, which has two objectives:
 
-**Objective 1 — Buildpack Migration:** Replace Docker-based Centurion packaging with Cloud Foundry buildpack-staged droplets using the goose-buildpack. The existing CF Task dispatch model, git-based workspace coordination, and LangGraph4j orchestration remain unchanged.
+**Objective 1 — Buildpack Migration:** Replace Docker-based Agent packaging with Cloud Foundry buildpack-staged droplets using the goose-buildpack. The existing CF Task dispatch model, git-based workspace coordination, and LangGraph4j orchestration remain unchanged.
 
-**Objective 2 — Agentic Build/Test Loop:** Enable Centurions to compile and test generated code within their task containers, feeding build failures back to the orchestrator for automated correction. This closes the agentic loop: generate → build → test → correct → re-test, producing verified code rather than untested artifacts.
+**Objective 2 — Agentic Build/Test Loop:** Enable Agents to compile and test generated code within their task containers, feeding build failures back to the orchestrator for automated correction. This closes the agentic loop: generate → build → test → correct → re-test, producing verified code rather than untested artifacts.
 
-**The core insight:** Centurion containers carry no persistent state. All state is externalized to PostgreSQL (checkpoints) and Git (code artifacts). The Docker image is just packaging for a Goose binary plus environment constraints. A Cloud Foundry supply buildpack provides the same capability without Dockerfiles, image builds, or registry management. The apt buildpack adds build toolchains (Maven, JDK, Python, Node) so that Centurions can compile and test the code they generate.
+**The core insight:** Agent containers carry no persistent state. All state is externalized to PostgreSQL (checkpoints) and Git (code artifacts). The Docker image is just packaging for a Goose binary plus environment constraints. A Cloud Foundry supply buildpack provides the same capability without Dockerfiles, image builds, or registry management. The apt buildpack adds build toolchains (Maven, JDK, Python, Node) so that Agents can compile and test the code they generate.
 
 **2\. Problem Statement**
 
 **2.1 Current Architecture**
 
-Today, each Centurion type (Forge, Gauntlet, Vigil, Pulse, Prism) has a dedicated Dockerfile in docker/centurion-{type}/. These images share a common base (centurion-base) that installs the Goose CLI binary, then add type-specific configurations. The images must be built, tagged, and pushed to a container registry (ghcr.io/dbbaskette) before deployment.
+Today, each Agent type (Coder, Tester, Reviewer, Researcher, Refactorer) has a dedicated Dockerfile in docker/agent-{type}/. These images share a common base (agent-base) that installs the Goose CLI binary, then add type-specific configurations. The images must be built, tagged, and pushed to a container registry (ghcr.io/dbbaskette) before deployment.
 
 **2.2 Pain Points**
 
@@ -46,15 +46,15 @@ Registry dependency: The CF deployment requires access to an external container 
 
 Inconsistent deployment model: The Worldmind core application deploys via buildpacks (java\_buildpack), but its worker agents deploy via Docker images. This creates two separate build and deployment pipelines for a single system.
 
-GenAI tile integration gap: Docker-based Centurions require manual configuration of LLM endpoints and API keys via environment variables. The GenAI tile’s VCAP\_SERVICES auto-discovery is not leveraged for worker agents.
+GenAI tile integration gap: Docker-based Agents require manual configuration of LLM endpoints and API keys via environment variables. The GenAI tile’s VCAP\_SERVICES auto-discovery is not leveraged for worker agents.
 
-No build verification: Centurions generate code but cannot verify it compiles or passes tests within the same task execution. Build verification requires a separate external step, breaking the agentic feedback loop.
+No build verification: Agents generate code but cannot verify it compiles or passes tests within the same task execution. Build verification requires a separate external step, breaking the agentic feedback loop.
 
-One-shot generation: Without a closed-loop correction cycle, code quality depends entirely on first-pass generation accuracy. There is no mechanism for a Centurion to learn from compilation errors or test failures within a single mission.
+One-shot generation: Without a closed-loop correction cycle, code quality depends entirely on first-pass generation accuracy. There is no mechanism for a Agent to learn from compilation errors or test failures within a single mission.
 
 **2.3 Opportunity**
 
-The goose-buildpack (github.com/cpage-pivotal/goose-buildpack) is a Cloud Foundry supply buildpack that installs the Goose CLI binary into any CF application. It supports GenAI tile auto-discovery, MCP server configuration via service bindings, and Goose skill files for agent personality customization. Combined with the apt buildpack for build toolchain installation and CF’s instances: 0 pattern for task-only apps, it provides everything Centurions need — including the ability to compile and test generated code — without Docker.
+The goose-buildpack (github.com/cpage-pivotal/goose-buildpack) is a Cloud Foundry supply buildpack that installs the Goose CLI binary into any CF application. It supports GenAI tile auto-discovery, MCP server configuration via service bindings, and Goose skill files for agent personality customization. Combined with the apt buildpack for build toolchain installation and CF’s instances: 0 pattern for task-only apps, it provides everything Agents need — including the ability to compile and test generated code — without Docker.
 
 **3\. Users and Personas**
 
@@ -62,7 +62,7 @@ Worldmind serves multiple user types, each interacting with the system at a diff
 
 **3.1 Mission Requester (End User)**
 
-The primary user of Worldmind. This person describes what they want built in natural language: “Build me a Spring Boot REST API that manages inventory with CRUD operations and connects to PostgreSQL.” They do not know or care about Centurions, buildpacks, or CF Tasks. They interact through the Worldmind UI or API, approve the generated plan, and receive a link to the completed code (Phase 1\) or deployed application (Phase 2).
+The primary user of Worldmind. This person describes what they want built in natural language: “Build me a Spring Boot REST API that manages inventory with CRUD operations and connects to PostgreSQL.” They do not know or care about Agents, buildpacks, or CF Tasks. They interact through the Worldmind UI or API, approve the generated plan, and receive a link to the completed code (Phase 1\) or deployed application (Phase 2).
 
 **Typical profiles:** Product managers, business analysts, junior developers, technical marketers building demos, sales engineers preparing proof-of-concept environments.
 
@@ -78,23 +78,23 @@ The person responsible for deploying and maintaining the Worldmind system on Clo
 
 **3.3 System Developer**
 
-A developer extending Worldmind itself — adding new Centurion types, modifying the LangGraph4j orchestration, or integrating new MCP servers. They work directly with the codebase and need to understand the buildpack chain, skill file format, and build result contract.
+A developer extending Worldmind itself — adding new Agent types, modifying the LangGraph4j orchestration, or integrating new MCP servers. They work directly with the codebase and need to understand the buildpack chain, skill file format, and build result contract.
 
 **Typical profiles:** Backend engineers, AI/ML engineers, contributors to the Worldmind open source project.
 
-**Phase 1 impact:** Moderate. They must understand the new manifest structure, buildpack chain, and agentic loop contract (build-result.json) when adding capabilities. The shift from Dockerfiles to .goose-config.yml changes how new Centurion types are created.
+**Phase 1 impact:** Moderate. They must understand the new manifest structure, buildpack chain, and agentic loop contract (build-result.json) when adding capabilities. The shift from Dockerfiles to .goose-config.yml changes how new Agent types are created.
 
-**3.4 Centurion (Agent Persona)**
+**3.4 Agent (Agent Persona)**
 
-Not a human user, but a critical persona in the system. Each Centurion type has a distinct personality, skill set, and permission boundary defined by its Goose skill file. Understanding Centurions as personas helps clarify why the system is structured the way it is — each one is a specialist with a specific mandate.
+Not a human user, but a critical persona in the system. Each Agent type has a distinct personality, skill set, and permission boundary defined by its Goose skill file. Understanding Agents as personas helps clarify why the system is structured the way it is — each one is a specialist with a specific mandate.
 
-| Centurion | Role | Persona Description |
+| Agent | Role | Persona Description |
 | :---- | :---- | :---- |
-| **Forge** | Code generator | The builder. Writes production code from directives. Compiles its own output to verify correctness. Takes feedback from Gauntlet test failures and corrects. |
-| **Gauntlet** | Test engineer | The challenger. Writes and executes test suites. Its job is to find what’s broken. Reports structured test results that drive the correction loop. |
-| **Vigil** | Code reviewer | The auditor. Reviews code for quality, security, and adherence to standards. Read-only access. Provides qualitative feedback that informs the Seal’s approval decision. |
-| **Pulse** | Researcher | The scout. Investigates APIs, libraries, and patterns needed for the mission. Read-only access. Produces research briefs that inform Forge’s implementation choices. |
-| **Prism** | Refactorer | The optimizer. Restructures existing code for clarity, performance, or maintainability. Can compile and test to verify refactoring doesn’t break anything. |
+| **Coder** | Code generator | The builder. Writes production code from tasks. Compiles its own output to verify correctness. Takes feedback from Tester test failures and corrects. |
+| **Tester** | Test engineer | The challenger. Writes and executes test suites. Its job is to find what’s broken. Reports structured test results that drive the correction loop. |
+| **Reviewer** | Code reviewer | The auditor. Reviews code for quality, security, and adherence to standards. Read-only access. Provides qualitative feedback that informs the QualityGate’s approval decision. |
+| **Researcher** | Researcher | The scout. Investigates APIs, libraries, and patterns needed for the mission. Read-only access. Produces research briefs that inform Coder’s implementation choices. |
+| **Refactorer** | Refactorer | The optimizer. Restructures existing code for clarity, performance, or maintainability. Can compile and test to verify refactoring doesn’t break anything. |
 
 **4\. System Components**
 
@@ -104,45 +104,45 @@ Worldmind is composed of several distinct components that work together to accep
 
 **Runtime:** Spring Boot application deployed via java\_buildpack on Cloud Foundry.
 
-The central orchestrator. Worldmind Core hosts the LangGraph4j state machine (WorldmindGraph), the REST API for mission submission, and the task dispatch layer. It receives natural language requests from users, runs them through the classification and planning stages, dispatches Centurion tasks via CF Tasks, monitors their completion, and manages the agentic retry loop. Core is the only long-running process in the system — everything else is ephemeral.
+The central orchestrator. Worldmind Core hosts the LangGraph4j state machine (WorldmindGraph), the REST API for mission submission, and the task dispatch layer. It receives natural language requests from users, runs them through the classification and planning stages, dispatches Agent tasks via CF Tasks, monitors their completion, and manages the agentic retry loop. Core is the only long-running process in the system — everything else is ephemeral.
 
-**Key sub-components:** WorldmindGraph (LangGraph4j state machine), MissionEngine (mission lifecycle management), CloudFoundryTaskProvider (CF Task dispatch), InstructionBuilder (directive generation), Seal (quality gate evaluation).
+**Key sub-components:** WorldmindGraph (LangGraph4j state machine), MissionEngine (mission lifecycle management), CloudFoundryTaskProvider (CF Task dispatch), InstructionBuilder (task generation), QualityGate (quality gate evaluation).
 
 **10.2 WorldmindGraph (LangGraph4j Orchestrator)**
 
 **Runtime:** Embedded within Worldmind Core.
 
-The stateful directed graph that defines the mission workflow. Each node in the graph represents a stage: classify, plan, dispatch, converge, evaluate, seal. Edges define transitions, including the conditional edges that implement the agentic retry loop — a failed build result triggers a transition back to the dispatch node with error context appended to the directive. State is checkpointed to PostgreSQL, making the workflow resumable after failures.
+The stateful directed graph that defines the mission workflow. Each node in the graph represents a stage: classify, plan, dispatch, converge, evaluate, quality_gate. Edges define transitions, including the conditional edges that implement the agentic retry loop — a failed build result triggers a transition back to the dispatch node with error context appended to the task. State is checkpointed to PostgreSQL, making the workflow resumable after failures.
 
-**10.3 Centurions (Worker Agents)**
+**10.3 Agents (Worker Agents)**
 
 **Runtime:** CF Tasks run against buildpack-staged apps (instances: 0). Ephemeral.
 
-The workforce. Each Centurion is a Goose CLI session running inside a CF Task container. It receives a directive (what to do), a workspace (git branch to clone), and a skill file (who it is). It executes the directive, optionally builds and tests the output, commits results to the branch, writes a build-result.json, and exits. Centurions have no persistent state — they are stateless workers that read from and write to Git.
+The workforce. Each Agent is a Goose CLI session running inside a CF Task container. It receives a task (what to do), a workspace (git branch to clone), and a skill file (who it is). It executes the task, optionally builds and tests the output, commits results to the branch, writes a build-result.json, and exits. Agents have no persistent state — they are stateless workers that read from and write to Git.
 
 **4.4 Nexus (MCP Gateway)**
 
 **Runtime:** Deployed as a CF app or external service. Registered as a CF user-provided service.
 
-The tool hub. Nexus is a Model Context Protocol (MCP) gateway that aggregates multiple MCP servers behind a single endpoint. Centurions connect to Nexus to access tools: Terrain (filesystem operations on the git workspace), Chronicle (git operations), and Spark (shell command execution). Nexus handles authentication, rate limiting, and tool routing. By registering Nexus as a CF user-provided service, all Centurions discover it automatically via VCAP\_SERVICES.
+The tool hub. Nexus is a Model Context Protocol (MCP) gateway that aggregates multiple MCP servers behind a single endpoint. Agents connect to Nexus to access tools: Terrain (filesystem operations on the git workspace), Chronicle (git operations), and Spark (shell command execution). Nexus handles authentication, rate limiting, and tool routing. By registering Nexus as a CF user-provided service, all Agents discover it automatically via VCAP\_SERVICES.
 
 **4.5 GenAI Tile**
 
 **Runtime:** Tanzu Platform managed service.
 
-The LLM provider. The GenAI tile is a Tanzu Platform service that provides access to large language models. It exposes a config\_url endpoint that describes available models and their capabilities (text generation, tool calling, embeddings). The goose-buildpack auto-discovers this service via VCAP\_SERVICES and configures Goose to use the first model with TOOLS capability. This eliminates the need to hardcode API keys or model endpoints in Centurion configuration.
+The LLM provider. The GenAI tile is a Tanzu Platform service that provides access to large language models. It exposes a config\_url endpoint that describes available models and their capabilities (text generation, tool calling, embeddings). The goose-buildpack auto-discovers this service via VCAP\_SERVICES and configures Goose to use the first model with TOOLS capability. This eliminates the need to hardcode API keys or model endpoints in Agent configuration.
 
 **4.6 Workspace Repository (Git)**
 
 **Runtime:** External Git repository (GitHub, GitLab, or Gitea).
 
-The coordination layer. Every mission gets a dedicated branch. Centurions clone the branch, make changes, and push. The orchestrator reads results from the branch. This provides the hard isolation boundary between Centurion tasks — a Centurion can only affect its assigned branch, and the orchestrator controls merges. The workspace also serves as the audit trail: every code change, test result, and build artifact is committed with a descriptive message.
+The coordination layer. Every mission gets a dedicated branch. Agents clone the branch, make changes, and push. The orchestrator reads results from the branch. This provides the hard isolation boundary between Agent tasks — a Agent can only affect its assigned branch, and the orchestrator controls merges. The workspace also serves as the audit trail: every code change, test result, and build artifact is committed with a descriptive message.
 
 **4.7 PostgreSQL (State Store)**
 
 **Runtime:** CF managed service (Tanzu Postgres or equivalent).
 
-The persistence layer. PostgreSQL stores LangGraph4j checkpoints (workflow state), mission metadata (status, retry counts, timestamps), and the Seal’s evaluation history. This is what makes the orchestration resumable — if Worldmind Core restarts, it can resume in-flight missions from the last checkpoint.
+The persistence layer. PostgreSQL stores LangGraph4j checkpoints (workflow state), mission metadata (status, retry counts, timestamps), and the QualityGate’s evaluation history. This is what makes the orchestration resumable — if Worldmind Core restarts, it can resume in-flight missions from the last checkpoint.
 
 **4.8 Component Interaction Summary**
 
@@ -154,10 +154,10 @@ Mission Requester
        │  
        ├── WorldmindGraph: classify → plan → dispatch  
        │  
-       ├── CloudFoundryTaskProvider: cf run-task centurion-forge  
+       ├── CloudFoundryTaskProvider: cf run-task agent-coder  
        │         │  
        │         ▼  
-       │    Centurion Task (apt \+ goose \+ binary buildpacks)  
+       │    Agent Task (apt \+ goose \+ binary buildpacks)  
        │         │  
        │         ├── Goose CLI session  
        │         ├── Connects to Nexus MCP (via service binding)  
@@ -169,7 +169,7 @@ Mission Requester
        │  
        ├── Core reads build-result.json from branch  
        ├── If fail: re-dispatch with error feedback (outer loop)  
-       ├── If pass: converge → Vigil review → Seal approval  
+       ├── If pass: converge → Reviewer review → QualityGate approval  
        │  
        └── PostgreSQL: checkpoint state at each transition
 
@@ -177,31 +177,31 @@ Mission Requester
 
 **5.1 Goals**
 
-G1: Replace all five Centurion Docker images with buildpack-staged CF apps configured via .goose-config.yml and skill files.
+G1: Replace all five Agent Docker images with buildpack-staged CF apps configured via .goose-config.yml and skill files.
 
-G2: Install build toolchains (JDK, Maven, Python, Node) via the apt buildpack so Centurions can compile and test generated code within task containers.
+G2: Install build toolchains (JDK, Maven, Python, Node) via the apt buildpack so Agents can compile and test generated code within task containers.
 
 G3: Implement a closed-loop agentic cycle in LangGraph4j: generate → build → test → feedback → correct → re-test, with a configurable maximum retry count.
 
 G4: Maintain the existing CF Task dispatch model in CloudFoundryTaskProvider with zero changes to the orchestration layer’s dispatch interface.
 
-G5: Leverage GenAI tile service bindings for automatic LLM credential discovery in Centurion workers.
+G5: Leverage GenAI tile service bindings for automatic LLM credential discovery in Agent workers.
 
-G6: Register Nexus (the MCP gateway) as a CF user-provided service that Centurions auto-discover via VCAP\_SERVICES.
+G6: Register Nexus (the MCP gateway) as a CF user-provided service that Agents auto-discover via VCAP\_SERVICES.
 
-G7: Preserve all existing Centurion permission constraints (filesystem paths, read/write vs. read-only, command allowlists).
+G7: Preserve all existing Agent permission constraints (filesystem paths, read/write vs. read-only, command allowlists).
 
 G8: Eliminate the Docker image build and registry push steps from the deployment pipeline.
 
 **5.2 Non-Goals (Phase 2\)**
 
-Deploy Centurion (Nova): A new agent type that performs cf push of generated applications to the platform. Deferred to Phase 2\.
+Deploy Agent (Nova): A new agent type that performs cf push of generated applications to the platform. Deferred to Phase 2\.
 
 Configuration UI: A user-facing interface for reviewing and overriding application properties before deployment. Deferred to Phase 2\.
 
 Application deployment: Staging and deploying the generated application as a running CF app. Phase 1 verifies code compiles and tests pass; Phase 2 deploys it.
 
-Docker provider removal: The DockerStarblasterProvider remains functional for local development. Only the CF deployment path changes.
+Docker provider removal: The DockerSandboxProvider remains functional for local development. Only the CF deployment path changes.
 
 **6\. Architecture**
 
@@ -209,7 +209,7 @@ Docker provider removal: The DockerStarblasterProvider remains functional for lo
 
 | Aspect | Current (Docker) | Phase 1 (Buildpack) |
 | :---- | :---- | :---- |
-| **Packaging** | Dockerfile per Centurion type | .goose-config.yml \+ skill file per type |
+| **Packaging** | Dockerfile per Agent type | .goose-config.yml \+ skill file per type |
 | **Binary delivery** | Baked into Docker image at build | Installed by goose-buildpack at staging |
 | **Build tools** | Baked into Docker image | Installed by apt buildpack at staging |
 | **Registry** | ghcr.io/dbbaskette | None — CF droplet store |
@@ -224,23 +224,23 @@ Docker provider removal: The DockerStarblasterProvider remains functional for lo
 
 | Component | Change | Details |
 | :---- | :---- | :---- |
-| docker/centurion-\* | Remove | Delete all Dockerfiles; replace with manifests/ |
-| manifests/ (new) | Add | Per-Centurion manifest.yml, .goose-config.yml, and apt.yml |
+| docker/agent-\* | Remove | Delete all Dockerfiles; replace with manifests/ |
+| manifests/ (new) | Add | Per-Agent manifest.yml, .goose-config.yml, and apt.yml |
 | CloudFoundryTaskProvider | Modify | Update task command to invoke Goose from buildpack path |
-| InstructionBuilder | Modify | Map Centurion types to skill names instead of Docker images |
+| InstructionBuilder | Modify | Map Agent types to skill names instead of Docker images |
 | WorldmindGraph | Modify | Add correction loop edges: test failure → re-dispatch with feedback |
 | MissionEngine | Modify | Support retry count tracking and build result parsing |
-| run.sh \--cf | Modify | Replace docker build/push with cf push of Centurion apps |
+| run.sh \--cf | Modify | Replace docker build/push with cf push of Agent apps |
 
 **10.3 Deployment Topology**
 
 CF Apps:  
   worldmind-core        ─ Spring Boot app (java\_buildpack), instances: 1  
-  centurion-forge       ─ Goose worker (apt \+ goose \+ binary buildpacks), instances: 0  
-  centurion-gauntlet    ─ Goose worker (apt \+ goose \+ binary buildpacks), instances: 0  
-  centurion-vigil       ─ Goose worker (apt \+ goose \+ binary buildpacks), instances: 0  
-  centurion-pulse       ─ Goose worker (apt \+ goose \+ binary buildpacks), instances: 0  
-  centurion-prism       ─ Goose worker (apt \+ goose \+ binary buildpacks), instances: 0  
+  agent-coder       ─ Goose worker (apt \+ goose \+ binary buildpacks), instances: 0  
+  agent-tester    ─ Goose worker (apt \+ goose \+ binary buildpacks), instances: 0  
+  agent-reviewer       ─ Goose worker (apt \+ goose \+ binary buildpacks), instances: 0  
+  agent-researcher       ─ Goose worker (apt \+ goose \+ binary buildpacks), instances: 0  
+  agent-refactorer       ─ Goose worker (apt \+ goose \+ binary buildpacks), instances: 0  
    
 CF Services:  
   worldmind-postgres    ─ PostgreSQL (checkpointing)  
@@ -253,15 +253,15 @@ CF Tasks (dispatched by worldmind-core):
 
 **7\. Buildpack Migration Requirements**
 
-**7.1 Centurion App Configuration**
+**7.1 Agent App Configuration**
 
-Each Centurion type is deployed as a CF app with instances: 0 (task-only, no long-running process). Three supply buildpacks are chained: the apt buildpack installs build toolchains, the goose-buildpack installs the Goose CLI binary, and binary\_buildpack satisfies CF’s final buildpack requirement.
+Each Agent type is deployed as a CF app with instances: 0 (task-only, no long-running process). Three supply buildpacks are chained: the apt buildpack installs build toolchains, the goose-buildpack installs the Goose CLI binary, and binary\_buildpack satisfies CF’s final buildpack requirement.
 
 **7.1.1 Manifest Structure**
 
-\# manifests/centurion-forge/manifest.yml  
+\# manifests/agent-coder/manifest.yml  
 applications:  
-\- name: centurion-forge  
+\- name: agent-coder  
   no-route: true  
   health-check-type: process  
   instances: 0  
@@ -279,9 +279,9 @@ applications:
 
 **7.1.2 Build Toolchain via apt Buildpack**
 
-Each Centurion app includes an apt.yml that declares the build toolchains needed to compile and test generated code. The apt buildpack installs these packages into the droplet during staging, making them available to every CF Task run against the app.
+Each Agent app includes an apt.yml that declares the build toolchains needed to compile and test generated code. The apt buildpack installs these packages into the droplet during staging, making them available to every CF Task run against the app.
 
-\# manifests/centurion-forge/apt.yml  
+\# manifests/agent-coder/apt.yml  
 packages:  
   \- openjdk-21-jdk-headless  
   \- maven  
@@ -292,22 +292,22 @@ packages:
   \- npm  
   \- git
 
-These are build-time tools, not application runtimes. The Centurion is not running a Java app — it is running Goose, which invokes mvn compile, pytest, or npm test as shell commands against the generated code. The JDK and Maven are CLI tools in the same way that git is a CLI tool.
+These are build-time tools, not application runtimes. The Agent is not running a Java app — it is running Goose, which invokes mvn compile, pytest, or npm test as shell commands against the generated code. The JDK and Maven are CLI tools in the same way that git is a CLI tool.
 
 **Memory and disk allocation:** Build tools increase the droplet size and task memory requirements. Memory is set to 1G (up from 512M) and disk\_quota to 2G to accommodate Maven dependency downloads and compilation. These values should be tuned during M1 validation.
 
-**7.1.3 Goose Configuration per Centurion**
+**7.1.3 Goose Configuration per Agent**
 
-\# manifests/centurion-forge/.goose-config.yml  
+\# manifests/agent-coder/.goose-config.yml  
 goose:  
   enabled: true  
   version: "latest"  
   skills:  
-    \- name: forge  
-      description: "Code generation Centurion"  
+    \- name: coder  
+      description: "Code generation Agent"  
       content: |  
-        You are Forge, a code generation Centurion.  
-        You write production-quality code based on directives.  
+        You are Coder, a code generation Agent.  
+        You write production-quality code based on tasks.  
         PERMISSIONS: Read/write src/, lib/, app/  
         RESTRICTIONS: Do not modify test files.  
         After writing code, run the appropriate build command  
@@ -319,25 +319,25 @@ goose:
           Node: npm install && npm run build  
         Always commit your changes with a descriptive message.
 
-**7.1.4 Complete Centurion Configuration Matrix**
+**7.1.4 Complete Agent Configuration Matrix**
 
-| Centurion | Role | Write Paths | Build Cmd | Test Cmd | MCP Tools |
+| Agent | Role | Write Paths | Build Cmd | Test Cmd | MCP Tools |
 | :---- | :---- | :---- | :---- | :---- | :---- |
-| **Forge** | Code generation | src/, lib/, app/ | mvn compile | — | Terrain, Chronicle |
-| **Gauntlet** | Test write/run | test/, spec/ | mvn compile | mvn test | Terrain, Spark |
-| **Vigil** | Code review | None | — | — | Terrain |
-| **Pulse** | Research | None | — | — | Terrain |
-| **Prism** | Refactoring | src/, lib/, app/ | mvn compile | mvn test | Terrain, Chronicle |
+| **Coder** | Code generation | src/, lib/, app/ | mvn compile | — | Terrain, Chronicle |
+| **Tester** | Test write/run | test/, spec/ | mvn compile | mvn test | Terrain, Spark |
+| **Reviewer** | Code review | None | — | — | Terrain |
+| **Researcher** | Research | None | — | — | Terrain |
+| **Refactorer** | Refactoring | src/, lib/, app/ | mvn compile | mvn test | Terrain, Chronicle |
 
 **7.2 Service Bindings**
 
 **7.2.1 GenAI Tile Binding**
 
-All Centurion apps bind to the same GenAI tile service instance (worldmind-genai). The goose-buildpack automatically discovers the binding at runtime by parsing VCAP\_SERVICES, calling the config\_url endpoint to discover available models, and selecting the first model with TOOLS capability. No API keys or endpoint URLs need to be specified in environment variables.
+All Agent apps bind to the same GenAI tile service instance (worldmind-genai). The goose-buildpack automatically discovers the binding at runtime by parsing VCAP\_SERVICES, calling the config\_url endpoint to discover available models, and selecting the first model with TOOLS capability. No API keys or endpoint URLs need to be specified in environment variables.
 
 **7.2.2 Nexus MCP Gateway Binding**
 
-The Nexus MCP gateway is registered as a CF user-provided service. Centurion apps bind to this service, and the goose-buildpack auto-discovers it as an MCP server when the credentials contain a uri field and an X-API-KEY header.
+The Nexus MCP gateway is registered as a CF user-provided service. Agent apps bind to this service, and the goose-buildpack auto-discovers it as an MCP server when the credentials contain a uri field and an X-API-KEY header.
 
 \# One-time setup  
 cf create-user-provided-service nexus-mcp \\  
@@ -358,44 +358,44 @@ The existing CloudFoundryTaskProvider dispatches work by calling cf run-task aga
 
 1\. Worldmind core creates a mission branch in the workspace git repository.
 
-2\. Core dispatches a CF Task against the appropriate Centurion app (e.g., centurion-forge).
+2\. Core dispatches a CF Task against the appropriate Agent app (e.g., agent-coder).
 
-3\. The task starts, Goose clones the mission branch, executes the directive, runs build verification, and pushes results (including build output).
+3\. The task starts, Goose clones the mission branch, executes the task, runs build verification, and pushes results (including build output).
 
 4\. The task exits. Core polls for task completion and collects results from the git branch.
 
-5\. If build/test failed: core extracts error output, appends it to the directive as feedback, and re-dispatches (up to max retries).
+5\. If build/test failed: core extracts error output, appends it to the task as feedback, and re-dispatches (up to max retries).
 
-6\. If build/test passed: results converge, Seal evaluates quality, and the next wave dispatches.
+6\. If build/test passed: results converge, QualityGate evaluates quality, and the next wave dispatches.
 
 **7.4 Deployment Script Changes**
 
 \# Before (Docker)  
-docker build \-t ghcr.io/dbbaskette/centurion-base docker/centurion-base/  
-docker build \-t ghcr.io/dbbaskette/centurion-forge docker/centurion-forge/  
-docker push ghcr.io/dbbaskette/centurion-forge  
+docker build \-t ghcr.io/dbbaskette/agent-base docker/agent-base/  
+docker build \-t ghcr.io/dbbaskette/agent-coder docker/agent-coder/  
+docker push ghcr.io/dbbaskette/agent-coder  
 \# ... repeat for all 5 types  
    
 \# After (Buildpack)  
-cf push \-f manifests/centurion-forge/manifest.yml  
-cf push \-f manifests/centurion-gauntlet/manifest.yml  
-cf push \-f manifests/centurion-vigil/manifest.yml  
-cf push \-f manifests/centurion-pulse/manifest.yml  
-cf push \-f manifests/centurion-prism/manifest.yml
+cf push \-f manifests/agent-coder/manifest.yml  
+cf push \-f manifests/agent-tester/manifest.yml  
+cf push \-f manifests/agent-reviewer/manifest.yml  
+cf push \-f manifests/agent-researcher/manifest.yml  
+cf push \-f manifests/agent-refactorer/manifest.yml
 
 **8\. Agentic Build/Test Loop**
 
 **10.1 Overview**
 
-The agentic loop is the core value proposition of Phase 1 beyond packaging. Without it, Centurions are code generators that produce unverified output. With it, Worldmind delivers code that compiles cleanly and passes its test suite. The loop operates at two levels: the inner loop (within a single Centurion task) and the outer loop (across wave re-dispatches by the orchestrator).
+The agentic loop is the core value proposition of Phase 1 beyond packaging. Without it, Agents are code generators that produce unverified output. With it, Worldmind delivers code that compiles cleanly and passes its test suite. The loop operates at two levels: the inner loop (within a single Agent task) and the outer loop (across wave re-dispatches by the orchestrator).
 
-**10.2 Inner Loop: Within a Centurion Task**
+**10.2 Inner Loop: Within a Agent Task**
 
-When a Centurion (Forge, Gauntlet, or Prism) generates or modifies code, Goose’s skill instructions direct it to immediately run the appropriate build command. If the build fails, Goose reads the error output and attempts to fix the code. This happens entirely within a single CF Task execution — Goose is an agentic LLM session that can iterate on its own work.
+When a Agent (Coder, Tester, or Refactorer) generates or modifies code, Goose’s skill instructions direct it to immediately run the appropriate build command. If the build fails, Goose reads the error output and attempts to fix the code. This happens entirely within a single CF Task execution — Goose is an agentic LLM session that can iterate on its own work.
 
 Inner Loop (within Goose session):  
    
-  1\. Goose generates/modifies code per directive  
+  1\. Goose generates/modifies code per task  
   2\. Goose runs: mvn compile \-q  (or pytest, npm test, etc.)  
   3\. If BUILD PASSES:  
        → git add, git commit, git push  
@@ -410,37 +410,37 @@ Inner Loop (within Goose session):
        → Write build-result.json: { status: "fail", errors: "..." }  
        → Task exits with failure code
 
-The inner loop retry count (default: 3\) is configured in the Goose skill file. This keeps the task execution bounded — a Centurion will not spin indefinitely trying to fix a fundamental design error.
+The inner loop retry count (default: 3\) is configured in the Goose skill file. This keeps the task execution bounded — a Agent will not spin indefinitely trying to fix a fundamental design error.
 
 **10.3 Outer Loop: Orchestrator Re-Dispatch**
 
-When the inner loop exhausts its retries and the task still fails, the orchestrator (LangGraph4j WorldmindGraph) receives the failure. It can then re-dispatch with additional context: the error output, suggestions from Vigil’s code review, or revised directives from the Planner.
+When the inner loop exhausts its retries and the task still fails, the orchestrator (LangGraph4j WorldmindGraph) receives the failure. It can then re-dispatch with additional context: the error output, suggestions from Reviewer’s code review, or revised tasks from the Planner.
 
 Outer Loop (LangGraph4j orchestration):  
    
-  Wave 1: Forge generates code, Gauntlet writes tests  
+  Wave 1: Coder generates code, Tester writes tests  
      │  
-     ├─ Forge inner loop: compile → fix → compile → PASS  
-     └─ Gauntlet inner loop: compile tests → PASS  
+     ├─ Coder inner loop: compile → fix → compile → PASS  
+     └─ Tester inner loop: compile tests → PASS  
      │  
-  Wave 2: Gauntlet runs tests against Forge’s code  
+  Wave 2: Tester runs tests against Coder’s code  
      │  
-     ├─ Tests pass → proceed to Wave 3 (Vigil review)  
-     └─ Tests fail → extract errors → re-dispatch Forge  
+     ├─ Tests pass → proceed to Wave 3 (Reviewer review)  
+     └─ Tests fail → extract errors → re-dispatch Coder  
         with test failures as feedback  
      │  
-  Correction Wave: Forge fixes code based on test feedback  
+  Correction Wave: Coder fixes code based on test feedback  
      │  
-     ├─ Forge inner loop: fix → compile → PASS  
-     └─ Re-run Gauntlet → tests pass → proceed  
+     ├─ Coder inner loop: fix → compile → PASS  
+     └─ Re-run Tester → tests pass → proceed  
      │  
-  Wave 3: Vigil reviews, Seal approves  
+  Wave 3: Reviewer reviews, QualityGate approves  
    
   Max outer retries: 3 (configurable per mission)
 
 **8.4 Build Result Contract**
 
-Centurions communicate build results to the orchestrator via a build-result.json file committed to the mission branch. This provides a structured, parseable contract that the orchestrator can read without scraping task logs.
+Agents communicate build results to the orchestrator via a build-result.json file committed to the mission branch. This provides a structured, parseable contract that the orchestrator can read without scraping task logs.
 
 // build-result.json (on success)  
 {  
@@ -467,7 +467,7 @@ Centurions communicate build results to the orchestrator via a build-result.json
 
 **8.5 Build Command Detection**
 
-Centurions detect the project type and select the appropriate build command based on the presence of build files in the workspace. This detection is encoded in the Goose skill instructions:
+Agents detect the project type and select the appropriate build command based on the presence of build files in the workspace. This detection is encoded in the Goose skill instructions:
 
 | Indicator File | Project Type | Build Command | Test Command |
 | :---- | :---- | :---- | :---- |
@@ -491,17 +491,17 @@ All retry parameters are configurable per mission via the Planner’s mission sp
 
 **9\. Permission Model**
 
-In the Docker model, Centurion permissions are enforced by the container’s filesystem mounts and command allowlists. In the buildpack model, permissions are enforced through Goose skill instructions and the command allowlist configuration in .goose-config.yml.
+In the Docker model, Agent permissions are enforced by the container’s filesystem mounts and command allowlists. In the buildpack model, permissions are enforced through Goose skill instructions and the command allowlist configuration in .goose-config.yml.
 
-The enforcement mechanism shifts from infrastructure-level (container mounts) to application-level (Goose instruction adherence \+ allowlists). This is a trade-off: Docker provides hard filesystem boundaries, while skill-based instructions rely on the LLM following its instructions. However, the git-based workspace model inherently limits what a Centurion can affect — it can only modify files in its cloned workspace branch. The orchestrator controls which changes are merged.
+The enforcement mechanism shifts from infrastructure-level (container mounts) to application-level (Goose instruction adherence \+ allowlists). This is a trade-off: Docker provides hard filesystem boundaries, while skill-based instructions rely on the LLM following its instructions. However, the git-based workspace model inherently limits what a Agent can affect — it can only modify files in its cloned workspace branch. The orchestrator controls which changes are merged.
 
-Build tool execution (mvn, pytest, npm) is explicitly added to the command allowlist for Forge, Gauntlet, and Prism Centurions. Vigil and Pulse retain read-only access with no build tool permissions.
+Build tool execution (mvn, pytest, npm) is explicitly added to the command allowlist for Coder, Tester, and Refactorer Agents. Reviewer and Researcher retain read-only access with no build tool permissions.
 
 **10\. Buildpack Requirements**
 
 **10.1 Buildpack Chain**
 
-Each Centurion app uses three buildpacks in the following order:
+Each Agent app uses three buildpacks in the following order:
 
 | Order | Buildpack | Type | Purpose |
 | :---- | :---- | :---- | :---- |
@@ -534,18 +534,18 @@ At task runtime, Maven will download dependencies from Maven Central (or a confi
 
 | \# | Milestone | Deliverable | Dependencies |
 | :---- | :---- | :---- | :---- |
-| M1 | Buildpack chain validation | Single Centurion (Forge) staged with apt \+ goose \+ binary buildpacks | Buildpack access |
-| M2 | Build toolchain validation | Forge task runs mvn compile against generated code inside container | M1 complete |
-| M3 | GenAI \+ MCP bindings verified | Forge uses LLM via GenAI binding, Nexus via service binding | GenAI tile, Nexus |
-| M4 | Inner agentic loop working | Forge compiles, detects errors, self-corrects within single task | M2 \+ M3 complete |
-| M5 | All five Centurions migrated | manifests/ directory with all configs; docker/ deprecated | M4 complete |
+| M1 | Buildpack chain validation | Single Agent (Coder) staged with apt \+ goose \+ binary buildpacks | Buildpack access |
+| M2 | Build toolchain validation | Coder task runs mvn compile against generated code inside container | M1 complete |
+| M3 | GenAI \+ MCP bindings verified | Coder uses LLM via GenAI binding, Nexus via service binding | GenAI tile, Nexus |
+| M4 | Inner agentic loop working | Coder compiles, detects errors, self-corrects within single task | M2 \+ M3 complete |
+| M5 | All five Agents migrated | manifests/ directory with all configs; docker/ deprecated | M4 complete |
 | M6 | Outer loop in orchestrator | LangGraph4j re-dispatches on build failure with error feedback | M5 complete |
-| M7 | End-to-end mission validated | Full cycle: plan → generate → build → test → correct → review → seal | M6 complete |
+| M7 | End-to-end mission validated | Full cycle: plan → generate → build → test → correct → review → quality_gate | M6 complete |
 | M8 | Deployment script updated | run.sh \--cf uses cf push; no docker build/push | M7 complete |
 
 **11.2 Rollback Strategy**
 
-The Docker-based deployment remains functional throughout Phase 1\. The DockerStarblasterProvider is not modified. If the buildpack migration encounters blocking issues, the CF deployment reverts to Docker images by switching the STARBLASTER\_PROVIDER configuration back to docker. The manifests/ directory and docker/ directory coexist until Phase 1 is validated and the Docker path is formally deprecated.
+The Docker-based deployment remains functional throughout Phase 1\. The DockerSandboxProvider is not modified. If the buildpack migration encounters blocking issues, the CF deployment reverts to Docker images by switching the SANDBOX\_PROVIDER configuration back to docker. The manifests/ directory and docker/ directory coexist until Phase 1 is validated and the Docker path is formally deprecated.
 
 **12\. Risks and Mitigations**
 
@@ -564,31 +564,31 @@ The Docker-based deployment remains functional throughout Phase 1\. The DockerSt
 
 Phase 1 is complete when all of the following are true:
 
-SC1: All five Centurion types (Forge, Gauntlet, Vigil, Pulse, Prism) are deployed as buildpack-staged CF apps with instances: 0, using the apt \+ goose \+ binary buildpack chain.
+SC1: All five Agent types (Coder, Tester, Reviewer, Researcher, Refactorer) are deployed as buildpack-staged CF apps with instances: 0, using the apt \+ goose \+ binary buildpack chain.
 
-SC2: Build toolchains (JDK, Maven, Python, Node) are available inside Centurion task containers and can compile generated code.
+SC2: Build toolchains (JDK, Maven, Python, Node) are available inside Agent task containers and can compile generated code.
 
-SC3: The inner agentic loop works: a Centurion generates code, runs the build, detects compilation errors, self-corrects, and produces a clean build within a single task execution.
+SC3: The inner agentic loop works: a Agent generates code, runs the build, detects compilation errors, self-corrects, and produces a clean build within a single task execution.
 
-SC4: The outer agentic loop works: when a Centurion task fails after exhausting inner retries, the orchestrator re-dispatches with error feedback, and the correction wave produces passing code.
+SC4: The outer agentic loop works: when a Agent task fails after exhausting inner retries, the orchestrator re-dispatches with error feedback, and the correction wave produces passing code.
 
-SC5: A build-result.json contract is committed to the mission branch by each build-capable Centurion, and the orchestrator correctly parses it to determine pass/fail.
+SC5: A build-result.json contract is committed to the mission branch by each build-capable Agent, and the orchestrator correctly parses it to determine pass/fail.
 
 SC6: LLM credentials are sourced exclusively from the GenAI tile service binding — no API keys in manifests or environment variables.
 
 SC7: Nexus MCP gateway is accessed via CF service binding — no hardcoded MCP endpoints.
 
-SC8: A full mission lifecycle (classify → plan → generate → build → test → correct → review → seal) completes successfully, producing code that compiles and passes its test suite.
+SC8: A full mission lifecycle (classify → plan → generate → build → test → correct → review → quality_gate) completes successfully, producing code that compiles and passes its test suite.
 
 SC9: The run.sh \--cf script deploys the full system without any docker build or docker push commands.
 
-SC10: Wave-based parallel dispatch works correctly — multiple Centurion tasks run concurrently, each with independent build/test execution.
+SC10: Wave-based parallel dispatch works correctly — multiple Agent tasks run concurrently, each with independent build/test execution.
 
 **14\. Future Phases (Out of Scope)**
 
 **Phase 2: Deploy**
 
-A new Nova Centurion type that pulls verified code from the mission branch, detects the appropriate buildpack, and performs cf push to deploy the application to the platform. Includes a configuration UI for reviewing and overriding application properties (service bindings, environment variables, scaling parameters) before deployment. Nova consumes the build-result.json produced in Phase 1 to confirm the code is deployment-ready.
+A new Nova Agent type that pulls verified code from the mission branch, detects the appropriate buildpack, and performs cf push to deploy the application to the platform. Includes a configuration UI for reviewing and overriding application properties (service bindings, environment variables, scaling parameters) before deployment. Nova consumes the build-result.json produced in Phase 1 to confirm the code is deployment-ready.
 
 **Phase 3: Full Platform Integration**
 

@@ -19,7 +19,7 @@ import java.time.Duration;
  * CLI command: worldmind status &lt;mission-id&gt;
  * <p>
  * Queries the checkpoint store for a specific mission and displays
- * formatted status including directive progress.
+ * formatted status including task progress.
  */
 @Command(name = "status", mixinStandardHelpOptions = true, description = "Check mission status")
 @Component
@@ -79,16 +79,16 @@ public class StatusCommand implements Runnable {
                 ConsoleOutput.info(String.format("Category: %s | Complexity: %d | Components: %s",
                         c.category(), c.complexity(), String.join(", ", c.affectedComponents()))));
 
-        // Directive progress table
-        var directives = state.directives();
-        if (!directives.isEmpty()) {
+        // Task progress table
+        var tasks = state.tasks();
+        if (!tasks.isEmpty()) {
             System.out.println();
             System.out.printf("  %-10s %-10s %-10s %-8s %s%n",
-                    "DIRECTIVE", "CENTURION", "STATUS", "ITER", "DESCRIPTION");
+                    "TASK", "AGENT", "STATUS", "ITER", "DESCRIPTION");
             System.out.println("  " + "-".repeat(64));
-            for (var d : directives) {
+            for (var d : tasks) {
                 System.out.printf("  %-10s %-10s %-10s %d/%-5d %s%n",
-                        d.id(), d.centurion(), d.status(),
+                        d.id(), d.agent(), d.status(),
                         d.iteration(), d.maxIterations(),
                         truncate(d.description(), 30));
             }
@@ -101,10 +101,10 @@ public class StatusCommand implements Runnable {
             ConsoleOutput.info("Waves executed: " + waveCount);
         }
 
-        // Seal status
+        // QualityGate status
         if (status == MissionStatus.COMPLETED || status == MissionStatus.FAILED) {
-            ConsoleOutput.seal(state.sealGranted(),
-                    state.sealGranted() ? "Quality gate passed" : "Quality gate not passed");
+            ConsoleOutput.quality_gate(state.quality_gateGranted(),
+                    state.quality_gateGranted() ? "Quality gate passed" : "Quality gate not passed");
         }
 
         // Metrics

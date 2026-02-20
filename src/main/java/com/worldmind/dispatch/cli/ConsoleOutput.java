@@ -35,14 +35,14 @@ public class ConsoleOutput {
                 "@|fg(red) x|@ " + message));
     }
 
-    public static void starblaster(String message) {
+    public static void sandbox(String message) {
         System.out.println(CommandLine.Help.Ansi.AUTO.string(
-                "@|fg(magenta) [STARBLASTER]|@ " + message));
+                "@|fg(magenta) [SANDBOX]|@ " + message));
     }
 
-    public static void centurion(String type, String message) {
+    public static void agent(String type, String message) {
         System.out.println(CommandLine.Help.Ansi.AUTO.string(
-                "@|fg(blue) [CENTURION " + type + "]|@ " + message));
+                "@|fg(blue) [AGENT " + type + "]|@ " + message));
     }
 
     public static void fileChange(String action, String path) {
@@ -54,7 +54,7 @@ public class ConsoleOutput {
     public static void testResult(TestResult result) {
         String status = result.passed() ? "@|fg(green) PASS|@" : "@|fg(red) FAIL|@";
         System.out.println(CommandLine.Help.Ansi.AUTO.string(
-                "  @|fg(yellow) [TEST]|@ " + status + " " + result.directiveId() +
+                "  @|fg(yellow) [TEST]|@ " + status + " " + result.taskId() +
                 " — " + result.totalTests() + " tests, " + result.failedTests() + " failed" +
                 " (" + result.durationMs() + "ms)"));
     }
@@ -63,7 +63,7 @@ public class ConsoleOutput {
         String status = feedback.score() >= 7 ? "@|fg(green) " + feedback.score() + "/10|@" :
                                                 "@|fg(red) " + feedback.score() + "/10|@";
         System.out.println(CommandLine.Help.Ansi.AUTO.string(
-                "  @|fg(yellow) [REVIEW]|@ " + status + " " + feedback.directiveId() +
+                "  @|fg(yellow) [REVIEW]|@ " + status + " " + feedback.taskId() +
                 " — " + feedback.summary()));
         for (String issue : feedback.issues()) {
             System.out.println(CommandLine.Help.Ansi.AUTO.string(
@@ -71,16 +71,16 @@ public class ConsoleOutput {
         }
     }
 
-    public static void wave(int waveNumber, int directiveCount) {
+    public static void wave(int waveNumber, int taskCount) {
         System.out.println(CommandLine.Help.Ansi.AUTO.string(
                 "@|bold,fg(yellow) [WAVE " + waveNumber + "]|@ dispatching " +
-                directiveCount + " directive" + (directiveCount != 1 ? "s" : "")));
+                taskCount + " task" + (taskCount != 1 ? "s" : "")));
     }
 
-    public static void parallelProgress(String directiveId, String status) {
+    public static void parallelProgress(String taskId, String status) {
         String statusColor = "PASSED".equals(status) ? "fg(green)" : "fg(red)";
         System.out.println(CommandLine.Help.Ansi.AUTO.string(
-                "  @|" + statusColor + " " + status + "|@ " + directiveId));
+                "  @|" + statusColor + " " + status + "|@ " + taskId));
     }
 
     public static void waveComplete(int waveNumber, int passed, int failed) {
@@ -90,13 +90,13 @@ public class ConsoleOutput {
                 (failed > 0 ? ", @|fg(red) " + failed + " failed|@" : "")));
     }
 
-    public static void seal(boolean granted, String reason) {
+    public static void quality_gate(boolean granted, String reason) {
         if (granted) {
             System.out.println(CommandLine.Help.Ansi.AUTO.string(
-                    "  @|fg(green),bold [SEAL GRANTED]|@ " + reason));
+                    "  @|fg(green),bold [QUALITY_GATE GRANTED]|@ " + reason));
         } else {
             System.out.println(CommandLine.Help.Ansi.AUTO.string(
-                    "  @|fg(red),bold [SEAL DENIED]|@ " + reason));
+                    "  @|fg(red),bold [QUALITY_GATE DENIED]|@ " + reason));
         }
     }
 
@@ -105,8 +105,8 @@ public class ConsoleOutput {
         System.out.println(CommandLine.Help.Ansi.AUTO.string(
                 "@|bold Mission Metrics|@"));
         System.out.println(CommandLine.Help.Ansi.AUTO.string(
-                "  Directives: @|fg(green) " + m.directivesCompleted() + " passed|@, @|fg(red) " +
-                m.directivesFailed() + " failed|@"));
+                "  Tasks: @|fg(green) " + m.tasksCompleted() + " passed|@, @|fg(red) " +
+                m.tasksFailed() + " failed|@"));
         if (m.wavesExecuted() > 0) {
             System.out.println(CommandLine.Help.Ansi.AUTO.string(
                     "  Waves: " + m.wavesExecuted()));
@@ -123,11 +123,11 @@ public class ConsoleOutput {
     public static void watchEvent(String eventType, String data) {
         String prefix = switch (eventType) {
             case "mission.created" -> "@|fg(cyan) [MISSION]|@";
-            case "starblaster.opened", "starblaster.closed" -> "@|fg(magenta) [STARBLASTER]|@";
-            case "directive.started", "directive.completed", "directive.failed" -> "@|fg(blue) [DIRECTIVE]|@";
+            case "sandbox.opened", "sandbox.closed" -> "@|fg(magenta) [SANDBOX]|@";
+            case "task.started", "task.completed", "task.failed" -> "@|fg(blue) [TASK]|@";
             case "wave.started", "wave.completed" -> "@|bold,fg(yellow) [WAVE]|@";
-            case "seal.granted" -> "@|fg(green),bold [SEAL]|@";
-            case "seal.denied" -> "@|fg(red),bold [SEAL]|@";
+            case "quality_gate.granted" -> "@|fg(green),bold [QUALITY_GATE]|@";
+            case "quality_gate.denied" -> "@|fg(red),bold [QUALITY_GATE]|@";
             case "mission.completed" -> "@|fg(green),bold [COMPLETE]|@";
             case "mission.failed" -> "@|fg(red),bold [FAILED]|@";
             default -> "@|fg(white) [" + eventType + "]|@";
