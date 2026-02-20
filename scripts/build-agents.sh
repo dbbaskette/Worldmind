@@ -1,29 +1,44 @@
 #!/bin/bash
-# Builds all agent images locally.
-# Usage: ./scripts/build-agents.sh
+# Builds all agent images locally, with optional push and smoke test.
+# Usage: ./scripts/build-agents.sh [--push] [--smoke-test]
 set -euo pipefail
 
 REGISTRY=${AGENT_IMAGE_REGISTRY:-ghcr.io/dbbaskette}
+PUSH=false
+SMOKE_TEST=false
 
-echo "Building agent-base..."
-docker build -t "$REGISTRY/agent-base:latest" docker/agent-base/
+for arg in "$@"; do
+  case "$arg" in
+    --push) PUSH=true ;;
+    --smoke-test) SMOKE_TEST=true ;;
+    *) echo "Unknown option: $arg"; exit 1 ;;
+  esac
+done
 
-echo "Building agent-coder..."
-docker build -t "$REGISTRY/agent-coder:latest" docker/agent-coder/
+AGENTS=(agent-base agent-coder agent-refactorer agent-researcher agent-reviewer agent-tester agent-deployer)
 
-echo "Building agent-refactorer..."
-docker build -t "$REGISTRY/agent-refactorer:latest" docker/agent-refactorer/
-
-echo "Building agent-researcher..."
-docker build -t "$REGISTRY/agent-researcher:latest" docker/agent-researcher/
-
-echo "Building agent-reviewer..."
-docker build -t "$REGISTRY/agent-reviewer:latest" docker/agent-reviewer/
-
-echo "Building agent-tester..."
-docker build -t "$REGISTRY/agent-tester:latest" docker/agent-tester/
-
-echo "Building agent-deployer..."
-docker build -t "$REGISTRY/agent-deployer:latest" docker/agent-deployer/
+for agent in "${AGENTS[@]}"; do
+  echo "Building $agent..."
+  docker build -t "$REGISTRY/$agent:latest" "docker/$agent/"
+done
 
 echo "All agent images built."
+
+if [ "$SMOKE_TEST" = true ]; then
+  echo ""
+  echo "Running smoke tests..."
+  echo "  agent-deployer: cf version"
+  docker run --rm "$REGISTRY/agent-deployer:latest" cf version
+  echo "  agent-deployer: mvn --version"
+  docker run --rm "$REGISTRY/agent-deployer:latest" mvn --version
+  echo "Smoke tests passed."
+fi
+
+if [ "$PUSH" = true ]; then
+  echo ""
+  for agent in "${AGENTS[@]}"; do
+    echo "Pushing $agent..."
+    docker push "$REGISTRY/$agent:latest"
+  done
+  echo "All agent images pushed."
+fi

@@ -7,9 +7,11 @@ LABEL com.worldmind.description="CF deployment agent with Maven and CF CLI"
 # Switch to root for package installation
 USER root
 
-# Install CF CLI v8 (binary placed in project dir, gitignored)
+# Install CF CLI v8 binary (must be placed in docker/agent-deployer/cf before building).
+# The binary is gitignored to support air-gapped environments.
 COPY cf /usr/local/bin/cf
-RUN chmod +x /usr/local/bin/cf
+RUN chmod +x /usr/local/bin/cf && \
+    cf version
 
 # Install Maven for building Java apps
 RUN apt-get update && apt-get install -y maven && rm -rf /var/lib/apt/lists/*
