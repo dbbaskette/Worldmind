@@ -130,19 +130,11 @@ public class CloudFoundrySandboxProvider implements SandboxProvider {
 
         // Export all env vars into the CF task shell so entrypoint.sh can read
         // GOOSE_PROVIDER, GOOSE_MODEL, provider API keys, and MCP server configs.
-        // For DEPLOYER agents, inject CF credentials so they can deploy apps via cf CLI.
-        // These are available in cfProperties from the orchestrator's env vars.
-        var effectiveEnvVars = new java.util.HashMap<>(request.envVars());
-        if ("deployer".equals(type)) {
-            effectiveEnvVars.putIfAbsent("CF_API_URL", cfProperties.getApiUrl());
-            effectiveEnvVars.putIfAbsent("CF_USERNAME", cfProperties.getCfUsername());
-            effectiveEnvVars.putIfAbsent("CF_PASSWORD", cfProperties.getCfPassword());
-            effectiveEnvVars.putIfAbsent("CF_ORG", cfProperties.getOrg());
-            effectiveEnvVars.putIfAbsent("CF_SPACE", cfProperties.getSpace());
-        }
-
-        var envExports = effectiveEnvVars.entrySet().stream()
-                .map(e -> "export %s='%s'".formatted(e.getKey(), e.getValue().replace("'", "\\'")))
+        // Note: CF credentials for the DEPLOYER agent are set via manifest.yml on the
+        // deployer app directly — CF tasks inherit the app's env vars, so no command-line
+        // injection is needed (which would expose credentials in `cf tasks` output and audit logs).
+        var envExports = request.envVars().entrySet().stream()
+                .map(e -> "export %s='%s'".formatted(e.getKey(), e.getValue().replace("'", "'\\''")))
                 .collect(Collectors.joining(" && "));
 
         // Determine branch setup and post-Goose git commands based on agent type.

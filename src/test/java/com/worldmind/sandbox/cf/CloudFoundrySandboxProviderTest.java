@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -32,7 +33,7 @@ class CloudFoundrySandboxProviderTest {
         cfProperties.setOrg("worldmind-org");
         cfProperties.setSpace("production");
         cfProperties.setGitRemoteUrl("https://github.com/example/project.git");
-        cfProperties.setAgentApps(new java.util.HashMap<>(Map.of(
+        cfProperties.setAgentApps(new HashMap<>(Map.of(
                 "coder", "agent-coder",
                 "reviewer", "agent-reviewer",
                 "tester", "agent-tester",
@@ -399,7 +400,10 @@ class CloudFoundrySandboxProviderTest {
     }
 
     @Test
-    void deployerTaskIncludesCfCredentials() {
+    void deployerTaskDoesNotInjectCfCredentialsInCommand() {
+        // CF credentials come from the deployer app's env (set in manifest.yml),
+        // NOT from the task command string — avoids exposing credentials in
+        // `cf tasks` output and CF audit logs.
         cfProperties.setCfUsername("cf-user");
         cfProperties.setCfPassword("cf-pass");
 
@@ -408,32 +412,31 @@ class CloudFoundrySandboxProviderTest {
         provider.openSandbox(request);
 
         var call = stubApiClient.createTaskCalls.get(0);
-        assertTrue(call.command.contains("CF_API_URL"),
-                "DEPLOYER should export CF_API_URL: " + call.command);
-        assertTrue(call.command.contains("CF_USERNAME"),
-                "DEPLOYER should export CF_USERNAME: " + call.command);
-        assertTrue(call.command.contains("CF_PASSWORD"),
-                "DEPLOYER should export CF_PASSWORD: " + call.command);
-        assertTrue(call.command.contains("CF_ORG"),
-                "DEPLOYER should export CF_ORG: " + call.command);
-        assertTrue(call.command.contains("CF_SPACE"),
-                "DEPLOYER should export CF_SPACE: " + call.command);
+        assertFalse(call.command.contains("CF_USERNAME"),
+                "DEPLOYER should NOT inject CF_USERNAME in command: " + call.command);
+        assertFalse(call.command.contains("CF_PASSWORD"),
+                "DEPLOYER should NOT inject CF_PASSWORD in command: " + call.command);
+        assertFalse(call.command.contains("cf-user"),
+                "DEPLOYER should NOT contain CF username value in command: " + call.command);
+        assertFalse(call.command.contains("cf-pass"),
+                "DEPLOYER should NOT contain CF password value in command: " + call.command);
     }
 
     @Test
-    void nonDeployerTaskDoesNotIncludeCfCredentials() {
-        cfProperties.setCfUsername("cf-user");
-        cfProperties.setCfPassword("cf-pass");
-
-        var request = makeRequest("coder", "TASK-001");
+    void envVarWithSingleQuoteIsEscapedCorrectlyForBash() {
+        // Bash single-quote escaping: close quote, escaped quote, reopen quote
+        // e.g. value = it's  →  export KEY='it'\''s'
+        var request = new AgentRequest(
+                "coder", "TASK-001", Path.of("/tmp/project"),
+                "Build something", Map.of("TEST_VAR", "it's a test"),
+                4096, 2, "", "base", 0
+        );
 
         provider.openSandbox(request);
 
         var call = stubApiClient.createTaskCalls.get(0);
-        assertFalse(call.command.contains("CF_USERNAME"),
-                "CODER should NOT export CF_USERNAME: " + call.command);
-        assertFalse(call.command.contains("CF_PASSWORD"),
-                "CODER should NOT export CF_PASSWORD: " + call.command);
+        assertTrue(call.command.contains("it'\\''s a test"),
+                "Single quotes should be escaped with bash pattern '\\'' : " + call.command);
     }
 
     @Test
