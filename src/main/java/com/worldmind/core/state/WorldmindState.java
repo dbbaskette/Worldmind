@@ -36,6 +36,7 @@ public class WorldmindState extends AgentState {
         Map.entry("retryContext",          Channels.base(() -> "")),
         Map.entry("metrics",               Channels.base((Reducer<MissionMetrics>) null)),
         Map.entry("productSpec",            Channels.base((Reducer<ProductSpec>) null)),
+        Map.entry("prdDocument",           Channels.base(() -> "")),  // User-provided PRD markdown (bypasses spec generation)
         Map.entry("projectPath",           Channels.base(() -> "")),
         Map.entry("gitRemoteUrl",          Channels.base(() -> "")),
         Map.entry("reasoningLevel",        Channels.base(() -> "medium")),
@@ -226,6 +227,14 @@ public class WorldmindState extends AgentState {
 
     public String clarifyingAnswers() {
         return this.<String>value("clarifyingAnswers").orElse("");
+    }
+
+    /**
+     * User-provided PRD document in markdown format.
+     * When present, this bypasses clarifying questions and spec generation phases.
+     */
+    public String prdDocument() {
+        return this.<String>value("prdDocument").orElse("");
     }
 
     public String runtimeTag() {

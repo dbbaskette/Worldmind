@@ -85,9 +85,12 @@ public class MissionController {
                     Map.of("error", "Invalid mode: " + request.mode()));
         }
 
-        if (request.request() == null || request.request().isBlank()) {
+        // Either request text or PRD document is required
+        boolean hasRequest = request.request() != null && !request.request().isBlank();
+        boolean hasPrd = request.prdDocument() != null && !request.prdDocument().isBlank();
+        if (!hasRequest && !hasPrd) {
             return ResponseEntity.badRequest().body(
-                    Map.of("error", "Request text is required"));
+                    Map.of("error", "Either request text or PRD document is required"));
         }
 
         // Generate an ID synchronously so we can return it immediately
@@ -103,21 +106,27 @@ public class MissionController {
             log.debug("Failed to clear old checkpoints for {}: {}", missionId, e.getMessage());
         }
 
+        // Use PRD title as request if PRD is provided without request text
+        String requestText = hasRequest ? request.request() : extractPrdTitle(request.prdDocument());
+
         // Store a placeholder state while the mission runs
+        // If PRD document provided, start at PLANNING; otherwise CLASSIFYING
+        MissionStatus initialStatus = hasPrd ? MissionStatus.PLANNING : MissionStatus.CLASSIFYING;
         missionStates.put(missionId, new WorldmindState(Map.of(
                 "missionId", missionId,
-                "request", request.request(),
+                "request", requestText,
                 "interactionMode", mode.name(),
-                "status", MissionStatus.CLASSIFYING.name()
+                "status", initialStatus.name()
         )));
 
-        // Run mission asynchronously (uses overload with projectPath/gitRemoteUrl/reasoningLevel)
+        // Run mission asynchronously (uses overload with projectPath/gitRemoteUrl/reasoningLevel/prdDocument)
         CompletableFuture<WorldmindState> future = CompletableFuture.supplyAsync(() -> {
             try {
-                WorldmindState result = missionEngine.runMission(missionId, request.request(), mode, 
+                WorldmindState result = missionEngine.runMission(missionId, requestText, mode, 
                         request.projectPath(), request.gitRemoteUrl(), request.reasoningLevel(),
                         request.executionStrategy(), 
-                        request.createCfDeployment() != null && request.createCfDeployment());
+                        request.createCfDeployment() != null && request.createCfDeployment(),
+                        request.prdDocument());
                 if (result != null) {
                     missionStates.put(missionId, result);
                 }
@@ -579,6 +588,34 @@ public class MissionController {
      *   <li>All branches if the mission itself failed</li>
      * </ul>
      */
+    /**
+     * Extracts the title from a PRD markdown document.
+     * Looks for a top-level heading (# Title) or uses the first line.
+     */
+    private String extractPrdTitle(String prdDocument) {
+        if (prdDocument == null || prdDocument.isBlank()) {
+            return "PRD Mission";
+        }
+        
+        String[] lines = prdDocument.split("\n");
+        for (String line : lines) {
+            String trimmed = line.trim();
+            if (trimmed.startsWith("# ")) {
+                return trimmed.substring(2).trim();
+            }
+        }
+        
+        // Fall back to first non-empty line
+        for (String line : lines) {
+            String trimmed = line.trim();
+            if (!trimmed.isEmpty()) {
+                return trimmed.length() > 100 ? trimmed.substring(0, 100) + "..." : trimmed;
+            }
+        }
+        
+        return "PRD Mission";
+    }
+
     private void cleanupMissionResources(String missionId) {
         try {
             eventBus.clearMission(missionId);

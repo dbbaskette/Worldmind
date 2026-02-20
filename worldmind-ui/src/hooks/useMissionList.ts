@@ -21,12 +21,12 @@ export function useMissionList() {
     }).catch(() => { /* ignore — backend may be unreachable on first load */ })
   }, [])
 
-  const submitMission = useCallback(async (request: string, mode: string, projectPath?: string, gitRemoteUrl?: string, reasoningLevel?: string, executionStrategy?: string, createCfDeployment?: boolean): Promise<string> => {
+  const submitMission = useCallback(async (request: string, mode: string, projectPath?: string, gitRemoteUrl?: string, reasoningLevel?: string, executionStrategy?: string, createCfDeployment?: boolean, prdDocument?: string): Promise<string> => {
     setSubmitting(true)
     setSubmitError(null)
 
     try {
-      const result = await apiClient.submitMission(request, mode, projectPath, gitRemoteUrl, reasoningLevel, executionStrategy, createCfDeployment)
+      const result = await apiClient.submitMission(request, mode, projectPath, gitRemoteUrl, reasoningLevel, executionStrategy, createCfDeployment, prdDocument)
       const missionId = result.mission_id
 
       // Add placeholder mission to list

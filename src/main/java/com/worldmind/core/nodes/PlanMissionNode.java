@@ -127,15 +127,33 @@ public class PlanMissionNode {
         }
 
         String request = state.request();
-        Classification classification = state.classification().orElseThrow(
-                () -> new IllegalStateException("Classification must be present before planning")
-        );
-        ProjectContext projectContext = state.projectContext().orElseThrow(
-                () -> new IllegalStateException("ProjectContext must be present before planning")
-        );
+        String prdDocument = state.prdDocument();
+        boolean hasPrd = prdDocument != null && !prdDocument.isBlank();
+        
+        // If PRD document is provided, use it directly without requiring classification
+        Classification classification;
+        ProjectContext projectContext;
         Optional<ProductSpec> productSpec = state.productSpec();
+        
+        if (hasPrd) {
+            // Create a synthetic classification for PRD-based missions
+            classification = state.classification().orElse(
+                    new Classification("feature", 3, List.of("all"), "sequential", "auto")
+            );
+            projectContext = state.projectContext().orElse(
+                    new ProjectContext(".", List.of(), "unknown", "unknown", Map.of(), 0, "")
+            );
+            log.info("Planning from user-provided PRD document ({} chars)", prdDocument.length());
+        } else {
+            classification = state.classification().orElseThrow(
+                    () -> new IllegalStateException("Classification must be present before planning")
+            );
+            projectContext = state.projectContext().orElseThrow(
+                    () -> new IllegalStateException("ProjectContext must be present before planning")
+            );
+        }
 
-        String userPrompt = buildUserPrompt(request, classification, projectContext, productSpec);
+        String userPrompt = buildUserPrompt(request, classification, projectContext, productSpec, prdDocument);
         // Plan generation uses structuredCall without MCP tools — the planner only
         // needs to structure tasks from the spec, not call external tools.
         MissionPlan plan = llmService.structuredCall(SYSTEM_PROMPT, userPrompt, MissionPlan.class);
@@ -308,8 +326,40 @@ public class PlanMissionNode {
     }
 
     private String buildUserPrompt(String request, Classification classification,
-                                   ProjectContext projectContext, Optional<ProductSpec> productSpec) {
+                                   ProjectContext projectContext, Optional<ProductSpec> productSpec,
+                                   String prdDocument) {
         var sb = new StringBuilder();
+        
+        // If user provided a PRD document, use it as the primary source
+        if (prdDocument != null && !prdDocument.isBlank()) {
+            sb.append("""
+                === USER-PROVIDED PRD DOCUMENT ===
+                
+                The user has provided a detailed Product Requirements Document below.
+                Use this as the PRIMARY source for creating tasks. The PRD contains
+                all the details needed for implementation.
+                
+                """);
+            sb.append(prdDocument);
+            sb.append("""
+                
+                === END OF PRD DOCUMENT ===
+                
+                === TASK GENERATION INSTRUCTIONS ===
+                Create tasks that implement the PRD completely. Each major section or
+                feature should map to one or more CODER tasks. Include relevant PRD
+                sections in each task's inputContext so agents have full context.
+                
+                Guidelines:
+                - Break down complex features into multiple tasks
+                - Include specific file paths in targetFiles where mentioned
+                - Copy acceptance criteria directly into task successCriteria
+                - Preserve all technical details from the PRD
+                
+                """);
+            return sb.toString();
+        }
+        
         sb.append(String.format("""
                 Request: %s
 

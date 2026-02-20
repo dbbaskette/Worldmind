@@ -83,21 +83,31 @@ public class MissionEngine {
     public WorldmindState runMission(String missionId, String request, InteractionMode mode,
                                      String projectPath, String gitRemoteUrl, String reasoningLevel,
                                      String executionStrategy, boolean createCfDeployment) {
+        return runMission(missionId, request, mode, projectPath, gitRemoteUrl, reasoningLevel,
+                executionStrategy, createCfDeployment, null);
+    }
+
+    public WorldmindState runMission(String missionId, String request, InteractionMode mode,
+                                     String projectPath, String gitRemoteUrl, String reasoningLevel,
+                                     String executionStrategy, boolean createCfDeployment,
+                                     String prdDocument) {
         MdcContext.setMission(missionId);
         try {
-            log.info("Starting mission {} with mode {}, reasoning={}, strategy={}, cfDeploy={} — request: {}", 
-                    missionId, mode, reasoningLevel, executionStrategy, createCfDeployment, request);
+            boolean hasPrd = prdDocument != null && !prdDocument.isBlank();
+            log.info("Starting mission {} with mode {}, reasoning={}, strategy={}, cfDeploy={}, hasPRD={} — request: {}", 
+                    missionId, mode, reasoningLevel, executionStrategy, createCfDeployment, hasPrd, request);
 
             eventBus.publish(new WorldmindEvent(
                     "mission.created", missionId, null,
-                    Map.of("mode", mode.name(), "request", request),
+                    Map.of("mode", mode.name(), "request", request, "hasPRD", hasPrd),
                     Instant.now()));
 
             var stateMap = new HashMap<String, Object>();
             stateMap.put("missionId", missionId);
             stateMap.put("request", request);
             stateMap.put("interactionMode", mode.name());
-            stateMap.put("status", MissionStatus.CLASSIFYING.name());
+            // If PRD document is provided, skip directly to planning
+            stateMap.put("status", hasPrd ? MissionStatus.PLANNING.name() : MissionStatus.CLASSIFYING.name());
             if (projectPath != null && !projectPath.isBlank()) {
                 stateMap.put("projectPath", projectPath);
             }
@@ -114,6 +124,12 @@ public class MissionEngine {
             // If user requested CF deployment artifacts
             if (createCfDeployment) {
                 stateMap.put("createCfDeployment", true);
+            }
+            // If user provided a PRD document, store it and skip spec generation
+            if (hasPrd) {
+                stateMap.put("prdDocument", prdDocument);
+                log.info("Mission {} using user-provided PRD document ({} chars), skipping spec generation",
+                        missionId, prdDocument.length());
             }
             Map<String, Object> initialState = Map.copyOf(stateMap);
 

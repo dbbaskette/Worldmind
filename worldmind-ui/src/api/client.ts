@@ -10,19 +10,21 @@ class ApiClient {
     gitRemoteUrl?: string,
     reasoningLevel?: string,
     executionStrategy?: string,
-    createCfDeployment?: boolean
+    createCfDeployment?: boolean,
+    prdDocument?: string
   ): Promise<{ mission_id: string; status: string }> {
     const response = await fetch(`${API_BASE}/missions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        request,
+        request: request || '',
         mode,
         project_path: projectPath || '',
         git_remote_url: gitRemoteUrl || '',
         reasoning_level: reasoningLevel || 'medium',
         execution_strategy: executionStrategy || 'SEQUENTIAL',
-        create_cf_deployment: createCfDeployment || false
+        create_cf_deployment: createCfDeployment || false,
+        prd_document: prdDocument || ''
       })
     })
 

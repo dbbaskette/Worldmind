@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { INTERACTION_MODES } from '../utils/constants'
 
 interface MissionFormProps {
-  onSubmit: (request: string, mode: string, projectPath?: string, gitRemoteUrl?: string, reasoningLevel?: string, executionStrategy?: string, createCfDeployment?: boolean) => Promise<void>
+  onSubmit: (request: string, mode: string, projectPath?: string, gitRemoteUrl?: string, reasoningLevel?: string, executionStrategy?: string, createCfDeployment?: boolean, prdDocument?: string) => Promise<void>
   submitting: boolean
   error: string | null
   showSettings?: boolean
@@ -32,12 +32,38 @@ export function MissionForm({ onSubmit, submitting, error, showSettings, onToggl
   const [executionStrategy, setExecutionStrategy] = useState('SEQUENTIAL')
   const [createCfDeployment, setCreateCfDeployment] = useState(false)
   const [showOptions, setShowOptions] = useState(false)
+  const [prdDocument, setPrdDocument] = useState('')
+  const [prdFileName, setPrdFileName] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        const content = event.target?.result as string
+        setPrdDocument(content)
+        setPrdFileName(file.name)
+      }
+      reader.readAsText(file)
+    }
+  }
+
+  const clearPrdDocument = () => {
+    setPrdDocument('')
+    setPrdFileName('')
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (request.trim()) {
-      await onSubmit(request, mode, projectPath || undefined, gitRemoteUrl || undefined, reasoningLevel, executionStrategy, createCfDeployment)
+    // Either request text or PRD document is required
+    if (request.trim() || prdDocument.trim()) {
+      await onSubmit(request, mode, projectPath || undefined, gitRemoteUrl || undefined, reasoningLevel, executionStrategy, createCfDeployment, prdDocument || undefined)
       setRequest('')
+      clearPrdDocument()
     }
   }
 
@@ -117,7 +143,7 @@ export function MissionForm({ onSubmit, submitting, error, showSettings, onToggl
           {/* Submit */}
           <button
             type="submit"
-            disabled={submitting || !request.trim()}
+            disabled={submitting || (!request.trim() && !prdDocument.trim())}
             className="px-4 py-2 bg-agent-reviewer text-white rounded-lg text-sm font-medium hover:bg-agent-reviewer/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all shrink-0"
           >
             {submitting ? (
@@ -208,6 +234,51 @@ export function MissionForm({ onSubmit, submitting, error, showSettings, onToggl
               <p className="text-[10px] text-wm_text-muted mt-1">
                 {EXECUTION_STRATEGIES.find(s => s.value === executionStrategy)?.description}
               </p>
+            </div>
+
+            {/* PRD Document Upload */}
+            <div>
+              <label className="block text-[10px] font-mono uppercase tracking-wider text-wm_text-muted mb-1.5">
+                PRD Document (Optional)
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".md,.markdown,.txt"
+                  onChange={handleFileUpload}
+                  disabled={submitting}
+                  className="hidden"
+                  id="prdFileInput"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={submitting}
+                  className="px-3 py-1.5 bg-wm-bg border border-wm-border rounded text-xs text-wm_text-secondary hover:border-wm_text-muted/50 transition-colors"
+                >
+                  {prdFileName ? 'Change File' : 'Upload PRD'}
+                </button>
+                {prdFileName && (
+                  <>
+                    <span className="text-xs text-agent-coder font-mono">{prdFileName}</span>
+                    <span className="text-[10px] text-wm_text-muted">({Math.round(prdDocument.length / 1024)}KB)</span>
+                    <button
+                      type="button"
+                      onClick={clearPrdDocument}
+                      className="p-1 text-wm_text-muted hover:text-red-400 transition-colors"
+                      title="Remove PRD"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </>
+                )}
+                {!prdFileName && (
+                  <span className="text-[10px] text-wm_text-muted">Upload a markdown PRD to skip Q&A and use detailed specs directly</span>
+                )}
+              </div>
             </div>
 
             {/* CF Deployment Checkbox */}

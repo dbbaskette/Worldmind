@@ -1,0 +1,121 @@
+---
+applications:
+
+  # --- Worldmind Orchestrator (Spring Boot JAR) ---
+  - name: worldmind
+    memory: 1536M
+    disk_quota: 2G
+    instances: 1
+    path: target/worldmind-0.1.0-SNAPSHOT.jar
+    buildpacks:
+      - java_buildpack_offline
+    env:
+      JBP_CONFIG_OPEN_JDK_JRE: '{ jre: { version: 21.+ }, memory_calculator: { stack_threads: 100 } }'
+      JAVA_OPTS: '-XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=64m -XX:+UseG1GC -XX:MaxGCPauseMillis=200'
+      SPRING_PROFILES_ACTIVE: cf
+      AGENT_IMAGE_REGISTRY: ((agent-image-registry))
+      CF_API_URL: ((cf-api-url))
+      CF_ORG: ((cf-org))
+      CF_SPACE: ((cf-space))
+      CF_USERNAME: ((cf-username))
+      CF_PASSWORD: ((cf-password))
+      GIT_TOKEN: ((git-token))
+      AGENT_CODER_APP: ((agent-coder-app))
+      AGENT_TESTER_APP: ((agent-tester-app))
+      AGENT_REVIEWER_APP: ((agent-reviewer-app))
+      AGENT_RESEARCHER_APP: ((agent-researcher-app))
+      AGENT_REFACTORER_APP: ((agent-refactorer-app))
+      GOOSE_PROVIDER: ((goose-provider))
+      GOOSE_MODEL: ((goose-model))
+      ANTHROPIC_API_KEY: ((anthropic-api-key))
+      OPENAI_API_KEY: ((openai-api-key))
+      GOOGLE_API_KEY: ((google-api-key))
+      MCP_ENABLED: ((mcp-enabled))
+      NEXUS_MCP_URL: ((nexus-mcp-url))
+      NEXUS_MCP_TOKEN: ((nexus-mcp-token))
+      NEXUS_MCP_TOKEN_CLASSIFY: ((nexus-mcp-token-classify))
+      NEXUS_MCP_TOKEN_UPLOAD: ((nexus-mcp-token-upload))
+      NEXUS_MCP_TOKEN_PLAN: ((nexus-mcp-token-plan))
+      NEXUS_MCP_TOKEN_QUALITY_GATE: ((nexus-mcp-token-quality_gate))
+      NEXUS_MCP_TOKEN_CODER: ((nexus-mcp-token-coder))
+      NEXUS_MCP_TOKEN_TESTER: ((nexus-mcp-token-tester))
+      NEXUS_MCP_TOKEN_REVIEWER: ((nexus-mcp-token-reviewer))
+      NEXUS_MCP_TOKEN_RESEARCHER: ((nexus-mcp-token-researcher))
+      NEXUS_MCP_TOKEN_REFACTORER: ((nexus-mcp-token-refactorer))
+    services:
+      - worldmind-postgres
+
+  # --- Agent: Coder (code generation) ---
+  - name: ((agent-coder-app))
+    docker:
+      image: ((agent-image-registry))/agent-coder:latest
+      username: ((docker-username))
+    memory: 2G
+    disk_quota: 4G
+    instances: 0
+    health-check-type: process
+    no-route: true
+    env:
+      OPENAI_API_KEY: ((openai-api-key))
+      GOOSE_PROVIDER: openai
+      GOOSE_MODEL: gpt-5-nano
+
+  # --- Agent: Tester (testing) ---
+  - name: ((agent-tester-app))
+    docker:
+      image: ((agent-image-registry))/agent-tester:latest
+      username: ((docker-username))
+    memory: 2G
+    disk_quota: 4G
+    instances: 0
+    health-check-type: process
+    no-route: true
+    env:
+      OPENAI_API_KEY: ((openai-api-key))
+      GOOSE_PROVIDER: openai
+      GOOSE_MODEL: gpt-5-nano
+
+  # --- Agent: Reviewer (code review) ---
+  - name: ((agent-reviewer-app))
+    docker:
+      image: ((agent-image-registry))/agent-reviewer:latest
+      username: ((docker-username))
+    memory: 2G
+    disk_quota: 4G
+    instances: 0
+    health-check-type: process
+    no-route: true
+    env:
+      OPENAI_API_KEY: ((openai-api-key))
+      GOOSE_PROVIDER: openai
+      GOOSE_MODEL: gpt-5-nano
+
+  # --- Agent: Researcher (research, read-only) ---
+  - name: ((agent-researcher-app))
+    docker:
+      image: ((agent-image-registry))/agent-researcher:latest
+      username: ((docker-username))
+    memory: 2G
+    disk_quota: 4G
+    instances: 0
+    health-check-type: process
+    no-route: true
+    env:
+      OPENAI_API_KEY: ((openai-api-key))
+      GOOSE_PROVIDER: openai
+      GOOSE_MODEL: gpt-5-nano
+
+  # --- Agent: Refactorer (refactoring) ---
+  - name: ((agent-refactorer-app))
+    docker:
+      image: ((agent-image-registry))/agent-refactorer:latest
+      username: ((docker-username))
+    memory: 2G
+    disk_quota: 4G
+    instances: 0
+    health-check-type: process
+    no-route: true
+    env:
+      OPENAI_API_KEY: ((openai-api-key))
+      GOOSE_PROVIDER: openai
+      GOOSE_MODEL: gpt-5-nano

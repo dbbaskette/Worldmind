@@ -5,13 +5,14 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 /**
  * Inbound JSON body for POST /api/v1/missions.
  *
- * @param request             natural-language mission request
+ * @param request             natural-language mission request (used if no prdDocument provided)
  * @param mode                interaction mode (FULL_AUTO, APPROVE_PLAN, STEP_BY_STEP); nullable — defaults to APPROVE_PLAN
  * @param projectPath         absolute path to the project directory
  * @param gitRemoteUrl        git remote URL for CF workspace coordination; nullable — falls back to config
  * @param reasoningLevel      reasoning depth for agents (low, medium, high, max); nullable — defaults to medium
  * @param executionStrategy   SEQUENTIAL or PARALLEL; nullable — defaults to planner decision (typically PARALLEL)
  * @param createCfDeployment  if true, append a final task to create CF deployment artifacts (manifest.yml, etc.)
+ * @param prdDocument         pre-written PRD document in markdown format; if provided, skips clarifying questions and spec generation
  */
 public record MissionRequest(
     String request,
@@ -20,5 +21,6 @@ public record MissionRequest(
     @JsonProperty("git_remote_url") String gitRemoteUrl,
     @JsonProperty("reasoning_level") String reasoningLevel,
     @JsonProperty("execution_strategy") String executionStrategy,
-    @JsonProperty("create_cf_deployment") Boolean createCfDeployment
+    @JsonProperty("create_cf_deployment") Boolean createCfDeployment,
+    @JsonProperty("prd_document") String prdDocument
 ) {}
