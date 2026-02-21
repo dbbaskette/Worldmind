@@ -40,6 +40,7 @@ worldmind:
     space: ${CF_SPACE:}
     cf-username: ${CF_USERNAME:}
     cf-password: ${CF_PASSWORD:}
+    apps-domain: ${CF_APPS_DOMAIN:apps.internal}
     git-token: ${GIT_TOKEN:}
     git-remote-url: ${GIT_REMOTE_URL:}
     orchestrator-url: https://${vcap.application.uris[0]:localhost:8080}
