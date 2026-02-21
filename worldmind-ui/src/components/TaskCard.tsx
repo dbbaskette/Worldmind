@@ -14,6 +14,21 @@ const PHASE_ACTIVITY: Record<Phase, string> = {
   QUALITY_GATE: 'Evaluating quality_gate',
 }
 
+const DEPLOYER_PHASES = ['BUILD', 'PUSH', 'VERIFY'] as const
+type DeployerPhase = typeof DEPLOYER_PHASES[number]
+
+const DEPLOYER_PHASE_ACTIVITY: Record<DeployerPhase, string> = {
+  BUILD: 'Building application',
+  PUSH: 'Pushing to CF',
+  VERIFY: 'Verifying health',
+}
+
+const DEPLOYER_PHASE_LABELS: Record<DeployerPhase, string> = {
+  BUILD: 'Build',
+  PUSH: 'Push',
+  VERIFY: 'Verify',
+}
+
 interface TaskCardProps {
   task: TaskResponse
   events: WorldmindEvent[]
@@ -150,6 +165,180 @@ function PhasePipeline({ task, events }: { task: TaskResponse; events: Worldmind
   )
 }
 
+function deriveDeployerPhase(events: WorldmindEvent[], status: string): { active: DeployerPhase | null; completed: Set<DeployerPhase>; failed: DeployerPhase | null } {
+  const completed = new Set<DeployerPhase>()
+  let active: DeployerPhase | null = null
+  let failed: DeployerPhase | null = null
+
+  if (status === 'FULFILLED') {
+    DEPLOYER_PHASES.forEach(p => completed.add(p))
+    return { active: null, completed, failed: null }
+  }
+  if (status === 'FAILED' && events.length === 0) {
+    return { active: null, completed, failed: 'BUILD' }
+  }
+  if (status === 'EXECUTING' && events.length === 0) {
+    return { active: 'BUILD', completed, failed: null }
+  }
+  if (status === 'PENDING') {
+    return { active: null, completed, failed: null }
+  }
+
+  for (const event of events) {
+    if (event.eventType === 'task.started') {
+      active = 'BUILD'
+    }
+    if (event.eventType === 'task.phase' || event.eventType === 'deployer.phase') {
+      const phase = (event.payload?.phase as string)?.toUpperCase() as DeployerPhase
+      if (phase && DEPLOYER_PHASES.includes(phase as DeployerPhase)) {
+        const idx = DEPLOYER_PHASES.indexOf(phase)
+        for (let i = 0; i < idx; i++) completed.add(DEPLOYER_PHASES[i])
+        active = phase
+      }
+    }
+    if (event.eventType === 'deployer.deployed' || event.eventType === 'task.fulfilled') {
+      DEPLOYER_PHASES.forEach(p => completed.add(p))
+      active = null
+    }
+    if (event.eventType === 'task.failed') {
+      failed = active || 'BUILD'
+      active = null
+    }
+  }
+
+  if (status === 'FULFILLED') {
+    DEPLOYER_PHASES.forEach(p => completed.add(p))
+    active = null
+    failed = null
+  }
+
+  if (status === 'FAILED' && !failed && !active) {
+    failed = 'BUILD'
+  }
+
+  return { active, completed, failed }
+}
+
+function DeployerPipeline({ task, events }: { task: TaskResponse; events: WorldmindEvent[] }) {
+  if (task.agent !== 'DEPLOYER') return null
+
+  const { active, completed, failed } = deriveDeployerPhase(events, task.status)
+
+  return (
+    <div className="flex items-center gap-0.5 mb-3">
+      {DEPLOYER_PHASES.map((phase, idx) => {
+        const isCompleted = completed.has(phase)
+        const isActive = active === phase
+        const isFailed = failed === phase
+
+        return (
+          <div key={phase} className="flex items-center">
+            <div className="flex flex-col items-center gap-0.5">
+              <div
+                className={`w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-bold transition-all ${
+                  isCompleted
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                    : isActive
+                    ? 'bg-teal-500/20 text-teal-400 border border-teal-500/40 animate-researcher'
+                    : isFailed
+                    ? 'bg-red-500/20 text-red-400 border border-red-500/40'
+                    : 'bg-wm-elevated text-wm_text-muted border border-wm-border'
+                }`}
+              >
+                {isCompleted ? '\u2713' : isFailed ? '\u2717' : (idx + 1)}
+              </div>
+              <span className={`text-[8px] font-mono uppercase tracking-wider ${
+                isActive ? 'text-teal-400' : isFailed ? 'text-red-400' : isCompleted ? 'text-emerald-400/60' : 'text-wm_text-muted'
+              }`}>
+                {DEPLOYER_PHASE_LABELS[phase]}
+              </span>
+            </div>
+            {idx < DEPLOYER_PHASES.length - 1 && (
+              <div className={`w-4 h-px mx-0.5 transition-all ${
+                completed.has(DEPLOYER_PHASES[idx + 1]) || active === DEPLOYER_PHASES[idx + 1]
+                  ? 'bg-emerald-500/50'
+                  : 'bg-wm-border'
+              }`} />
+            )}
+          </div>
+        )
+      })}
+
+      {active && (task.status === 'EXECUTING' || task.status === 'RUNNING') && (
+        <div className="ml-3 flex items-center gap-1.5 text-[10px] text-teal-400">
+          <span className="w-1 h-1 rounded-full bg-teal-400 animate-researcher" />
+          {DEPLOYER_PHASE_ACTIVITY[active]}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DeploymentUrl({ events, task }: { events: WorldmindEvent[]; task: TaskResponse }) {
+  const url = useMemo(() => {
+    // Check for explicit deployment URL in events
+    for (let i = events.length - 1; i >= 0; i--) {
+      const e = events[i]
+      if (e.eventType === 'deployer.deployed' && e.payload?.url) {
+        return e.payload.url as string
+      }
+      if (e.eventType === 'task.fulfilled' && e.payload?.deploymentUrl) {
+        return e.payload.deploymentUrl as string
+      }
+    }
+    // Try to extract URL from task description (route convention: {mission-id}.apps.{domain})
+    const urlPattern = /[\w-]+\.apps\.[\w.-]+/
+    for (let i = events.length - 1; i >= 0; i--) {
+      const e = events[i]
+      if (e.payload?.output) {
+        const match = (e.payload.output as string).match(urlPattern)
+        if (match) return match[0]
+      }
+    }
+    // Check task description for route
+    const descMatch = task.description?.match(urlPattern)
+    if (descMatch) return descMatch[0]
+    return null
+  }, [events, task.description])
+
+  if (!url || task.status !== 'FULFILLED') return null
+
+  const displayUrl = url.replace(/^https?:\/\//, '')
+  const href = url.startsWith('http') ? url : `https://${url}`
+
+  return (
+    <div className="mt-2 bg-emerald-500/10 border border-emerald-500/20 rounded px-2.5 py-2 flex items-center gap-2">
+      {/* Link icon */}
+      <svg className="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.07-9.07l-1.757 1.757a4.5 4.5 0 010 6.364l4.5-4.5a4.5 4.5 0 00-6.364-6.364" />
+      </svg>
+      <span className="text-[11px] text-emerald-400 font-medium">Deployed:</span>
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-[11px] font-mono text-emerald-400 hover:text-emerald-300 underline underline-offset-2 truncate transition-colors"
+      >
+        {displayUrl}
+      </a>
+    </div>
+  )
+}
+
+function DeployerRetryInfo({ task }: { task: TaskResponse }) {
+  if (task.agent !== 'DEPLOYER') return null
+  if (task.max_iterations <= 1) return null
+
+  const attempt = task.iteration + 1
+  const isFinal = task.status === 'FAILED' && attempt >= task.max_iterations
+
+  return (
+    <span className={`font-mono ${isFinal ? 'text-red-400' : 'text-amber-400/70'}`}>
+      deploy attempt {attempt}/{task.max_iterations}
+    </span>
+  )
+}
+
 function FailureReason({ events }: { events: WorldmindEvent[] }) {
   const failedEvent = events.find(e => e.eventType === 'task.failed' && e.payload?.reason)
   if (!failedEvent) return null
@@ -243,10 +432,16 @@ export function TaskCard({ task, events, onRetry, index, total }: TaskCardProps)
         <p className="text-xs text-wm_text-secondary leading-relaxed mb-2">{task.description}</p>
 
         <PhasePipeline task={task} events={events} />
+        <DeployerPipeline task={task} events={events} />
         <FailureReason events={events} />
+        {task.agent === 'DEPLOYER' && <DeploymentUrl events={events} task={task} />}
 
         <div className="flex items-center gap-3 text-[10px] text-wm_text-muted flex-wrap">
-          <span className="font-mono">iter {task.iteration + 1}/{task.max_iterations}</span>
+          {task.agent === 'DEPLOYER' ? (
+            <DeployerRetryInfo task={task} />
+          ) : (
+            <span className="font-mono">iter {task.iteration + 1}/{task.max_iterations}</span>
+          )}
           {task.elapsed_ms && (
             <span className="font-mono">{formatDuration(task.elapsed_ms)}</span>
           )}

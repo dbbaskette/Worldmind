@@ -27,6 +27,7 @@ export default {
           reviewer: '#818CF8',
           researcher: '#22D3EE',
           refactorer: '#F472B6',
+          deployer: '#2DD4BF',
         },
         status: {
           success: '#10B981',
