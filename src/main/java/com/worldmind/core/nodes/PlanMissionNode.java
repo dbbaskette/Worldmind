@@ -178,12 +178,18 @@ public class PlanMissionNode {
         tasks = ensureCoderTask(tasks, request);
         tasks = assignTypeDependencies(tasks);
         
-        // If user requested CF deployment artifacts, append a final task
+        // Detect whether any planned task targets manifest.yml (before adding deployer)
+        boolean manifestCreatedByTask = tasks.stream()
+                .filter(t -> t.targetFiles() != null)
+                .flatMap(t -> t.targetFiles().stream())
+                .anyMatch(f -> f.endsWith("manifest.yml"));
+
+        // If user requested CF deployment, append a DEPLOYER task
         if (state.createCfDeployment()) {
-            tasks = appendCfDeploymentTask(tasks, state.clarifyingAnswers());
+            tasks = appendCfDeploymentTask(tasks, state, manifestCreatedByTask);
         }
 
-        // Detect whether any planned task targets manifest.yml
+        // Re-check after appending deployer task (deployer also targets manifest.yml)
         boolean manifestTaskExists = tasks.stream()
                 .filter(t -> t.targetFiles() != null)
                 .flatMap(t -> t.targetFiles().stream())
@@ -253,54 +259,164 @@ public class PlanMissionNode {
     }
 
     /**
-     * Appends a final CODER task to create Cloud Foundry deployment artifacts.
-     * This task depends on all other CODER/REFACTORER tasks so it runs last
-     * and can inspect the actual code structure.
-     * 
+     * Appends a DEPLOYER task that builds and deploys the application to Cloud Foundry.
+     * This task depends on all CODER/REFACTORER tasks so it runs after all code is complete.
+     *
      * @param tasks existing tasks to append to
-     * @param clarifyingAnswers JSON string containing user's answers, may include service binding info
+     * @param state the current workflow state (provides missionId, clarifyingAnswers, etc.)
+     * @param manifestCreatedByTask whether a preceding task already creates manifest.yml
      */
-    private List<Task> appendCfDeploymentTask(List<Task> tasks, String clarifyingAnswers) {
-        // Find all CODER/REFACTORER task IDs as dependencies
+    private List<Task> appendCfDeploymentTask(List<Task> tasks, WorldmindState state,
+                                               boolean manifestCreatedByTask) {
         List<String> coderRefactorerIds = tasks.stream()
                 .filter(d -> "CODER".equalsIgnoreCase(d.agent()) || "REFACTORER".equalsIgnoreCase(d.agent()))
                 .map(Task::id)
                 .toList();
 
-        // Extract service binding info from clarifying answers if present
-        String serviceBindingInstruction = extractServiceBindingInstruction(clarifyingAnswers);
+        String instructions = buildDeployerInstructions(state, manifestCreatedByTask);
 
-        String cfId = String.format("TASK-%03d", tasks.size() + 1);
-        var cfTask = new Task(
-                cfId, "CODER",
-                "Create Cloud Foundry deployment artifacts based on the completed application",
-                """
-                Examine the project structure and create appropriate Cloud Foundry deployment files.
-                
-                STEPS:
-                1. List all files to understand what was built (HTML/CSS/JS, Java, Node, etc.)
-                2. Determine the appropriate buildpack based on the file types
-                3. Create manifest.yml with:
-                   - A descriptive app name matching the application's purpose
-                   - 'default-route: true' (NEVER hardcode routes)
-                   - Appropriate memory and disk quotas
-                   - The correct buildpack
-                   - Service bindings if specified below
-                4. For staticfile apps: Create a Staticfile with 'root: public' if files are in public/
-                5. Verify the manifest references valid paths that exist
-                
-                DO NOT create deployment artifacts if they already exist in the project.
-                """ + serviceBindingInstruction,
-                "Valid manifest.yml created that can be used with 'cf push'",
+        var deployerTask = new Task(
+                "TASK-DEPLOY", "DEPLOYER",
+                "Build and deploy application to Cloud Foundry",
+                instructions,
+                "App deployed, started, and health check passes within 5 minutes",
                 coderRefactorerIds,
                 TaskStatus.PENDING, 0, 3,
-                FailureStrategy.RETRY, List.of("manifest.yml", "Staticfile"), List.of(), null
+                FailureStrategy.RETRY, List.of("manifest.yml"), List.of(), null
         );
 
         var result = new ArrayList<>(tasks);
-        result.add(cfTask);
-        log.info("Appended CF deployment task {} with dependencies on {}", cfId, coderRefactorerIds);
+        result.add(deployerTask);
+        log.info("Appended DEPLOYER task TASK-DEPLOY with dependencies on {}", coderRefactorerIds);
         return result;
+    }
+
+    /**
+     * Builds markdown instructions for the DEPLOYER agent, including build command,
+     * conditional manifest generation, CF auth, deploy, and health check steps.
+     */
+    private String buildDeployerInstructions(WorldmindState state, boolean manifestCreatedByTask) {
+        String missionId = state.missionId();
+        String clarifyingAnswers = state.clarifyingAnswers();
+
+        var sb = new StringBuilder();
+
+        // Build step
+        sb.append("""
+                ## Build
+
+                Build the application before deployment:
+                - If `./mvnw` exists: `./mvnw clean package -DskipTests`
+                - Otherwise: `mvn clean package -DskipTests`
+
+                """);
+
+        // Manifest step (conditional)
+        if (manifestCreatedByTask) {
+            sb.append("""
+                    ## Use existing manifest
+
+                    A preceding task has already created `manifest.yml` in the repository.
+                    Use the existing manifest.yml as-is for deployment.
+
+                    """);
+        } else {
+            List<String> serviceNames = parseServiceNames(clarifyingAnswers);
+            sb.append(String.format("""
+                    ## Generate manifest.yml
+
+                    Create a `manifest.yml` with the following template:
+                    ```yaml
+                    applications:
+                    - name: %s
+                      memory: 1G
+                      instances: 1
+                      buildpack: java_buildpack_offline
+                      path: target/*.jar
+                      routes:
+                      - route: %s.apps.$CF_APPS_DOMAIN
+                    """, missionId, missionId));
+
+            if (!serviceNames.isEmpty()) {
+                sb.append("  services:\n");
+                for (String svc : serviceNames) {
+                    sb.append("  - ").append(svc).append("\n");
+                }
+            }
+
+            sb.append("```\n\n");
+
+            if (!serviceNames.isEmpty()) {
+                sb.append("## Service Bindings\n\n");
+                sb.append("The following services must be bound to the application:\n");
+                for (String svc : serviceNames) {
+                    sb.append("- ").append(svc).append("\n");
+                }
+                sb.append("\n");
+            }
+        }
+
+        // CF auth step
+        sb.append("""
+                ## CF Authentication
+
+                Authenticate with Cloud Foundry:
+                ```bash
+                cf api $CF_API_URL
+                cf auth $CF_USERNAME $CF_PASSWORD
+                cf target -o $CF_ORG -s $CF_SPACE
+                ```
+
+                """);
+
+        // Deploy step
+        sb.append("""
+                ## Deploy
+
+                Push the application to Cloud Foundry:
+                ```bash
+                cf push -f manifest.yml
+                ```
+
+                """);
+
+        // Health check
+        sb.append("""
+                ## Health Check
+
+                Verify the application reaches `running` state:
+                - Wait for the app to start (up to 5 minutes)
+                - Check `cf app` shows status as `running`
+                - Verify the route is accessible
+                """);
+
+        return sb.toString();
+    }
+
+    /**
+     * Parses service instance names from clarifying answers JSON.
+     */
+    private List<String> parseServiceNames(String clarifyingAnswers) {
+        if (clarifyingAnswers == null || clarifyingAnswers.isBlank()) {
+            return List.of();
+        }
+        try {
+            var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            var answers = mapper.readTree(clarifyingAnswers);
+            if (answers.has("cf_service_bindings")) {
+                String serviceAnswer = answers.get("cf_service_bindings").asText();
+                if (serviceAnswer != null && !serviceAnswer.isBlank()
+                        && !serviceAnswer.equalsIgnoreCase("No services needed")) {
+                    return java.util.Arrays.stream(serviceAnswer.split(","))
+                            .map(String::trim)
+                            .filter(s -> !s.isEmpty())
+                            .toList();
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not parse clarifying answers for service bindings: {}", e.getMessage());
+        }
+        return List.of();
     }
 
     /**
