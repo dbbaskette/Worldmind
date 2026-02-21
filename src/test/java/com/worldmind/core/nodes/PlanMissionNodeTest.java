@@ -410,9 +410,11 @@ class PlanMissionNodeTest {
         @SuppressWarnings("unchecked")
         var tasks = (List<Task>) result.get("tasks");
         var lastTask = tasks.get(tasks.size() - 1);
+        assertEquals("TASK-DEPLOY", lastTask.id());
         assertEquals("DEPLOYER", lastTask.agent());
         assertEquals("Build and deploy application to Cloud Foundry", lastTask.description());
         assertEquals("App deployed, started, and health check passes within 5 minutes", lastTask.successCriteria());
+        assertEquals(List.of("manifest.yml"), lastTask.targetFiles());
         assertEquals(3, lastTask.maxIterations());
         assertEquals(FailureStrategy.RETRY, lastTask.onFailure());
     }
@@ -597,6 +599,116 @@ class PlanMissionNodeTest {
         assertTrue(instructions.contains("cf push -f manifest.yml"));
         // Health check
         assertTrue(instructions.contains("running"));
+    }
+
+    @Test
+    @DisplayName("DEPLOYER instructions include mvn fallback when no wrapper exists")
+    void deployerInstructionsIncludeMvnFallback() {
+        var mockLlm = mock(LlmService.class);
+        var plan = new MissionPlan("Build app", "sequential", List.of(
+                new MissionPlan.TaskPlan("CODER", "Create app", "", "Done", List.of(), List.of("src/App.java"))
+        ));
+        when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
+
+        var node = new PlanMissionNode(mockLlm);
+        var state = new WorldmindState(Map.of(
+                "request", "Build app",
+                "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
+                "projectContext", new ProjectContext(".", List.of(), "java", "spring-boot", Map.of(), 5, "test"),
+                "createCfDeployment", true,
+                "missionId", "wmnd-2026-0001"
+        ));
+
+        var result = node.apply(state);
+
+        @SuppressWarnings("unchecked")
+        var tasks = (List<Task>) result.get("tasks");
+        String instructions = tasks.get(tasks.size() - 1).inputContext();
+        assertTrue(instructions.contains("./mvnw clean package -DskipTests"));
+        assertTrue(instructions.contains("mvn clean package -DskipTests"));
+    }
+
+    @Test
+    @DisplayName("omits services block when answer is 'No services needed'")
+    void omitsServicesWhenNoServicesNeeded() {
+        var mockLlm = mock(LlmService.class);
+        var plan = new MissionPlan("Build app", "sequential", List.of(
+                new MissionPlan.TaskPlan("CODER", "Create app", "", "Done", List.of(), List.of("src/App.java"))
+        ));
+        when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
+
+        var node = new PlanMissionNode(mockLlm);
+        var state = new WorldmindState(Map.of(
+                "request", "Build app",
+                "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
+                "projectContext", new ProjectContext(".", List.of(), "java", "spring-boot", Map.of(), 5, "test"),
+                "createCfDeployment", true,
+                "missionId", "wmnd-2026-0001",
+                "clarifyingAnswers", "{\"cf_service_bindings\": \"No services needed\"}"
+        ));
+
+        var result = node.apply(state);
+
+        @SuppressWarnings("unchecked")
+        var tasks = (List<Task>) result.get("tasks");
+        String instructions = tasks.get(tasks.size() - 1).inputContext();
+        assertFalse(instructions.contains("services:"));
+        assertFalse(instructions.contains("Service Bindings"));
+    }
+
+    @Test
+    @DisplayName("handles malformed JSON in clarifying answers gracefully")
+    void handlesMalformedJsonInClarifyingAnswers() {
+        var mockLlm = mock(LlmService.class);
+        var plan = new MissionPlan("Build app", "sequential", List.of(
+                new MissionPlan.TaskPlan("CODER", "Create app", "", "Done", List.of(), List.of("src/App.java"))
+        ));
+        when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
+
+        var node = new PlanMissionNode(mockLlm);
+        var state = new WorldmindState(Map.of(
+                "request", "Build app",
+                "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
+                "projectContext", new ProjectContext(".", List.of(), "java", "spring-boot", Map.of(), 5, "test"),
+                "createCfDeployment", true,
+                "missionId", "wmnd-2026-0001",
+                "clarifyingAnswers", "not-valid-json"
+        ));
+
+        var result = node.apply(state);
+
+        @SuppressWarnings("unchecked")
+        var tasks = (List<Task>) result.get("tasks");
+        var deployerTask = tasks.get(tasks.size() - 1);
+        assertEquals("DEPLOYER", deployerTask.agent());
+        assertFalse(deployerTask.inputContext().contains("Service Bindings"));
+    }
+
+    @Test
+    @DisplayName("uses fallback missionId 'app' when state missionId is empty")
+    void usesFallbackMissionIdWhenEmpty() {
+        var mockLlm = mock(LlmService.class);
+        var plan = new MissionPlan("Build app", "sequential", List.of(
+                new MissionPlan.TaskPlan("CODER", "Create app", "", "Done", List.of(), List.of("src/App.java"))
+        ));
+        when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
+
+        var node = new PlanMissionNode(mockLlm);
+        var state = new WorldmindState(Map.of(
+                "request", "Build app",
+                "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
+                "projectContext", new ProjectContext(".", List.of(), "java", "spring-boot", Map.of(), 5, "test"),
+                "createCfDeployment", true,
+                "clarifyingAnswers", ""
+        ));
+
+        var result = node.apply(state);
+
+        @SuppressWarnings("unchecked")
+        var tasks = (List<Task>) result.get("tasks");
+        String instructions = tasks.get(tasks.size() - 1).inputContext();
+        assertTrue(instructions.contains("name: app"));
+        assertTrue(instructions.contains("app.apps.$CF_APPS_DOMAIN"));
     }
 
     @Test
