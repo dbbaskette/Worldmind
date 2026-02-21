@@ -747,6 +747,93 @@ class PlanMissionNodeTest {
     }
 
     @Test
+    @DisplayName("manifestCreatedByTask is false when createCfDeployment=true but no LLM task targets manifest.yml")
+    void manifestCreatedByTaskFalseWhenOnlyDeployerOwnsManifest() {
+        var mockLlm = mock(LlmService.class);
+        var plan = new MissionPlan(
+                "Build app",
+                "sequential",
+                List.of(
+                        new MissionPlan.TaskPlan("CODER", "Create app", "", "App works", List.of(), List.of("src/App.java"))
+                )
+        );
+        when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
+
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
+        var state = new WorldmindState(Map.of(
+                "request", "Build app",
+                "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
+                "projectContext", new ProjectContext(".", List.of(), "java", "spring-boot", Map.of(), 5, "test"),
+                "createCfDeployment", true,
+                "missionId", "wmnd-2026-0001"
+        ));
+
+        var result = node.apply(state);
+
+        // manifestCreatedByTask is false because detection runs before DEPLOYER append —
+        // the DEPLOYER's own manifest.yml in targetFiles does not count
+        assertFalse((Boolean) result.get("manifestCreatedByTask"));
+
+        // The DEPLOYER task itself targets manifest.yml and will generate it
+        @SuppressWarnings("unchecked")
+        var tasks = (List<Task>) result.get("tasks");
+        var deployerTask = tasks.get(tasks.size() - 1);
+        assertEquals("DEPLOYER", deployerTask.agent());
+        assertEquals(List.of("manifest.yml"), deployerTask.targetFiles());
+        assertTrue(deployerTask.inputContext().contains("Generate manifest.yml"));
+    }
+
+    @Test
+    @DisplayName("manifestCreatedByTask is false when a task has null targetFiles")
+    void manifestCreatedByTaskFalseWithNullTargetFiles() {
+        var mockLlm = mock(LlmService.class);
+        var plan = new MissionPlan(
+                "Build app",
+                "sequential",
+                List.of(
+                        new MissionPlan.TaskPlan("RESEARCHER", "Research patterns", "", "Done", List.of(), null),
+                        new MissionPlan.TaskPlan("CODER", "Create app", "", "App works", List.of(), List.of("src/App.java"))
+                )
+        );
+        when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
+
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
+        var state = new WorldmindState(Map.of(
+                "request", "Build app",
+                "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
+                "projectContext", new ProjectContext(".", List.of(), "java", "spring-boot", Map.of(), 5, "test")
+        ));
+
+        var result = node.apply(state);
+        assertFalse((Boolean) result.get("manifestCreatedByTask"));
+    }
+
+    @Test
+    @DisplayName("does not match files like cfmanifest.yml as manifest.yml")
+    void doesNotMatchFalsePositiveManifestFileName() {
+        var mockLlm = mock(LlmService.class);
+        var plan = new MissionPlan(
+                "Build app",
+                "sequential",
+                List.of(
+                        new MissionPlan.TaskPlan("CODER", "Create app", "", "App works", List.of(),
+                                List.of("cfmanifest.yml", "not-a-cf-manifest.yml"))
+                )
+        );
+        when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
+
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
+        var state = new WorldmindState(Map.of(
+                "request", "Build app",
+                "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
+                "projectContext", new ProjectContext(".", List.of(), "java", "spring-boot", Map.of(), 5, "test")
+        ));
+
+        var result = node.apply(state);
+        assertFalse((Boolean) result.get("manifestCreatedByTask"));
+    }
+
+    @Test
     @DisplayName("injects CODER task when LLM plan contains only RESEARCHER and REVIEWER")
     void injectsCoderWhenMissing() {
         var mockLlm = mock(LlmService.class);
