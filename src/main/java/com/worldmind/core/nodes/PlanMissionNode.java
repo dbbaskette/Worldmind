@@ -385,7 +385,11 @@ public class PlanMissionNode {
 
     /**
      * Extracts service instance names from clarifying answers JSON.
-     * Returns a list of individual service names parsed from the cf_service_bindings answer.
+     * Supports two answer formats:
+     * <ol>
+     *   <li>Structured JSON array: {@code [{"type":"postgresql","instanceName":"my-db"}]}</li>
+     *   <li>Legacy comma/newline-separated: {@code "todo-db, my-redis-cache"}</li>
+     * </ol>
      * Sanitizes names to prevent YAML injection.
      */
     List<String> extractServiceNames(String clarifyingAnswers) {
@@ -396,19 +400,46 @@ public class PlanMissionNode {
             var answers = OBJECT_MAPPER.readTree(clarifyingAnswers);
             if (answers.has("cf_service_bindings")) {
                 String serviceAnswer = answers.get("cf_service_bindings").asText();
-                if (serviceAnswer != null && !serviceAnswer.isBlank()
-                        && !serviceAnswer.equalsIgnoreCase("No services needed")) {
-                    return java.util.Arrays.stream(serviceAnswer.split("[,\\n]+"))
-                            .map(String::trim)
-                            .filter(s -> !s.isEmpty())
-                            .map(s -> s.replaceAll("[\\r\\n:{}|>]", ""))
-                            .toList();
+                if (serviceAnswer == null || serviceAnswer.isBlank()
+                        || serviceAnswer.equalsIgnoreCase("No services needed")) {
+                    return List.of();
                 }
+
+                // Try structured JSON array format first: [{"type":"postgresql","instanceName":"my-db"}]
+                try {
+                    var arr = OBJECT_MAPPER.readTree(serviceAnswer);
+                    if (arr.isArray()) {
+                        var names = new ArrayList<String>();
+                        for (var node : arr) {
+                            String instanceName = node.has("instanceName")
+                                    ? node.get("instanceName").asText() : null;
+                            if (instanceName != null && !instanceName.isBlank()) {
+                                names.add(sanitizeServiceName(instanceName));
+                            }
+                        }
+                        if (!names.isEmpty()) {
+                            return names;
+                        }
+                    }
+                } catch (Exception ignored) {
+                    // Not JSON array — fall through to legacy parsing
+                }
+
+                // Legacy format: comma/newline-separated names
+                return java.util.Arrays.stream(serviceAnswer.split("[,\\n]+"))
+                        .map(String::trim)
+                        .filter(s -> !s.isEmpty())
+                        .map(this::sanitizeServiceName)
+                        .toList();
             }
         } catch (Exception e) {
             log.warn("Could not parse service names from clarifying answers: {}", e.getMessage());
         }
         return List.of();
+    }
+
+    private String sanitizeServiceName(String name) {
+        return name.replaceAll("[\\r\\n:{}|>]", "");
     }
 
     private String buildUserPrompt(String request, Classification classification,
