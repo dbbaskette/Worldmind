@@ -294,9 +294,9 @@ export function MissionForm({ onSubmit, submitting, error, showSettings, onToggl
                 className="w-4 h-4 rounded border-wm-border bg-wm-bg text-agent-coder focus:ring-agent-coder/50 focus:ring-offset-0"
               />
               <label htmlFor="createCfDeployment" className="text-xs text-wm_text-secondary cursor-pointer">
-                Create Cloud Foundry deployment artifacts
+                CF Deploy
               </label>
-              <span className="text-[10px] text-wm_text-muted">(manifest.yml, Staticfile, etc.)</span>
+              <span className="text-[10px] text-wm_text-muted">Build and deploy the completed application to Cloud Foundry. Verifies the app starts successfully.</span>
             </div>
 
             {/* Project Path & Git URL */}
