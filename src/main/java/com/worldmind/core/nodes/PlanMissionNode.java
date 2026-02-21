@@ -658,12 +658,20 @@ public class PlanMissionNode {
                             sb.append("      - ").append(b).append("\n");
                         }
                     }
+                    if (comp.integrationPoints() != null && !comp.integrationPoints().isEmpty()) {
+                        sb.append("    Integration Points: ").append(String.join(", ", comp.integrationPoints())).append("\n");
+                    }
                 }
             }
 
             if (spec.edgeCases() != null && !spec.edgeCases().isEmpty()) {
                 sb.append("\nEDGE CASES:\n");
                 for (var ec : spec.edgeCases()) sb.append("  - ").append(ec).append("\n");
+            }
+
+            if (spec.outOfScopeAssumptions() != null && !spec.outOfScopeAssumptions().isEmpty()) {
+                sb.append("\nOUT-OF-SCOPE ASSUMPTIONS:\n");
+                for (var a : spec.outOfScopeAssumptions()) sb.append("  - ").append(a).append("\n");
             }
 
             sb.append("""
