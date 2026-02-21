@@ -306,16 +306,21 @@ public final class InstructionBuilder {
      * @param manifestCreatedByTask whether a preceding task already created manifest.yml
      * @param serviceBindings       service instance names to bind (may be null or empty)
      * @param appType               application type, e.g. "spring-boot"
+     * @param deployerProperties    deployer configuration properties for manifest defaults
      * @return markdown instruction string for the DEPLOYER agent
      */
     public static String buildDeployerInstruction(Task task, String missionId, String cfAppsDomain,
                                                   boolean manifestCreatedByTask,
-                                                  List<String> serviceBindings, String appType) {
+                                                  List<String> serviceBindings, String appType,
+                                                  DeployerProperties deployerProperties) {
         String appName = (missionId != null && !missionId.isBlank()) ? missionId : "app";
         String domain = (cfAppsDomain != null && !cfAppsDomain.isBlank()) ? cfAppsDomain : "$CF_APPS_DOMAIN";
         String route = appName + ".apps." + domain;
         String type = (appType != null && !appType.isBlank()) ? appType : "spring-boot";
         List<String> services = (serviceBindings != null) ? serviceBindings : List.of();
+
+        var defaults = deployerProperties.getDefaults();
+        int healthTimeoutMinutes = deployerProperties.getHealthTimeout() / 60;
 
         var sb = new StringBuilder();
 
@@ -358,15 +363,16 @@ public final class InstructionBuilder {
             sb.append("```yaml\n");
             sb.append("applications:\n");
             sb.append("- name: ").append(appName).append("\n");
-            sb.append("  memory: 1G\n");
-            sb.append("  instances: 1\n");
+            sb.append("  memory: ").append(defaults.getMemory()).append("\n");
+            sb.append("  instances: ").append(defaults.getInstances()).append("\n");
             sb.append("  path: target/*.jar\n");
             sb.append("  buildpacks:\n");
-            sb.append("  - java_buildpack_offline\n");
+            sb.append("  - ").append(defaults.getBuildpack()).append("\n");
             sb.append("  routes:\n");
             sb.append("  - route: ").append(route).append("\n");
             sb.append("  env:\n");
-            sb.append("    JBP_CONFIG_OPEN_JDK_JRE: '{ jre: { version: 21.+ } }'\n");
+            sb.append("    JBP_CONFIG_OPEN_JDK_JRE: '{ jre: { version: ")
+                    .append(defaults.getJavaVersion()).append(".+ } }'\n");
             if (!services.isEmpty()) {
                 sb.append("  services:\n");
                 for (String svc : services) {
@@ -388,7 +394,8 @@ public final class InstructionBuilder {
         sb.append("```bash\n");
         sb.append("cf app ").append(appName).append("\n");
         sb.append("```\n");
-        sb.append("Confirm the app shows `running` status and the health check passes within 5 minutes.\n\n");
+        sb.append("Confirm the app shows `running` status and the health check passes within ")
+                .append(healthTimeoutMinutes).append(" minutes.\n\n");
 
         // Section 7: Success Criteria
         sb.append("## Success Criteria\n\n");

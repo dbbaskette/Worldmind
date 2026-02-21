@@ -51,3 +51,8 @@ worldmind:
       researcher: ${AGENT_RESEARCHER_APP:agent-researcher}
       refactorer: ${AGENT_REFACTORER_APP:agent-refactorer}
       deployer: ${AGENT_DEPLOYER_APP:agent-deployer}
+
+deployer:
+  health-timeout: ${DEPLOYER_HEALTH_TIMEOUT:300}
+  defaults:
+    memory: ${DEPLOYER_DEFAULT_MEMORY:1G}

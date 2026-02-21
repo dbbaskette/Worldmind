@@ -247,7 +247,7 @@ class InstructionBuilderTest {
         var task = deployerTask();
 
         String instruction = InstructionBuilder.buildDeployerInstruction(
-                task, "my-todo-app", "cf.example.com", false, List.of(), "spring-boot");
+                task, "my-todo-app", "cf.example.com", false, List.of(), "spring-boot", defaultDeployerProps());
 
         assertTrue(instruction.contains("Deployment Task: TASK-DEPLOY"));
         assertTrue(instruction.contains("Deploy the completed application to Cloud Foundry"));
@@ -258,7 +258,7 @@ class InstructionBuilderTest {
         var task = deployerTask();
 
         String instruction = InstructionBuilder.buildDeployerInstruction(
-                task, "my-todo-app", "cf.example.com", false, List.of(), "spring-boot");
+                task, "my-todo-app", "cf.example.com", false, List.of(), "spring-boot", defaultDeployerProps());
 
         assertTrue(instruction.contains("spring-boot"));
         assertTrue(instruction.contains("target/*.jar"));
@@ -270,7 +270,7 @@ class InstructionBuilderTest {
         var task = deployerTask();
 
         String instruction = InstructionBuilder.buildDeployerInstruction(
-                task, "my-app", "cf.example.com", false, List.of(), "spring-boot");
+                task, "my-app", "cf.example.com", false, List.of(), "spring-boot", defaultDeployerProps());
 
         assertTrue(instruction.contains("$CF_API_URL"));
         assertTrue(instruction.contains("$CF_USERNAME"));
@@ -284,7 +284,7 @@ class InstructionBuilderTest {
         var task = deployerTask();
 
         String instruction = InstructionBuilder.buildDeployerInstruction(
-                task, "my-app", "cf.example.com", false, List.of(), "spring-boot");
+                task, "my-app", "cf.example.com", false, List.of(), "spring-boot", defaultDeployerProps());
 
         assertTrue(instruction.contains("./mvnw clean package -DskipTests"));
         assertTrue(instruction.contains("mvn clean package -DskipTests"));
@@ -295,7 +295,7 @@ class InstructionBuilderTest {
         var task = deployerTask();
 
         String instruction = InstructionBuilder.buildDeployerInstruction(
-                task, "my-todo-app", "cf.example.com", false, List.of(), "spring-boot");
+                task, "my-todo-app", "cf.example.com", false, List.of(), "spring-boot", defaultDeployerProps());
 
         assertTrue(instruction.contains("name: my-todo-app"));
         assertTrue(instruction.contains("memory: 1G"));
@@ -310,7 +310,7 @@ class InstructionBuilderTest {
         var task = deployerTask();
 
         String instruction = InstructionBuilder.buildDeployerInstruction(
-                task, "my-app", "cf.example.com", true, List.of(), "spring-boot");
+                task, "my-app", "cf.example.com", true, List.of(), "spring-boot", defaultDeployerProps());
 
         assertTrue(instruction.contains("Use the existing manifest as-is"));
         assertFalse(instruction.contains("name: my-app\n"));
@@ -323,7 +323,7 @@ class InstructionBuilderTest {
         var services = List.of("todo-db", "redis-cache");
 
         String instruction = InstructionBuilder.buildDeployerInstruction(
-                task, "my-app", "cf.example.com", false, services, "spring-boot");
+                task, "my-app", "cf.example.com", false, services, "spring-boot", defaultDeployerProps());
 
         assertTrue(instruction.contains("services:"));
         assertTrue(instruction.contains("  - todo-db"));
@@ -335,7 +335,7 @@ class InstructionBuilderTest {
         var task = deployerTask();
 
         String instruction = InstructionBuilder.buildDeployerInstruction(
-                task, "my-app", "cf.example.com", false, List.of(), "spring-boot");
+                task, "my-app", "cf.example.com", false, List.of(), "spring-boot", defaultDeployerProps());
 
         assertFalse(instruction.contains("services:"));
     }
@@ -345,7 +345,7 @@ class InstructionBuilderTest {
         var task = deployerTask();
 
         String instruction = InstructionBuilder.buildDeployerInstruction(
-                task, "my-app", "cf.example.com", false, null, "spring-boot");
+                task, "my-app", "cf.example.com", false, null, "spring-boot", defaultDeployerProps());
 
         assertFalse(instruction.contains("services:"));
     }
@@ -355,7 +355,7 @@ class InstructionBuilderTest {
         var task = deployerTask();
 
         String instruction = InstructionBuilder.buildDeployerInstruction(
-                task, "my-app", "cf.example.com", false, List.of(), "spring-boot");
+                task, "my-app", "cf.example.com", false, List.of(), "spring-boot", defaultDeployerProps());
 
         assertTrue(instruction.contains("cf push -f manifest.yml"));
     }
@@ -365,7 +365,7 @@ class InstructionBuilderTest {
         var task = deployerTask();
 
         String instruction = InstructionBuilder.buildDeployerInstruction(
-                task, "my-app", "cf.example.com", false, List.of(), "spring-boot");
+                task, "my-app", "cf.example.com", false, List.of(), "spring-boot", defaultDeployerProps());
 
         assertTrue(instruction.contains("cf app my-app"));
         assertTrue(instruction.contains("running"));
@@ -378,7 +378,7 @@ class InstructionBuilderTest {
         var task = deployerTask();
 
         String instruction = InstructionBuilder.buildDeployerInstruction(
-                task, null, null, false, null, null);
+                task, null, null, false, null, null, defaultDeployerProps());
 
         assertTrue(instruction.contains("name: app"));
         assertTrue(instruction.contains("$CF_APPS_DOMAIN"));
@@ -390,12 +390,36 @@ class InstructionBuilderTest {
         var task = deployerTask();
 
         String instruction = InstructionBuilder.buildDeployerInstruction(
-                task, "snake-game", "apps.internal.io", false, List.of(), "spring-boot");
+                task, "snake-game", "apps.internal.io", false, List.of(), "spring-boot", defaultDeployerProps());
 
         assertTrue(instruction.contains("route: snake-game.apps.apps.internal.io"));
     }
 
+    @Test
+    void deployerUsesCustomPropertiesInManifest() {
+        var task = deployerTask();
+        var props = new DeployerProperties();
+        props.setHealthTimeout(600);
+        props.getDefaults().setMemory("2G");
+        props.getDefaults().setInstances(3);
+        props.getDefaults().setBuildpack("java_buildpack");
+        props.getDefaults().setJavaVersion(17);
+
+        String instruction = InstructionBuilder.buildDeployerInstruction(
+                task, "my-app", "cf.example.com", false, List.of(), "spring-boot", props);
+
+        assertTrue(instruction.contains("memory: 2G"));
+        assertTrue(instruction.contains("instances: 3"));
+        assertTrue(instruction.contains("java_buildpack"));
+        assertTrue(instruction.contains("version: 17.+"));
+        assertTrue(instruction.contains("10 minutes"));
+    }
+
     // --- Test helpers ---
+
+    private DeployerProperties defaultDeployerProps() {
+        return new DeployerProperties();
+    }
 
     private Task deployerTask() {
         return new Task(

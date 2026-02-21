@@ -10,6 +10,7 @@ import com.worldmind.core.model.MissionStatus;
 import com.worldmind.core.model.ProductSpec;
 import com.worldmind.core.model.ProjectContext;
 import com.worldmind.core.state.WorldmindState;
+import com.worldmind.sandbox.DeployerProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -133,9 +134,11 @@ public class PlanMissionNode {
             """;
 
     private final LlmService llmService;
+    private final DeployerProperties deployerProperties;
 
-    public PlanMissionNode(LlmService llmService) {
+    public PlanMissionNode(LlmService llmService, DeployerProperties deployerProperties) {
         this.llmService = llmService;
+        this.deployerProperties = deployerProperties;
     }
 
     public Map<String, Object> apply(WorldmindState state) {
@@ -294,6 +297,9 @@ public class PlanMissionNode {
         String missionId = (rawId != null && !rawId.isBlank()) ? rawId : "app";
         String clarifyingAnswers = state.clarifyingAnswers();
 
+        var defaults = deployerProperties.getDefaults();
+        int healthTimeoutMinutes = deployerProperties.getHealthTimeout() / 60;
+
         var sb = new StringBuilder();
         sb.append("# Deployment Task\n\n");
         sb.append("Deploy the completed application to Cloud Foundry.\n\n");
@@ -346,16 +352,17 @@ public class PlanMissionNode {
             sb.append("```yaml\n");
             sb.append("applications:\n");
             sb.append("- name: ").append(missionId).append("\n");
-            sb.append("  memory: 1G\n");
-            sb.append("  instances: 1\n");
+            sb.append("  memory: ").append(defaults.getMemory()).append("\n");
+            sb.append("  instances: ").append(defaults.getInstances()).append("\n");
             sb.append("  path: target/*.jar\n");
             sb.append("  buildpacks:\n");
-            sb.append("  - java_buildpack_offline\n");
+            sb.append("  - ").append(defaults.getBuildpack()).append("\n");
             sb.append("  routes:\n");
             sb.append("  - route: ").append(missionId)
                     .append(".apps.$CF_APPS_DOMAIN\n");
             sb.append("  env:\n");
-            sb.append("    JBP_CONFIG_OPEN_JDK_JRE: '{ jre: { version: 21.+ } }'\n");
+            sb.append("    JBP_CONFIG_OPEN_JDK_JRE: '{ jre: { version: ")
+                    .append(defaults.getJavaVersion()).append(".+ } }'\n");
             if (!serviceNames.isEmpty()) {
                 sb.append("  services:\n");
                 for (String svc : serviceNames) {
@@ -377,7 +384,8 @@ public class PlanMissionNode {
         sb.append("```bash\n");
         sb.append("cf app ").append(missionId).append("\n");
         sb.append("```\n");
-        sb.append("Confirm the app shows `running` status and the health check passes within 5 minutes.\n");
+        sb.append("Confirm the app shows `running` status and the health check passes within ")
+                .append(healthTimeoutMinutes).append(" minutes.\n");
         sb.append("Report the deployment URL and status.\n");
 
         return sb.toString();
