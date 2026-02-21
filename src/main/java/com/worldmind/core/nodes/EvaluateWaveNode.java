@@ -20,6 +20,7 @@ import org.springframework.stereotype.Component;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.*;
+import java.util.regex.Pattern;
 
 /**
  * Evaluates all tasks in the current wave after dispatch.
@@ -34,6 +35,12 @@ import java.util.*;
 public class EvaluateWaveNode {
 
     private static final Logger log = LoggerFactory.getLogger(EvaluateWaveNode.class);
+
+    // Pre-compiled patterns for extractServiceName (avoid recompiling on every call)
+    private static final Pattern SERVICE_NOT_FOUND_PATTERN =
+            Pattern.compile("(?i)could not find service\\s+(\\S+)");
+    private static final Pattern SERVICE_INSTANCE_NOT_FOUND_PATTERN =
+            Pattern.compile("(?i)service instance\\s+'?(\\S+?)'?\\s+not found");
 
     private final AgentDispatcher bridge;
     private final QualityGateEvaluationService quality_gateService;
@@ -679,7 +686,7 @@ public class EvaluateWaveNode {
         if (lower.contains("crashed") || lower.contains("exit status")) {
             boolean memoryRelated = lower.contains("out of memory") || lower.contains("oom") || lower.contains("memory");
             String reason = memoryRelated
-                    ? "App crashed on start — may need more memory (currently 1G)"
+                    ? "App crashed on start — likely out of memory"
                     : "App crashed on start — review crash logs for missing configuration or port binding issues";
             String suggestion = memoryRelated
                     ? "Increase memory allocation in manifest.yml (e.g., memory: 2G)"
@@ -690,11 +697,12 @@ public class EvaluateWaveNode {
                     extractRelevantLogs(output, "crash", "CRASHED", "exit"));
         }
 
-        // Health check timeout
-        if (lower.contains("health check timeout") || lower.contains("timed out")
+        // Health check timeout — require "health" context to avoid matching unrelated timeouts
+        if (lower.contains("health check timeout")
+                || (lower.contains("timed out") && lower.contains("health"))
                 || (lower.contains("health check") && lower.contains("fail"))) {
             return new DeploymentDiagnosis("HEALTH_CHECK_TIMEOUT",
-                    "Health check timeout after 300s — check /actuator/health endpoint",
+                    "Health check timeout — check /actuator/health endpoint",
                     "Increase health-check-timeout in manifest.yml or verify the health check endpoint is correct",
                     extractRelevantLogs(output, "health", "timeout", "check"));
         }
@@ -707,24 +715,17 @@ public class EvaluateWaveNode {
 
     /**
      * Extracts the service name from deployment output containing service binding errors.
-     * Looks for patterns like "Could not find service my-db" or "service instance 'my-db' not found".
+     * Looks for error-specific patterns like "Could not find service my-db" or
+     * "service instance 'my-db' not found". Returns null if no error-specific match is found,
+     * so the caller can fall back to a generic CF message.
      */
     private String extractServiceName(String output) {
         if (output == null) return null;
         // Pattern: "Could not find service <name>"
-        var matcher = java.util.regex.Pattern.compile(
-                "(?i)could not find service\\s+(\\S+)"
-        ).matcher(output);
+        var matcher = SERVICE_NOT_FOUND_PATTERN.matcher(output);
         if (matcher.find()) return matcher.group(1);
         // Pattern: "service instance '<name>'" or "service instance <name>"
-        matcher = java.util.regex.Pattern.compile(
-                "(?i)service instance\\s+'?(\\S+?)'?\\s+not found"
-        ).matcher(output);
-        if (matcher.find()) return matcher.group(1);
-        // Pattern: "Binding service <name>"
-        matcher = java.util.regex.Pattern.compile(
-                "(?i)binding service\\s+(\\S+)"
-        ).matcher(output);
+        matcher = SERVICE_INSTANCE_NOT_FOUND_PATTERN.matcher(output);
         if (matcher.find()) return matcher.group(1);
         return null;
     }

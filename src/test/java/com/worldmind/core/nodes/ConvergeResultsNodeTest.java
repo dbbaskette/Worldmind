@@ -1,6 +1,7 @@
 package com.worldmind.core.nodes;
 
 import com.worldmind.core.events.EventBus;
+import com.worldmind.core.events.WorldmindEvent;
 import com.worldmind.core.model.*;
 import com.worldmind.core.state.WorldmindState;
 import org.junit.jupiter.api.BeforeEach;
@@ -8,6 +9,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -310,6 +312,72 @@ class ConvergeResultsNodeTest {
         var metrics = (MissionMetrics) result.get("metrics");
         assertEquals(2, metrics.tasksCompleted());
         assertEquals(0, metrics.tasksFailed());
+    }
+
+    @Test
+    @DisplayName("successful deployment publishes event with deploymentUrl in event data")
+    void successfulDeploymentPublishesEventWithUrl() {
+        var capturedEvents = new ArrayList<WorldmindEvent>();
+        var eventBus = new EventBus();
+        eventBus.subscribeAll(capturedEvents::add);
+        var nodeWithCapture = new ConvergeResultsNode(eventBus);
+
+        var d1 = new Task(
+            "TASK-DEPLOY", "DEPLOYER", "Deploy app",
+            "", "App running",
+            List.of(), TaskStatus.PASSED, 1, 3,
+            FailureStrategy.RETRY, List.of(), List.of(), 30000L
+        );
+
+        var state = new WorldmindState(Map.of(
+            "tasks", List.of(d1),
+            "testResults", List.of(),
+            "sandboxes", List.of(),
+            "deploymentUrl", "https://wmnd-2026-0001.apps.tas-tdc.kuhn-labs.com"
+        ));
+
+        nodeWithCapture.apply(state);
+
+        var completedEvent = capturedEvents.stream()
+                .filter(e -> "mission.completed".equals(e.eventType()))
+                .findFirst()
+                .orElse(null);
+        assertNotNull(completedEvent, "mission.completed event should be published");
+        assertEquals("https://wmnd-2026-0001.apps.tas-tdc.kuhn-labs.com",
+                completedEvent.payload().get("deploymentUrl"),
+                "Event data should contain the deploymentUrl");
+    }
+
+    @Test
+    @DisplayName("mission without deployment does not include deploymentUrl in event data")
+    void noDeploymentOmitsUrlFromEvent() {
+        var capturedEvents = new ArrayList<WorldmindEvent>();
+        var eventBus = new EventBus();
+        eventBus.subscribeAll(capturedEvents::add);
+        var nodeWithCapture = new ConvergeResultsNode(eventBus);
+
+        var d1 = new Task(
+            "TASK-001", "CODER", "Create service",
+            "", "Service exists",
+            List.of(), TaskStatus.PASSED, 1, 3,
+            FailureStrategy.RETRY, List.of(), List.of(), 2000L
+        );
+
+        var state = new WorldmindState(Map.of(
+            "tasks", List.of(d1),
+            "testResults", List.of(),
+            "sandboxes", List.of()
+        ));
+
+        nodeWithCapture.apply(state);
+
+        var completedEvent = capturedEvents.stream()
+                .filter(e -> "mission.completed".equals(e.eventType()))
+                .findFirst()
+                .orElse(null);
+        assertNotNull(completedEvent, "mission.completed event should be published");
+        assertFalse(completedEvent.payload().containsKey("deploymentUrl"),
+                "Event data should NOT contain deploymentUrl when no deployment occurred");
     }
 
     @Test
