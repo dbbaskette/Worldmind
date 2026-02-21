@@ -75,7 +75,15 @@ public class ScheduleWaveNode {
             log.info("Wave {} — no eligible tasks, all done", nextWaveCount);
         } else {
             log.info("Wave {} — scheduling {} tasks: {}", nextWaveCount, waveIds.size(), waveIds);
-            
+
+            // Log when the DEPLOYER wave is being scheduled
+            boolean hasDeployer = waveIds.stream()
+                    .flatMap(id -> tasks.stream().filter(t -> t.id().equals(id)))
+                    .anyMatch(t -> "DEPLOYER".equals(t.agent()));
+            if (hasDeployer) {
+                log.info("Scheduling DEPLOYER wave for mission {}", state.missionId());
+            }
+
             // Record wave execution metrics
             if (metrics != null) {
                 String strategyName = strategy == ExecutionStrategy.PARALLEL ? "parallel" : "sequential";

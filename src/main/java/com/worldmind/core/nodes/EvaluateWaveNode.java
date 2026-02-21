@@ -99,7 +99,16 @@ public class EvaluateWaveNode {
                     continue;
                 }
 
-                // Non-CODER tasks auto-pass
+                // DEPLOYER task — evaluate deployment health (no quality gate)
+                if ("DEPLOYER".equalsIgnoreCase(task.agent())) {
+                    var deployResult = evaluateDeployerResult(id, task, dispatchResult, state,
+                            completedIds, updatedTasks, errors);
+                    if (deployResult.retryContext != null) retryContext = deployResult.retryContext;
+                    if (deployResult.missionFailed) missionStatus = MissionStatus.FAILED;
+                    continue;
+                }
+
+                // Non-CODER tasks auto-pass (RESEARCHER, TESTER, REVIEWER, etc.)
                 if (!"CODER".equalsIgnoreCase(task.agent())) {
                     log.info("Auto-passing non-CODER task {} [{}]", id, task.agent());
                     completedIds.add(id);
@@ -502,6 +511,115 @@ public class EvaluateWaveNode {
                 sb.append("- ").append(suggestion).append("\n");
             }
         }
+        return sb.toString();
+    }
+
+    /**
+     * Evaluates DEPLOYER task results based on deployment health rather than code quality.
+     * DEPLOYER does NOT go through the quality gate (no TESTER/REVIEWER needed).
+     */
+    private FailureOutcome evaluateDeployerResult(String id, Task task, WaveDispatchResult dispatchResult,
+                                                   WorldmindState state,
+                                                   List<String> completedIds, List<Task> updatedTasks,
+                                                   List<String> errors) {
+        // DEPLOYER that failed at dispatch — apply failure strategy
+        if (dispatchResult.status() == TaskStatus.FAILED) {
+            log.info("DEPLOYER task {} failed at dispatch — applying failure strategy", id);
+            String reason = "Deployment failed during execution";
+            FailureStrategy action = task.onFailure() != null ? task.onFailure() : FailureStrategy.RETRY;
+            if (action == FailureStrategy.RETRY && task.iteration() >= task.maxIterations()) {
+                action = FailureStrategy.ESCALATE;
+            }
+            return handleFailure(id, task, dispatchResult, action, reason,
+                    enrichDeployerRetryContext(task.inputContext(), reason, dispatchResult.output()),
+                    completedIds, updatedTasks, errors);
+        }
+
+        // Check deployment output for success/failure
+        String output = dispatchResult.output() != null ? dispatchResult.output() : "";
+        boolean deploymentSuccessful = isDeploymentSuccessful(output);
+
+        if (deploymentSuccessful) {
+            String deploymentUrl = extractDeploymentUrl(output);
+            log.info("DEPLOYER task {} succeeded. Deployment URL: {}", id, deploymentUrl);
+            completedIds.add(id);
+            updatedTasks.add(withResult(task, dispatchResult, TaskStatus.PASSED));
+
+            eventBus.publish(new WorldmindEvent("deployer.success",
+                    state.missionId(), id,
+                    Map.of("deploymentUrl", deploymentUrl != null ? deploymentUrl : ""),
+                    Instant.now()));
+
+            return new FailureOutcome();
+        } else {
+            log.warn("DEPLOYER task {} failed health check — evaluating retry", id);
+            String reason = "Deployment health check failed. Check cf push output for staging errors or crash logs.";
+            FailureStrategy action = task.onFailure() != null ? task.onFailure() : FailureStrategy.RETRY;
+            if (action == FailureStrategy.RETRY && task.iteration() >= task.maxIterations()) {
+                action = FailureStrategy.ESCALATE;
+            }
+
+            eventBus.publish(new WorldmindEvent("deployer.failed",
+                    state.missionId(), id,
+                    Map.of("reason", reason,
+                           "output", summarizeAgentOutput(output)),
+                    Instant.now()));
+
+            return handleFailure(id, task, dispatchResult, action, reason,
+                    enrichDeployerRetryContext(task.inputContext(), reason, output),
+                    completedIds, updatedTasks, errors);
+        }
+    }
+
+    /**
+     * Checks deployment output for success markers indicating the app started and is healthy.
+     */
+    private boolean isDeploymentSuccessful(String output) {
+        if (output == null || output.isBlank()) return false;
+        String lower = output.toLowerCase();
+        return lower.contains("app started")
+                || lower.contains("instances running")
+                || (lower.contains("requested state") && lower.contains("running"))
+                || lower.contains("status: running");
+    }
+
+    /**
+     * Extracts the deployment URL from cf push output.
+     * Looks for route patterns like "routes: url" or "https://..." in the output.
+     */
+    private String extractDeploymentUrl(String output) {
+        if (output == null) return null;
+        // Look for route in cf push output (e.g., "routes: app-name.apps.domain.com")
+        var routeMatcher = java.util.regex.Pattern.compile(
+                "routes?:\\s*(\\S+\\.\\S+\\.\\S+)", java.util.regex.Pattern.CASE_INSENSITIVE
+        ).matcher(output);
+        if (routeMatcher.find()) {
+            String route = routeMatcher.group(1);
+            return route.startsWith("http") ? route : "https://" + route;
+        }
+        // Fallback: look for explicit URL
+        var urlMatcher = java.util.regex.Pattern.compile(
+                "https?://\\S+\\.apps\\.\\S+", java.util.regex.Pattern.CASE_INSENSITIVE
+        ).matcher(output);
+        if (urlMatcher.find()) {
+            return urlMatcher.group();
+        }
+        return null;
+    }
+
+    /**
+     * Enriches DEPLOYER retry context with deployment failure details.
+     */
+    private String enrichDeployerRetryContext(String baseContext, String failureReason, String deployOutput) {
+        var sb = new StringBuilder(baseContext != null ? baseContext : "");
+        sb.append("\n\n## PREVIOUS DEPLOYMENT ATTEMPT FAILED\n\n");
+        sb.append(failureReason).append("\n\n");
+        if (deployOutput != null && !deployOutput.isBlank()) {
+            sb.append("**Deployment output (last 2000 chars):**\n```\n");
+            sb.append(summarizeAgentOutput(deployOutput));
+            sb.append("\n```\n\n");
+        }
+        sb.append("Review the error output above and fix the issue before retrying deployment.\n");
         return sb.toString();
     }
 

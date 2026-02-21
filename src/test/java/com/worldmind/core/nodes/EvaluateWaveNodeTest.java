@@ -307,4 +307,130 @@ class EvaluateWaveNodeTest {
 
         assertEquals(MissionStatus.FAILED.name(), result.get("status"));
     }
+
+    // --- DEPLOYER Tests ---
+
+    private Task deployerTask(String id, int iteration, int maxIterations, FailureStrategy onFailure) {
+        return new Task(id, "DEPLOYER", "Deploy app", "", "App running", List.of(),
+                TaskStatus.PENDING, iteration, maxIterations, onFailure, List.of("manifest.yml"), List.of(), null);
+    }
+
+    private WaveDispatchResult deployerSuccessResult(String id) {
+        String output = "Pushing app wmnd-2026-0001...\n"
+                + "Staging app...\n"
+                + "Build succeeded\n"
+                + "requested state: started\n"
+                + "instances: 1/1\n"
+                + "routes: wmnd-2026-0001.apps.tas-tdc.kuhn-labs.com\n"
+                + "status: running\n"
+                + "App started";
+        return new WaveDispatchResult(id, TaskStatus.PASSED, List.of(), output, 30000L);
+    }
+
+    private WaveDispatchResult deployerFailureResult(String id) {
+        String output = "Pushing app wmnd-2026-0001...\n"
+                + "Staging app...\n"
+                + "Build succeeded\n"
+                + "Start unsuccessful\n"
+                + "Error: App crashed during startup";
+        return new WaveDispatchResult(id, TaskStatus.PASSED, List.of(), output, 30000L);
+    }
+
+    @Test
+    @DisplayName("DEPLOYER success -> completedIds updated, no TESTER/REVIEWER dispatched")
+    @SuppressWarnings("unchecked")
+    void deployerSuccessNoQualityGate() {
+        var d = deployerTask("TASK-DEPLOY", 0, 3, FailureStrategy.RETRY);
+
+        var state = new WorldmindState(Map.of(
+                "waveTaskIds", List.of("TASK-DEPLOY"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(deployerSuccessResult("TASK-DEPLOY"))
+        ));
+
+        var result = node.apply(state);
+
+        var completedIds = (List<String>) result.get("completedTaskIds");
+        assertTrue(completedIds.contains("TASK-DEPLOY"));
+        // DEPLOYER does NOT trigger TESTER/REVIEWER
+        verify(mockBridge, never()).executeTask(any(), any(), any(), any(), any());
+        // No mission failure
+        assertNull(result.get("status"));
+    }
+
+    @Test
+    @DisplayName("DEPLOYER health check failure -> retry with enriched context")
+    void deployerHealthCheckFailureRetry() {
+        var d = deployerTask("TASK-DEPLOY", 0, 3, FailureStrategy.RETRY);
+
+        var state = new WorldmindState(Map.of(
+                "waveTaskIds", List.of("TASK-DEPLOY"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(deployerFailureResult("TASK-DEPLOY"))
+        ));
+
+        var result = node.apply(state);
+
+        // Retry: completedTaskIds may be absent (empty list not written to state)
+        @SuppressWarnings("unchecked")
+        var completedIds = (List<String>) result.get("completedTaskIds");
+        assertTrue(completedIds == null || !completedIds.contains("TASK-DEPLOY"));
+        assertTrue(((String) result.get("retryContext")).contains("TASK-DEPLOY"));
+        // No TESTER/REVIEWER dispatched
+        verify(mockBridge, never()).executeTask(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("DEPLOYER dispatch failure -> retry")
+    void deployerDispatchFailureRetry() {
+        var d = deployerTask("TASK-DEPLOY", 0, 3, FailureStrategy.RETRY);
+
+        var state = new WorldmindState(Map.of(
+                "waveTaskIds", List.of("TASK-DEPLOY"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(failedResult("TASK-DEPLOY"))
+        ));
+
+        var result = node.apply(state);
+
+        // Retry: completedTaskIds may be absent (empty list not written to state)
+        @SuppressWarnings("unchecked")
+        var completedIds = (List<String>) result.get("completedTaskIds");
+        assertTrue(completedIds == null || !completedIds.contains("TASK-DEPLOY"));
+        assertTrue(((String) result.get("retryContext")).contains("TASK-DEPLOY"));
+    }
+
+    @Test
+    @DisplayName("DEPLOYER retries exhausted -> mission FAILED")
+    void deployerRetriesExhaustedEscalation() {
+        var d = deployerTask("TASK-DEPLOY", 3, 3, FailureStrategy.RETRY);
+
+        var state = new WorldmindState(Map.of(
+                "waveTaskIds", List.of("TASK-DEPLOY"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(deployerFailureResult("TASK-DEPLOY"))
+        ));
+
+        var result = node.apply(state);
+
+        assertEquals(MissionStatus.FAILED.name(), result.get("status"));
+    }
+
+    @Test
+    @DisplayName("DEPLOYER does NOT trigger REVIEWER (skip quality gate entirely)")
+    void deployerSkipsReviewer() {
+        var d = deployerTask("TASK-DEPLOY", 0, 3, FailureStrategy.RETRY);
+
+        var state = new WorldmindState(Map.of(
+                "waveTaskIds", List.of("TASK-DEPLOY"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(deployerSuccessResult("TASK-DEPLOY"))
+        ));
+
+        node.apply(state);
+
+        // Verify NO bridge calls at all — DEPLOYER skips TESTER and REVIEWER
+        verify(mockBridge, never()).executeTask(any(), any(), any(), any(), any());
+        verify(mockQualityGateService, never()).evaluateQualityGate(any(), any(), any());
+    }
 }

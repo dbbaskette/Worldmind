@@ -91,4 +91,32 @@ class ScheduleWaveNodeTest {
         return new Task(id, "CODER", "Do " + id, "", "Done", List.of(),
                 TaskStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of(), List.of(), null);
     }
+
+    private Task deployerTask(String id) {
+        return new Task(id, "DEPLOYER", "Deploy " + id, "", "App running", List.of(),
+                TaskStatus.PENDING, 0, 3, FailureStrategy.RETRY, List.of("manifest.yml"), List.of(), null);
+    }
+
+    @Test
+    @DisplayName("DEPLOYER wave is scheduled and logged")
+    void deployerWaveScheduled() {
+        when(mockScheduler.computeNextWave(anyList(), anySet(), any(), anyInt()))
+                .thenReturn(List.of("TASK-DEPLOY"));
+
+        var state = new WorldmindState(Map.of(
+                "missionId", "test-mission-001",
+                "tasks", List.of(
+                        task("TASK-001"), task("TASK-002"), deployerTask("TASK-DEPLOY")
+                ),
+                "completedTaskIds", List.of("TASK-001", "TASK-002"),
+                "executionStrategy", ExecutionStrategy.PARALLEL.name(),
+                "waveCount", 2
+        ));
+
+        var result = node.apply(state);
+
+        assertEquals(List.of("TASK-DEPLOY"), result.get("waveTaskIds"));
+        assertEquals(3, result.get("waveCount"));
+        assertEquals(MissionStatus.EXECUTING.name(), result.get("status"));
+    }
 }

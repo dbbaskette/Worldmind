@@ -237,4 +237,74 @@ class TaskSchedulerTest {
         assertTrue(wave1.contains("C"));
         assertFalse(wave1.contains("B"));  // Blocked by A's b.js
     }
+
+    // --- DEPLOYER Scheduling Tests ---
+
+    private Task taskWithAgent(String id, String agent, List<String> deps, List<String> targetFiles) {
+        return new Task(id, agent, "Do " + id, "", "Done", deps,
+                TaskStatus.PENDING, 0, 3, FailureStrategy.RETRY, targetFiles, List.of(), null);
+    }
+
+    @Test
+    @DisplayName("DEPLOYER with deps on all CODERs only eligible when ALL complete")
+    void deployerEligibleOnlyWhenAllCodersComplete() {
+        var tasks = List.of(
+                taskWithAgent("C1", "CODER", List.of(), List.of("src/A.java")),
+                taskWithAgent("C2", "CODER", List.of(), List.of("src/B.java")),
+                taskWithAgent("C3", "CODER", List.of(), List.of("src/C.java")),
+                taskWithAgent("C4", "CODER", List.of(), List.of("src/D.java")),
+                taskWithAgent("C5", "CODER", List.of(), List.of("src/E.java")),
+                taskWithAgent("DEPLOY", "DEPLOYER", List.of("C1", "C2", "C3", "C4", "C5"), List.of("manifest.yml"))
+        );
+
+        // No coders complete — DEPLOYER not eligible
+        var wave1 = scheduler.computeNextWave(tasks, Set.of(), ExecutionStrategy.PARALLEL, 10);
+        assertEquals(5, wave1.size());
+        assertFalse(wave1.contains("DEPLOY"));
+
+        // 4 of 5 coders complete — DEPLOYER still not eligible
+        var wave2 = scheduler.computeNextWave(tasks, Set.of("C1", "C2", "C3", "C4"), ExecutionStrategy.PARALLEL, 10);
+        assertEquals(1, wave2.size());
+        assertTrue(wave2.contains("C5"));
+        assertFalse(wave2.contains("DEPLOY"));
+
+        // All 5 coders complete — DEPLOYER now eligible
+        var wave3 = scheduler.computeNextWave(tasks, Set.of("C1", "C2", "C3", "C4", "C5"), ExecutionStrategy.PARALLEL, 10);
+        assertEquals(1, wave3.size());
+        assertTrue(wave3.contains("DEPLOY"));
+    }
+
+    @Test
+    @DisplayName("DEPLOYER targets manifest.yml, no file conflict with CODER source files")
+    void deployerNoFileConflictWithCoders() {
+        var tasks = List.of(
+                taskWithAgent("C1", "CODER", List.of(), List.of("src/Main.java")),
+                taskWithAgent("DEPLOY", "DEPLOYER", List.of("C1"), List.of("manifest.yml"))
+        );
+
+        // When C1 is complete, DEPLOYER is eligible — no file overlap
+        var wave = scheduler.computeNextWave(tasks, Set.of("C1"), ExecutionStrategy.PARALLEL, 10);
+        assertEquals(1, wave.size());
+        assertTrue(wave.contains("DEPLOY"));
+    }
+
+    @Test
+    @DisplayName("DEPLOYER runs as single-task wave after all coders")
+    void deployerRunsAsSingleTaskWave() {
+        var tasks = List.of(
+                taskWithAgent("C1", "CODER", List.of(), List.of("src/A.java")),
+                taskWithAgent("C2", "CODER", List.of(), List.of("src/B.java")),
+                taskWithAgent("DEPLOY", "DEPLOYER", List.of("C1", "C2"), List.of("manifest.yml"))
+        );
+
+        // Wave 1: CODERs
+        var wave1 = scheduler.computeNextWave(tasks, Set.of(), ExecutionStrategy.PARALLEL, 10);
+        assertEquals(2, wave1.size());
+        assertTrue(wave1.containsAll(List.of("C1", "C2")));
+
+        // Wave 2: DEPLOYER only
+        var wave2 = scheduler.computeNextWave(tasks, Set.of("C1", "C2"), ExecutionStrategy.PARALLEL, 10);
+        assertEquals(1, wave2.size());
+        assertEquals("DEPLOY", wave2.get(0));
+    }
 }
