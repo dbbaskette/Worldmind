@@ -14,6 +14,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +33,7 @@ import java.util.Optional;
 public class PlanMissionNode {
 
     private static final Logger log = LoggerFactory.getLogger(PlanMissionNode.class);
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private static final String SYSTEM_PROMPT = """
             You are a mission planner for Worldmind, an agentic code assistant.
@@ -113,8 +116,7 @@ public class PlanMissionNode {
               targetFiles: ["src/main/java/com/example/service/TodoService.java"]
             - CODER: Create the TodoController REST endpoints
               targetFiles: ["src/main/java/com/example/controller/TodoController.java"]
-            - CODER: Create Cloud Foundry manifest.yml for deployment
-              targetFiles: ["manifest.yml"]
+            Note: If CF deployment is enabled, a DEPLOYER task is added automatically — do NOT plan manifest.yml creation.
 
             BAD example (tasks too large):
             - CODER: Create model, repository, service, and controller  ← TOO BIG, split into 4 tasks
@@ -178,16 +180,16 @@ public class PlanMissionNode {
         tasks = ensureCoderTask(tasks, request);
         tasks = assignTypeDependencies(tasks);
         
-        // If user requested CF deployment, append a final DEPLOYER task
-        if (state.createCfDeployment()) {
-            tasks = appendDeployerTask(tasks, state);
-        }
-
-        // Detect whether any planned task targets manifest.yml
+        // Detect whether any planned task targets manifest.yml (before adding DEPLOYER)
         boolean manifestTaskExists = tasks.stream()
                 .filter(t -> t.targetFiles() != null)
                 .flatMap(t -> t.targetFiles().stream())
                 .anyMatch(f -> f.endsWith("manifest.yml"));
+
+        // If user requested CF deployment, append a final DEPLOYER task
+        if (state.createCfDeployment()) {
+            tasks = appendDeployerTask(tasks, state, manifestTaskExists);
+        }
 
         log.info("Mission plan: {} tasks — {}", tasks.size(),
                 tasks.stream().map(d -> d.id() + "[" + d.agent() + "](deps:" + d.dependencies() + ")").toList());
@@ -255,28 +257,18 @@ public class PlanMissionNode {
     /**
      * Appends a final DEPLOYER task to build, deploy, and verify the application on Cloud Foundry.
      * This task depends on all CODER/REFACTORER tasks so it runs as the final wave.
-     *
-     * @param tasks existing tasks to append to
-     * @param state current workflow state (provides clarifying answers, mission ID, manifest detection)
      */
-    private List<Task> appendDeployerTask(List<Task> tasks, WorldmindState state) {
-        // Depends on ALL coder/refactorer tasks
+    private List<Task> appendDeployerTask(List<Task> tasks, WorldmindState state,
+                                           boolean manifestCreatedByTask) {
         List<String> dependencies = tasks.stream()
                 .filter(t -> "CODER".equalsIgnoreCase(t.agent()) || "REFACTORER".equalsIgnoreCase(t.agent()))
                 .map(Task::id)
                 .toList();
 
-        // Check if any planned task already creates manifest.yml
-        boolean manifestTaskExists = tasks.stream()
-                .filter(t -> t.targetFiles() != null)
-                .flatMap(t -> t.targetFiles().stream())
-                .anyMatch(f -> f.endsWith("manifest.yml"));
+        String instructions = buildDeployerInstructions(state, manifestCreatedByTask);
 
-        String instructions = buildDeployerInstructions(state, manifestTaskExists);
-
-        String deployId = String.format("TASK-%03d", tasks.size() + 1);
         var deployerTask = new Task(
-                deployId, "DEPLOYER",
+                "TASK-DEPLOY", "DEPLOYER",
                 "Build and deploy application to Cloud Foundry",
                 instructions,
                 "App deployed, started, and health check passes within 5 minutes",
@@ -289,7 +281,7 @@ public class PlanMissionNode {
 
         var result = new ArrayList<>(tasks);
         result.add(deployerTask);
-        log.info("Appended DEPLOYER task {} with dependencies on {}", deployId, dependencies);
+        log.info("Appended DEPLOYER task TASK-DEPLOY with dependencies on {}", dependencies);
         return result;
     }
 
@@ -298,7 +290,8 @@ public class PlanMissionNode {
      * Includes build commands, manifest generation (conditional), CF auth, deploy, and health check.
      */
     private String buildDeployerInstructions(WorldmindState state, boolean manifestTaskExists) {
-        String missionId = state.missionId();
+        String rawId = state.missionId();
+        String missionId = (rawId != null && !rawId.isBlank()) ? rawId : "app";
         String clarifyingAnswers = state.clarifyingAnswers();
 
         var sb = new StringBuilder();
@@ -352,14 +345,14 @@ public class PlanMissionNode {
             sb.append("No task created a manifest. Create `manifest.yml` with this content:\n");
             sb.append("```yaml\n");
             sb.append("applications:\n");
-            sb.append("- name: ").append(missionId.isEmpty() ? "${MISSION_ID}" : missionId).append("\n");
+            sb.append("- name: ").append(missionId).append("\n");
             sb.append("  memory: 1G\n");
             sb.append("  instances: 1\n");
             sb.append("  path: target/*.jar\n");
             sb.append("  buildpacks:\n");
             sb.append("  - java_buildpack_offline\n");
             sb.append("  routes:\n");
-            sb.append("  - route: ").append(missionId.isEmpty() ? "${MISSION_ID}" : missionId)
+            sb.append("  - route: ").append(missionId)
                     .append(".apps.$CF_APPS_DOMAIN\n");
             sb.append("  env:\n");
             sb.append("    JBP_CONFIG_OPEN_JDK_JRE: '{ jre: { version: 21.+ } }'\n");
@@ -382,7 +375,7 @@ public class PlanMissionNode {
         sb.append("### 5. Verify deployment\n");
         sb.append("Wait for the app to reach `running` state:\n");
         sb.append("```bash\n");
-        sb.append("cf app ").append(missionId.isEmpty() ? "${MISSION_ID}" : missionId).append("\n");
+        sb.append("cf app ").append(missionId).append("\n");
         sb.append("```\n");
         sb.append("Confirm the app shows `running` status and the health check passes within 5 minutes.\n");
         sb.append("Report the deployment URL and status.\n");
@@ -393,22 +386,22 @@ public class PlanMissionNode {
     /**
      * Extracts service instance names from clarifying answers JSON.
      * Returns a list of individual service names parsed from the cf_service_bindings answer.
+     * Sanitizes names to prevent YAML injection.
      */
-    private List<String> extractServiceNames(String clarifyingAnswers) {
+    List<String> extractServiceNames(String clarifyingAnswers) {
         if (clarifyingAnswers == null || clarifyingAnswers.isBlank()) {
             return List.of();
         }
         try {
-            var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-            var answers = mapper.readTree(clarifyingAnswers);
+            var answers = OBJECT_MAPPER.readTree(clarifyingAnswers);
             if (answers.has("cf_service_bindings")) {
                 String serviceAnswer = answers.get("cf_service_bindings").asText();
                 if (serviceAnswer != null && !serviceAnswer.isBlank()
                         && !serviceAnswer.equalsIgnoreCase("No services needed")) {
-                    // Parse comma or newline-separated service names
                     return java.util.Arrays.stream(serviceAnswer.split("[,\\n]+"))
                             .map(String::trim)
                             .filter(s -> !s.isEmpty())
+                            .map(s -> s.replaceAll("[\\r\\n:{}|>]", ""))
                             .toList();
                 }
             }
