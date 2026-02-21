@@ -712,6 +712,40 @@ class PlanMissionNodeTest {
     }
 
     @Test
+    @DisplayName("DEPLOYER instructions include service bindings from structured JSON array format")
+    void deployerInstructionsIncludeStructuredServiceBindings() {
+        var mockLlm = mock(LlmService.class);
+        var plan = new MissionPlan(
+                "Build app",
+                "sequential",
+                List.of(
+                        new MissionPlan.TaskPlan("CODER", "Create app", "", "Done", List.of(), List.of("src/App.java"))
+                )
+        );
+        when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
+
+        var node = new PlanMissionNode(mockLlm);
+        var state = new WorldmindState(Map.of(
+                "request", "Build app",
+                "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
+                "projectContext", new ProjectContext(".", List.of(), "java", "spring-boot", Map.of(), 5, "test"),
+                "createCfDeployment", true,
+                "missionId", "wmnd-2026-0001",
+                "clarifyingAnswers", "{\"cf_service_bindings\": \"[{\\\"type\\\":\\\"postgresql\\\",\\\"instanceName\\\":\\\"my-todo-db\\\"},{\\\"type\\\":\\\"redis\\\",\\\"instanceName\\\":\\\"my-cache\\\"}]\"}"
+        ));
+
+        var result = node.apply(state);
+
+        @SuppressWarnings("unchecked")
+        var tasks = (List<Task>) result.get("tasks");
+        var deployerTask = tasks.get(tasks.size() - 1);
+        String instructions = deployerTask.inputContext();
+        assertTrue(instructions.contains("my-todo-db"));
+        assertTrue(instructions.contains("my-cache"));
+        assertTrue(instructions.contains("Service Bindings"));
+    }
+
+    @Test
     @DisplayName("injects CODER task when LLM plan contains only RESEARCHER and REVIEWER")
     void injectsCoderWhenMissing() {
         var mockLlm = mock(LlmService.class);
