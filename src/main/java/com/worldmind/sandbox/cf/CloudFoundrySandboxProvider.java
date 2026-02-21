@@ -134,6 +134,12 @@ public class CloudFoundrySandboxProvider implements SandboxProvider {
                 .map(e -> "export %s='%s'".formatted(e.getKey(), e.getValue().replace("'", "'\\''")))
                 .collect(Collectors.joining(" && "));
 
+        // SPEC DIVERGENCE: The original spec called for CF credentials to be
+        // "included in the env vars passed to the CF task" (via CF API environment_variables).
+        // Instead, we inject them as bash export statements within the task command.
+        // This is more secure: CF API environment_variables are visible in `cf tasks`
+        // output and audit logs, whereas command-embedded exports are not exposed separately.
+        //
         // For DEPLOYER tasks only: inject CF credentials so the agent can
         // authenticate and deploy to the target CF environment.
         // Other agent types (coder, tester, reviewer) do not need CF credentials.

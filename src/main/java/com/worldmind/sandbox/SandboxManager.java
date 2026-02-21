@@ -17,6 +17,13 @@ import java.util.stream.Stream;
 /**
  * Orchestrates Agent execution inside Sandbox containers.
  *
+ * <p>This class is intentionally agent-type-agnostic: it does not maintain a
+ * whitelist of recognized agent types. The {@code agentType} parameter is passed
+ * through to the {@link SandboxProvider}, which handles all type-specific behavior
+ * (e.g. branch strategy, credential injection, CF app mapping). New agent types
+ * (coder, tester, reviewer, deployer, researcher, etc.) can be added without
+ * modifying this class.
+ *
  * <p>Responsibilities:
  * <ul>
  *   <li>Assembles environment variables from {@link SandboxProperties}</li>
