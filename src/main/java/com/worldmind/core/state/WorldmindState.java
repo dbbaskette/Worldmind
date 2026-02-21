@@ -44,6 +44,7 @@ public class WorldmindState extends AgentState {
         Map.entry("createCfDeployment",   Channels.base(() -> false)),  // If true, append CF deployment task
         Map.entry("clarifyingQuestions",  Channels.base((Reducer<ClarifyingQuestions>) null)),  // Questions for user
         Map.entry("clarifyingAnswers",    Channels.base(() -> "")),  // User's answers as JSON
+        Map.entry("manifestCreatedByTask", Channels.base(() -> false)),  // True when a planned task targets manifest.yml
 
         // ── Wave execution channels (Phase 4) ────────────────────────
         Map.entry("waveTaskIds",      Channels.base((Supplier<List<String>>) List::of)),
@@ -192,6 +193,10 @@ public class WorldmindState extends AgentState {
 
     public boolean createCfDeployment() {
         return this.<Boolean>value("createCfDeployment").orElse(false);
+    }
+
+    public boolean manifestCreatedByTask() {
+        return this.<Boolean>value("manifestCreatedByTask").orElse(false);
     }
 
     @SuppressWarnings("unchecked")

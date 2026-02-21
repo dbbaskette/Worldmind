@@ -183,25 +183,33 @@ public class PlanMissionNode {
             tasks = appendCfDeploymentTask(tasks, state.clarifyingAnswers());
         }
 
+        // Detect whether any planned task targets manifest.yml
+        boolean manifestTaskExists = tasks.stream()
+                .filter(t -> t.targetFiles() != null)
+                .flatMap(t -> t.targetFiles().stream())
+                .anyMatch(f -> f.endsWith("manifest.yml"));
+
         log.info("Mission plan: {} tasks — {}", tasks.size(),
                 tasks.stream().map(d -> d.id() + "[" + d.agent() + "](deps:" + d.dependencies() + ")").toList());
+        log.info("Manifest created by task: {}", manifestTaskExists);
 
         // Use user's execution strategy override if specified, otherwise use planner's suggestion
         String userStrategy = state.<String>value("userExecutionStrategy").orElse(null);
-        log.info("Planning strategy: userExecutionStrategy='{}', LLM suggested='{}'", 
+        log.info("Planning strategy: userExecutionStrategy='{}', LLM suggested='{}'",
                 userStrategy, plan.executionStrategy());
-        
+
         String effectiveStrategy = (userStrategy != null && !userStrategy.isBlank())
                 ? userStrategy
                 : plan.executionStrategy().toUpperCase();
-        
-        log.info("Effective execution strategy: {} (user override: {})", 
+
+        log.info("Effective execution strategy: {} (user override: {})",
                 effectiveStrategy, userStrategy != null && !userStrategy.isBlank());
 
         return Map.of(
                 "tasks", tasks,
                 "executionStrategy", effectiveStrategy,
-                "status", MissionStatus.AWAITING_APPROVAL.name()
+                "status", MissionStatus.AWAITING_APPROVAL.name(),
+                "manifestCreatedByTask", manifestTaskExists
         );
     }
 
