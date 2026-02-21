@@ -47,7 +47,9 @@ spring-shell.log
 hs_err_pid*
 replay_pid*
 
-# CF CLI binary (downloaded separately for air-gapped builds)
+# CF CLI binary — scoped to docker/agent-deployer/ build context rather than
+# project root so it is available to COPY in the Dockerfile without extra paths.
+# Download separately for air-gapped builds; verify checksum before building.
 docker/agent-deployer/cf
 
 # Utility scripts
