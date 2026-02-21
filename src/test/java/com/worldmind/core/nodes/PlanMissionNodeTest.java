@@ -384,6 +384,222 @@ class PlanMissionNodeTest {
     }
 
     @Test
+    @DisplayName("appendDeployerTask creates DEPLOYER task instead of CODER")
+    void appendsDeployerTaskNotCoder() {
+        var mockLlm = mock(LlmService.class);
+        var plan = new MissionPlan(
+                "Build todo app",
+                "sequential",
+                List.of(
+                        new MissionPlan.TaskPlan("CODER", "Create app", "", "App works", List.of(), List.of("src/App.java"))
+                )
+        );
+        when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
+
+        var node = new PlanMissionNode(mockLlm);
+        var state = new WorldmindState(Map.of(
+                "request", "Build todo app",
+                "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
+                "projectContext", new ProjectContext(".", List.of(), "java", "spring-boot", Map.of(), 5, "test"),
+                "createCfDeployment", true,
+                "missionId", "wmnd-2026-0001"
+        ));
+
+        var result = node.apply(state);
+
+        @SuppressWarnings("unchecked")
+        var tasks = (List<Task>) result.get("tasks");
+        var lastTask = tasks.get(tasks.size() - 1);
+        assertEquals("DEPLOYER", lastTask.agent());
+        assertEquals("Build and deploy application to Cloud Foundry", lastTask.description());
+        assertEquals("App deployed, started, and health check passes within 5 minutes", lastTask.successCriteria());
+        assertEquals(3, lastTask.maxIterations());
+        assertEquals(FailureStrategy.RETRY, lastTask.onFailure());
+    }
+
+    @Test
+    @DisplayName("DEPLOYER task depends on all CODER and REFACTORER tasks")
+    void deployerDependsOnCoderAndRefactorer() {
+        var mockLlm = mock(LlmService.class);
+        var plan = new MissionPlan(
+                "Build app",
+                "sequential",
+                List.of(
+                        new MissionPlan.TaskPlan("RESEARCHER", "Research", "", "Done", List.of(), List.of()),
+                        new MissionPlan.TaskPlan("CODER", "Create model", "", "Done", List.of(), List.of("Model.java")),
+                        new MissionPlan.TaskPlan("REFACTORER", "Refactor service", "", "Done", List.of(), List.of("Service.java")),
+                        new MissionPlan.TaskPlan("CODER", "Create controller", "", "Done", List.of(), List.of("Controller.java"))
+                )
+        );
+        when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
+
+        var node = new PlanMissionNode(mockLlm);
+        var state = new WorldmindState(Map.of(
+                "request", "Build app",
+                "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
+                "projectContext", new ProjectContext(".", List.of(), "java", "spring-boot", Map.of(), 5, "test"),
+                "createCfDeployment", true,
+                "missionId", "wmnd-2026-0001"
+        ));
+
+        var result = node.apply(state);
+
+        @SuppressWarnings("unchecked")
+        var tasks = (List<Task>) result.get("tasks");
+        var deployerTask = tasks.get(tasks.size() - 1);
+        assertEquals("DEPLOYER", deployerTask.agent());
+        // Should depend on TASK-002 (CODER), TASK-003 (REFACTORER), TASK-004 (CODER) — not TASK-001 (RESEARCHER)
+        assertTrue(deployerTask.dependencies().contains("TASK-002"));
+        assertTrue(deployerTask.dependencies().contains("TASK-003"));
+        assertTrue(deployerTask.dependencies().contains("TASK-004"));
+        assertFalse(deployerTask.dependencies().contains("TASK-001"));
+    }
+
+    @Test
+    @DisplayName("DEPLOYER instructions include manifest template when no task creates manifest.yml")
+    void deployerInstructionsIncludeManifestWhenNoTaskCreatesIt() {
+        var mockLlm = mock(LlmService.class);
+        var plan = new MissionPlan(
+                "Build app",
+                "sequential",
+                List.of(
+                        new MissionPlan.TaskPlan("CODER", "Create app", "", "Done", List.of(), List.of("src/App.java"))
+                )
+        );
+        when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
+
+        var node = new PlanMissionNode(mockLlm);
+        var state = new WorldmindState(Map.of(
+                "request", "Build app",
+                "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
+                "projectContext", new ProjectContext(".", List.of(), "java", "spring-boot", Map.of(), 5, "test"),
+                "createCfDeployment", true,
+                "missionId", "wmnd-2026-0001"
+        ));
+
+        var result = node.apply(state);
+
+        @SuppressWarnings("unchecked")
+        var tasks = (List<Task>) result.get("tasks");
+        var deployerTask = tasks.get(tasks.size() - 1);
+        String instructions = deployerTask.inputContext();
+        assertTrue(instructions.contains("Generate manifest.yml"));
+        assertTrue(instructions.contains("java_buildpack_offline"));
+        assertTrue(instructions.contains("wmnd-2026-0001.apps.$CF_APPS_DOMAIN"));
+        assertTrue(instructions.contains("wmnd-2026-0001"));
+    }
+
+    @Test
+    @DisplayName("DEPLOYER instructions use existing manifest when a task creates manifest.yml")
+    void deployerInstructionsUseExistingManifest() {
+        var mockLlm = mock(LlmService.class);
+        var plan = new MissionPlan(
+                "Build app",
+                "sequential",
+                List.of(
+                        new MissionPlan.TaskPlan("CODER", "Create app", "", "Done", List.of(), List.of("src/App.java")),
+                        new MissionPlan.TaskPlan("CODER", "Create manifest", "", "Done", List.of(), List.of("manifest.yml"))
+                )
+        );
+        when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
+
+        var node = new PlanMissionNode(mockLlm);
+        var state = new WorldmindState(Map.of(
+                "request", "Build app",
+                "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
+                "projectContext", new ProjectContext(".", List.of(), "java", "spring-boot", Map.of(), 5, "test"),
+                "createCfDeployment", true,
+                "missionId", "wmnd-2026-0001"
+        ));
+
+        var result = node.apply(state);
+
+        @SuppressWarnings("unchecked")
+        var tasks = (List<Task>) result.get("tasks");
+        var deployerTask = tasks.get(tasks.size() - 1);
+        String instructions = deployerTask.inputContext();
+        assertTrue(instructions.contains("Use existing manifest"));
+        assertTrue(instructions.contains("already created `manifest.yml`"));
+        assertFalse(instructions.contains("Generate manifest.yml"));
+    }
+
+    @Test
+    @DisplayName("DEPLOYER instructions include service bindings from clarifying answers")
+    void deployerInstructionsIncludeServiceBindings() {
+        var mockLlm = mock(LlmService.class);
+        var plan = new MissionPlan(
+                "Build app",
+                "sequential",
+                List.of(
+                        new MissionPlan.TaskPlan("CODER", "Create app", "", "Done", List.of(), List.of("src/App.java"))
+                )
+        );
+        when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
+
+        var node = new PlanMissionNode(mockLlm);
+        var state = new WorldmindState(Map.of(
+                "request", "Build app",
+                "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
+                "projectContext", new ProjectContext(".", List.of(), "java", "spring-boot", Map.of(), 5, "test"),
+                "createCfDeployment", true,
+                "missionId", "wmnd-2026-0001",
+                "clarifyingAnswers", "{\"cf_service_bindings\": \"todo-db, my-redis-cache\"}"
+        ));
+
+        var result = node.apply(state);
+
+        @SuppressWarnings("unchecked")
+        var tasks = (List<Task>) result.get("tasks");
+        var deployerTask = tasks.get(tasks.size() - 1);
+        String instructions = deployerTask.inputContext();
+        assertTrue(instructions.contains("todo-db"));
+        assertTrue(instructions.contains("my-redis-cache"));
+        assertTrue(instructions.contains("Service Bindings"));
+    }
+
+    @Test
+    @DisplayName("DEPLOYER instructions include CF auth and deploy commands with env vars")
+    void deployerInstructionsIncludeCfAuthAndDeploy() {
+        var mockLlm = mock(LlmService.class);
+        var plan = new MissionPlan(
+                "Build app",
+                "sequential",
+                List.of(
+                        new MissionPlan.TaskPlan("CODER", "Create app", "", "Done", List.of(), List.of("src/App.java"))
+                )
+        );
+        when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
+
+        var node = new PlanMissionNode(mockLlm);
+        var state = new WorldmindState(Map.of(
+                "request", "Build app",
+                "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
+                "projectContext", new ProjectContext(".", List.of(), "java", "spring-boot", Map.of(), 5, "test"),
+                "createCfDeployment", true,
+                "missionId", "wmnd-2026-0001"
+        ));
+
+        var result = node.apply(state);
+
+        @SuppressWarnings("unchecked")
+        var tasks = (List<Task>) result.get("tasks");
+        var deployerTask = tasks.get(tasks.size() - 1);
+        String instructions = deployerTask.inputContext();
+        // CF auth with env var references
+        assertTrue(instructions.contains("$CF_API_URL"));
+        assertTrue(instructions.contains("$CF_USERNAME"));
+        assertTrue(instructions.contains("$CF_PASSWORD"));
+        assertTrue(instructions.contains("$CF_ORG"));
+        assertTrue(instructions.contains("$CF_SPACE"));
+        // Build command
+        assertTrue(instructions.contains("./mvnw clean package -DskipTests"));
+        // Deploy command
+        assertTrue(instructions.contains("cf push -f manifest.yml"));
+        // Health check
+        assertTrue(instructions.contains("running"));
+    }
+
+    @Test
     @DisplayName("injects CODER task when LLM plan contains only RESEARCHER and REVIEWER")
     void injectsCoderWhenMissing() {
         var mockLlm = mock(LlmService.class);
