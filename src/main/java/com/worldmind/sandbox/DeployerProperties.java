@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 public class DeployerProperties {
 
     private int healthTimeout = 300;
+    private boolean skipSslValidation = false;
     private DeployerDefaults defaults = new DeployerDefaults();
 
     public int getHealthTimeout() {
@@ -20,6 +21,14 @@ public class DeployerProperties {
 
     public void setHealthTimeout(int healthTimeout) {
         this.healthTimeout = healthTimeout;
+    }
+
+    public boolean isSkipSslValidation() {
+        return skipSslValidation;
+    }
+
+    public void setSkipSslValidation(boolean skipSslValidation) {
+        this.skipSslValidation = skipSslValidation;
     }
 
     public DeployerDefaults getDefaults() {
