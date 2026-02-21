@@ -188,25 +188,58 @@ export function MissionDetail({ missionId }: MissionDetailProps) {
         <TaskTimeline tasks={mission.tasks} waveCount={mission.wave_count} />
       )}
 
-      {mission.tasks.length > 0 && (
-        <div className="mb-5">
-          <div className="text-[10px] font-mono uppercase tracking-wider text-wm_text-muted mb-3">
-            Tasks ({mission.tasks.length})
-          </div>
-          <div className="space-y-2">
-            {mission.tasks.map((task, idx) => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                events={events.filter(e => e.taskId === task.id)}
-                onRetry={isTerminal ? handleRetryTask : undefined}
-                index={idx}
-                total={mission.tasks.length}
-              />
-            ))}
-          </div>
-        </div>
-      )}
+      {mission.tasks.length > 0 && (() => {
+        const codeTasks = mission.tasks.filter(t => t.agent !== 'DEPLOYER')
+        const deployerTasks = mission.tasks.filter(t => t.agent === 'DEPLOYER')
+
+        return (
+          <>
+            {codeTasks.length > 0 && (
+              <div className="mb-5">
+                <div className="text-[10px] font-mono uppercase tracking-wider text-wm_text-muted mb-3">
+                  Tasks ({codeTasks.length})
+                </div>
+                <div className="space-y-2">
+                  {codeTasks.map((task, idx) => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      events={events.filter(e => e.taskId === task.id)}
+                      onRetry={isTerminal ? handleRetryTask : undefined}
+                      index={idx}
+                      total={codeTasks.length}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {deployerTasks.length > 0 && (
+              <div className="mb-5">
+                <div className="flex items-center gap-2 mb-3">
+                  {/* Rocket icon */}
+                  <svg className="w-3.5 h-3.5 text-agent-deployer" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.58-5.84a14.927 14.927 0 00-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-6.233 0c-1.045 1.045-1.573 3.141-1.573 5.655 0 .464.015.903.044 1.317.023.33.298.588.629.599.31.01.646.015.997.015 2.514 0 4.61-.528 5.655-1.573a4.493 4.493 0 000-6.233" />
+                  </svg>
+                  <div className="text-[10px] font-mono uppercase tracking-wider text-agent-deployer">
+                    Deployment
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {deployerTasks.map((task) => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      events={events.filter(e => e.taskId === task.id)}
+                      onRetry={isTerminal ? handleRetryTask : undefined}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )
+      })()}
 
       <EventLog events={events} connectionStatus={connectionStatus} />
 

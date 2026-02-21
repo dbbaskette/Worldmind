@@ -23,6 +23,7 @@ export const AGENT_COLORS = {
   REVIEWER: 'bg-agent-reviewer/20 text-agent-reviewer border border-agent-reviewer/30',
   RESEARCHER: 'bg-agent-researcher/20 text-agent-researcher border border-agent-researcher/30',
   REFACTORER: 'bg-agent-refactorer/20 text-agent-refactorer border border-agent-refactorer/30',
+  DEPLOYER: 'bg-agent-deployer/20 text-agent-deployer border border-agent-deployer/30',
 } as const
 
 // Agent solid accent colors for left-border tints
@@ -32,6 +33,7 @@ export const AGENT_ACCENT: Record<string, string> = {
   REVIEWER: '#818CF8',
   RESEARCHER: '#22D3EE',
   REFACTORER: '#F472B6',
+  DEPLOYER: '#2DD4BF',
 }
 
 // Event type colors for log entries
@@ -47,6 +49,8 @@ export const EVENT_COLORS = {
   'quality_gate.granted': 'text-emerald-400',
   'wave.scheduled': 'text-cyan-400',
   'wave.completed': 'text-teal-400',
+  'deployer.phase': 'text-teal-400',
+  'deployer.deployed': 'text-emerald-400',
 } as const
 
 // Interaction modes
