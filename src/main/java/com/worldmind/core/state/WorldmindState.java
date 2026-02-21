@@ -45,6 +45,7 @@ public class WorldmindState extends AgentState {
         Map.entry("clarifyingQuestions",  Channels.base((Reducer<ClarifyingQuestions>) null)),  // Questions for user
         Map.entry("clarifyingAnswers",    Channels.base(() -> "")),  // User's answers as JSON
         Map.entry("manifestCreatedByTask", Channels.base(() -> false)),  // True when a planned task targets manifest.yml
+        Map.entry("deploymentUrl",        Channels.base(() -> "")),     // URL of deployed app (set by DEPLOYER on success)
 
         // ── Wave execution channels (Phase 4) ────────────────────────
         Map.entry("waveTaskIds",      Channels.base((Supplier<List<String>>) List::of)),
@@ -197,6 +198,10 @@ public class WorldmindState extends AgentState {
 
     public boolean manifestCreatedByTask() {
         return this.<Boolean>value("manifestCreatedByTask").orElse(false);
+    }
+
+    public String deploymentUrl() {
+        return this.<String>value("deploymentUrl").orElse("");
     }
 
     @SuppressWarnings("unchecked")

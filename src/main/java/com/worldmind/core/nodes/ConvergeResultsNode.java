@@ -91,19 +91,41 @@ public class ConvergeResultsNode {
             aggregateDurationMs
         );
 
-        // COMPLETED if any tasks passed or none exist; FAILED if all failed
-        MissionStatus finalStatus = (completed > 0 || tasks.isEmpty())
-                ? MissionStatus.COMPLETED
-                : MissionStatus.FAILED;
+        // If EvaluateWaveNode already marked mission FAILED (e.g., DEPLOYER failure),
+        // preserve that status even if some code tasks passed.
+        boolean alreadyFailed = state.status() == MissionStatus.FAILED;
+        MissionStatus finalStatus;
+        if (alreadyFailed) {
+            finalStatus = MissionStatus.FAILED;
+        } else if (completed > 0 || tasks.isEmpty()) {
+            finalStatus = MissionStatus.COMPLETED;
+        } else {
+            finalStatus = MissionStatus.FAILED;
+        }
 
-        log.info("Mission converged — {} completed, {} failed, {} tests ({} passed), {} files changed",
-                completed, failed, testsRun, testsPassed, filesCreated + filesModified);
+        // Include deployment info in summary
+        String deploymentUrl = state.deploymentUrl();
+        boolean hasDeploymentUrl = deploymentUrl != null && !deploymentUrl.isBlank();
+
+        if (hasDeploymentUrl) {
+            log.info("Mission converged — {} completed, {} failed, {} tests ({} passed), {} files changed, deploymentUrl={}",
+                    completed, failed, testsRun, testsPassed, filesCreated + filesModified, deploymentUrl);
+        } else {
+            log.info("Mission converged — {} completed, {} failed, {} tests ({} passed), {} files changed",
+                    completed, failed, testsRun, testsPassed, filesCreated + filesModified);
+        }
+
+        var eventData = new java.util.HashMap<String, Object>();
+        eventData.put("status", finalStatus.name());
+        eventData.put("tasksCompleted", completed);
+        eventData.put("tasksFailed", failed);
+        if (hasDeploymentUrl) {
+            eventData.put("deploymentUrl", deploymentUrl);
+        }
 
         eventBus.publish(new WorldmindEvent(
                 "mission.completed", state.missionId(), null,
-                Map.of("status", finalStatus.name(),
-                       "tasksCompleted", completed,
-                       "tasksFailed", failed),
+                eventData,
                 Instant.now()));
 
         return Map.of(

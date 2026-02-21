@@ -243,6 +243,76 @@ class ConvergeResultsNodeTest {
     }
 
     @Test
+    @DisplayName("DEPLOYER failure preserves FAILED status even when code tasks passed")
+    void deployerFailurePreservesFailed() {
+        // Simulate: 2 CODER tasks passed, but mission is FAILED because DEPLOYER failed
+        var d1 = new Task(
+            "TASK-001", "CODER", "Create service",
+            "", "Service exists",
+            List.of(), TaskStatus.PASSED, 1, 3,
+            FailureStrategy.RETRY, List.of(), List.of(), 2000L
+        );
+        var d2 = new Task(
+            "TASK-002", "CODER", "Create controller",
+            "", "Controller exists",
+            List.of(), TaskStatus.PASSED, 1, 3,
+            FailureStrategy.RETRY, List.of(), List.of(), 3000L
+        );
+        var d3 = new Task(
+            "TASK-DEPLOY", "DEPLOYER", "Deploy app",
+            "", "App running",
+            List.of(), TaskStatus.FAILED, 3, 3,
+            FailureStrategy.RETRY, List.of(), List.of(), 30000L
+        );
+
+        var state = new WorldmindState(Map.of(
+            "tasks", List.of(d1, d2, d3),
+            "testResults", List.of(),
+            "sandboxes", List.of(),
+            "status", MissionStatus.FAILED.name()
+        ));
+
+        var result = node.apply(state);
+
+        // Even though 2 code tasks passed, DEPLOYER failure means mission is FAILED
+        assertEquals(MissionStatus.FAILED.name(), result.get("status"));
+        var metrics = (MissionMetrics) result.get("metrics");
+        assertEquals(2, metrics.tasksCompleted());
+        assertEquals(1, metrics.tasksFailed());
+    }
+
+    @Test
+    @DisplayName("successful deployment includes URL in log (state preserved)")
+    void successfulDeploymentIncludesUrl() {
+        var d1 = new Task(
+            "TASK-001", "CODER", "Create service",
+            "", "Service exists",
+            List.of(), TaskStatus.PASSED, 1, 3,
+            FailureStrategy.RETRY, List.of(), List.of(), 2000L
+        );
+        var d2 = new Task(
+            "TASK-DEPLOY", "DEPLOYER", "Deploy app",
+            "", "App running",
+            List.of(), TaskStatus.PASSED, 1, 3,
+            FailureStrategy.RETRY, List.of(), List.of(), 30000L
+        );
+
+        var state = new WorldmindState(Map.of(
+            "tasks", List.of(d1, d2),
+            "testResults", List.of(),
+            "sandboxes", List.of(),
+            "deploymentUrl", "https://wmnd-2026-0001.apps.tas-tdc.kuhn-labs.com"
+        ));
+
+        var result = node.apply(state);
+
+        assertEquals(MissionStatus.COMPLETED.name(), result.get("status"));
+        var metrics = (MissionMetrics) result.get("metrics");
+        assertEquals(2, metrics.tasksCompleted());
+        assertEquals(0, metrics.tasksFailed());
+    }
+
+    @Test
     @DisplayName("calculates duration from sandbox start/completion times")
     void calculatesDurationFromSandboxes() {
         var start1 = Instant.parse("2026-02-06T10:00:00Z");

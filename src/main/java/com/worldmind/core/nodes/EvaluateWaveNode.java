@@ -648,16 +648,20 @@ public class EvaluateWaveNode {
         // Maven/Gradle build failures (happen before cf push)
         if (lower.contains("build failure") || lower.contains("build failed")) {
             return new DeploymentDiagnosis("BUILD_FAILURE",
-                    "Maven/Gradle build failed before deployment",
+                    "Maven build error — check pom.xml dependencies",
                     "Fix compilation errors or dependency issues in pom.xml/build.gradle",
                     extractRelevantLogs(output, "BUILD FAILURE", "build failed", "ERROR"));
         }
 
-        // Service binding failures
+        // Service binding failures — extract service name from output
         if (lower.contains("could not find service") || lower.contains("service binding failed")
                 || (lower.contains("service instance") && lower.contains("not found"))) {
+            String serviceName = extractServiceName(output);
+            String reason = serviceName != null
+                    ? "Service '" + serviceName + "' not found — ensure it exists in the target CF space"
+                    : "CF service binding failed — required service instance does not exist in the target space";
             return new DeploymentDiagnosis("SERVICE_BINDING_FAILURE",
-                    "Cloud Foundry service binding failed — required service instance does not exist",
+                    reason,
                     "Pre-create the required service instance using 'cf create-service' before deploying",
                     extractRelevantLogs(output, "service", "binding", "not found"));
         }
@@ -666,18 +670,22 @@ public class EvaluateWaveNode {
         if (lower.contains("staging error") || lower.contains("staging failed")
                 || lower.contains("failed to stage")) {
             return new DeploymentDiagnosis("STAGING_FAILURE",
-                    "Cloud Foundry staging failed — the buildpack could not compile the application",
+                    "CF staging error — see staging logs",
                     "Check buildpack compatibility and application configuration",
                     extractRelevantLogs(output, "staging", "error", "buildpack"));
         }
 
         // App crashes
         if (lower.contains("crashed") || lower.contains("exit status")) {
-            String suggestion = lower.contains("out of memory") || lower.contains("oom") || lower.contains("memory")
-                    ? "Increase memory allocation in manifest.yml (e.g., memory: 1G)"
+            boolean memoryRelated = lower.contains("out of memory") || lower.contains("oom") || lower.contains("memory");
+            String reason = memoryRelated
+                    ? "App crashed on start — may need more memory (currently 1G)"
+                    : "App crashed on start — review crash logs for missing configuration or port binding issues";
+            String suggestion = memoryRelated
+                    ? "Increase memory allocation in manifest.yml (e.g., memory: 2G)"
                     : "Review crash logs for missing configuration or port binding issues";
             return new DeploymentDiagnosis("APP_CRASHED",
-                    "Application crashed on startup",
+                    reason,
                     suggestion,
                     extractRelevantLogs(output, "crash", "CRASHED", "exit"));
         }
@@ -686,7 +694,7 @@ public class EvaluateWaveNode {
         if (lower.contains("health check timeout") || lower.contains("timed out")
                 || (lower.contains("health check") && lower.contains("fail"))) {
             return new DeploymentDiagnosis("HEALTH_CHECK_TIMEOUT",
-                    "Application failed to pass health check within the timeout period",
+                    "Health check timeout after 300s — check /actuator/health endpoint",
                     "Increase health-check-timeout in manifest.yml or verify the health check endpoint is correct",
                     extractRelevantLogs(output, "health", "timeout", "check"));
         }
@@ -695,6 +703,30 @@ public class EvaluateWaveNode {
                 "Deployment failed for an unrecognized reason",
                 "Review the full deployment output for error details",
                 summarizeAgentOutput(output));
+    }
+
+    /**
+     * Extracts the service name from deployment output containing service binding errors.
+     * Looks for patterns like "Could not find service my-db" or "service instance 'my-db' not found".
+     */
+    private String extractServiceName(String output) {
+        if (output == null) return null;
+        // Pattern: "Could not find service <name>"
+        var matcher = java.util.regex.Pattern.compile(
+                "(?i)could not find service\\s+(\\S+)"
+        ).matcher(output);
+        if (matcher.find()) return matcher.group(1);
+        // Pattern: "service instance '<name>'" or "service instance <name>"
+        matcher = java.util.regex.Pattern.compile(
+                "(?i)service instance\\s+'?(\\S+?)'?\\s+not found"
+        ).matcher(output);
+        if (matcher.find()) return matcher.group(1);
+        // Pattern: "Binding service <name>"
+        matcher = java.util.regex.Pattern.compile(
+                "(?i)binding service\\s+(\\S+)"
+        ).matcher(output);
+        if (matcher.find()) return matcher.group(1);
+        return null;
     }
 
     /**
