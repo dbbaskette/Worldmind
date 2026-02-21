@@ -6,6 +6,7 @@ import com.worldmind.core.graph.WorldmindGraph;
 import com.worldmind.core.nodes.*;
 import com.worldmind.core.scanner.ProjectScanner;
 import com.worldmind.core.state.WorldmindState;
+import com.worldmind.sandbox.DeployerProperties;
 import org.bsc.langgraph4j.RunnableConfig;
 import org.bsc.langgraph4j.checkpoint.BaseCheckpointSaver;
 import org.bsc.langgraph4j.checkpoint.Checkpoint;
@@ -122,7 +123,7 @@ class CheckpointerTest {
                 new UploadContextNode(mockScanner),
                 new GenerateClarifyingQuestionsNode(mockLlm),
                 new GenerateSpecNode(mockLlm, null, null),
-                new PlanMissionNode(mockLlm),
+                new PlanMissionNode(mockLlm, new DeployerProperties()),
                 mockScheduleWave,
                 mockParallelDispatch,
                 mockEvaluateWave,

@@ -10,6 +10,7 @@ import com.worldmind.core.model.MissionStatus;
 import com.worldmind.core.model.ProductSpec;
 import com.worldmind.core.model.ProjectContext;
 import com.worldmind.core.state.WorldmindState;
+import com.worldmind.sandbox.DeployerProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -42,7 +43,7 @@ class PlanMissionNodeTest {
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
 
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
         var state = new WorldmindState(Map.of(
                 "request", "Add user endpoint",
                 "classification", new Classification("feature", 3, List.of("api"), "sequential", "java"),
@@ -82,7 +83,7 @@ class PlanMissionNodeTest {
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
 
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
         var state = new WorldmindState(Map.of(
                 "request", "Refactor service layer",
                 "classification", new Classification("refactor", 4, List.of("service"), "parallel", "java"),
@@ -106,7 +107,7 @@ class PlanMissionNodeTest {
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
 
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
         var state = new WorldmindState(Map.of(
                 "request", "Write tests",
                 "classification", new Classification("test", 2, List.of("test"), "sequential", "java"),
@@ -144,7 +145,7 @@ class PlanMissionNodeTest {
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
 
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
         var state = new WorldmindState(Map.of(
                 "request", "Build full feature",
                 "classification", new Classification("feature", 5, List.of("api", "service", "model"), "parallel", "base"),
@@ -178,7 +179,7 @@ class PlanMissionNodeTest {
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
 
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
         var state = new WorldmindState(Map.of(
                 "request", "Fix login bug",
                 "classification", new Classification("bugfix", 2, List.of("auth", "service"), "sequential", "java"),
@@ -205,7 +206,7 @@ class PlanMissionNodeTest {
     @DisplayName("throws when classification is missing from state")
     void throwsWhenClassificationMissing() {
         var mockLlm = mock(LlmService.class);
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
         var state = new WorldmindState(Map.of(
                 "request", "Do something",
                 "projectContext", new ProjectContext(".", List.of(), "java", "maven", Map.of(), 5, "test")
@@ -218,7 +219,7 @@ class PlanMissionNodeTest {
     @DisplayName("throws when projectContext is missing from state")
     void throwsWhenProjectContextMissing() {
         var mockLlm = mock(LlmService.class);
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
         var state = new WorldmindState(Map.of(
                 "request", "Do something",
                 "classification", new Classification("feature", 1, List.of(), "sequential", "base")
@@ -240,7 +241,7 @@ class PlanMissionNodeTest {
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
 
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
         var state = new WorldmindState(Map.of(
                 "request", "Test",
                 "classification", new Classification("test", 1, List.of(), "sequential", "java"),
@@ -284,7 +285,7 @@ class PlanMissionNodeTest {
                 List.of("Database is already configured")
         );
 
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
         var state = new WorldmindState(Map.of(
                 "request", "Add authentication",
                 "classification", new Classification("feature", 3, List.of("auth"), "sequential", "java"),
@@ -323,7 +324,7 @@ class PlanMissionNodeTest {
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
 
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
         var state = new WorldmindState(Map.of(
                 "request", "Build app with deployment",
                 "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
@@ -348,7 +349,7 @@ class PlanMissionNodeTest {
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
 
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
         var state = new WorldmindState(Map.of(
                 "request", "Build app",
                 "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
@@ -372,7 +373,7 @@ class PlanMissionNodeTest {
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
 
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
         var state = new WorldmindState(Map.of(
                 "request", "Build app",
                 "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
@@ -396,7 +397,7 @@ class PlanMissionNodeTest {
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
 
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
         var state = new WorldmindState(Map.of(
                 "request", "Build todo app",
                 "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
@@ -435,7 +436,7 @@ class PlanMissionNodeTest {
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
 
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
         var state = new WorldmindState(Map.of(
                 "request", "Build app",
                 "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
@@ -470,7 +471,7 @@ class PlanMissionNodeTest {
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
 
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
         var state = new WorldmindState(Map.of(
                 "request", "Build app",
                 "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
@@ -505,7 +506,7 @@ class PlanMissionNodeTest {
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
 
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
         var state = new WorldmindState(Map.of(
                 "request", "Build app",
                 "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
@@ -538,7 +539,7 @@ class PlanMissionNodeTest {
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
 
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
         var state = new WorldmindState(Map.of(
                 "request", "Build app",
                 "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
@@ -572,7 +573,7 @@ class PlanMissionNodeTest {
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
 
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
         var state = new WorldmindState(Map.of(
                 "request", "Build app",
                 "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
@@ -610,7 +611,7 @@ class PlanMissionNodeTest {
         ));
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
 
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
         var state = new WorldmindState(Map.of(
                 "request", "Build app",
                 "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
@@ -637,7 +638,7 @@ class PlanMissionNodeTest {
         ));
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
 
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
         var state = new WorldmindState(Map.of(
                 "request", "Build app",
                 "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
@@ -665,7 +666,7 @@ class PlanMissionNodeTest {
         ));
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
 
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
         var state = new WorldmindState(Map.of(
                 "request", "Build app",
                 "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
@@ -693,7 +694,7 @@ class PlanMissionNodeTest {
         ));
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
 
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
         var state = new WorldmindState(Map.of(
                 "request", "Build app",
                 "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
@@ -724,7 +725,7 @@ class PlanMissionNodeTest {
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
 
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
         var state = new WorldmindState(Map.of(
                 "request", "Build app",
                 "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
@@ -759,7 +760,7 @@ class PlanMissionNodeTest {
         );
         when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
 
-        var node = new PlanMissionNode(mockLlm);
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
         var state = new WorldmindState(Map.of(
                 "request", "Build a pacman game",
                 "classification", new Classification("feature", 3, List.of("ui"), "sequential", "base"),

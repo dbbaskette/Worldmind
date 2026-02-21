@@ -189,3 +189,13 @@ worldmind:
           refactorer: ${NEXUS_MCP_TOKEN_REFACTORER:}
   health:
     timeout-seconds: 5
+
+deployer:
+  defaults:
+    memory: 1G
+    instances: 1
+    health-check-type: http
+    health-check-path: /actuator/health
+    buildpack: java_buildpack_offline
+    java-version: 21
+  health-timeout: 300

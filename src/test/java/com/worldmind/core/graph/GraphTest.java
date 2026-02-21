@@ -5,6 +5,7 @@ import com.worldmind.core.model.*;
 import com.worldmind.core.nodes.*;
 import com.worldmind.core.scanner.ProjectScanner;
 import com.worldmind.core.state.WorldmindState;
+import com.worldmind.sandbox.DeployerProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -110,7 +111,7 @@ class GraphTest {
                 new UploadContextNode(mockScanner),
                 new GenerateClarifyingQuestionsNode(mockLlm),
                 new GenerateSpecNode(mockLlm, null, null),
-                new PlanMissionNode(mockLlm),
+                new PlanMissionNode(mockLlm, new DeployerProperties()),
                 mockScheduleWave,
                 mockParallelDispatch,
                 mockEvaluateWave,
