@@ -451,7 +451,7 @@ public class EvaluateWaveNode {
         if (action == FailureStrategy.RETRY) {
             oscillationDetector.recordFailure(id, reason);
             int failureCount = oscillationDetector.failureCount(id);
-            if (failureCount >= task.maxIterations()) {
+            if (failureCount >= task.maxIterations() || task.iteration() >= task.maxIterations()) {
                 log.warn("Max retries ({}) exhausted for task {} — escalating", task.maxIterations(), id);
                 action = FailureStrategy.ESCALATE;
             } else if (oscillationDetector.isOscillating(id)) {
@@ -538,9 +538,6 @@ public class EvaluateWaveNode {
             var diagnosis = diagnoseDeploymentFailure(dispatchResult.output());
             String reason = "Deployment failed: " + diagnosis.reason();
             FailureStrategy action = task.onFailure() != null ? task.onFailure() : FailureStrategy.RETRY;
-            if (action == FailureStrategy.RETRY && task.iteration() >= task.maxIterations()) {
-                action = FailureStrategy.ESCALATE;
-            }
             return handleFailure(id, task, dispatchResult, action, reason,
                     enrichDeployerRetryContext(task.inputContext(), diagnosis),
                     completedIds, updatedTasks, errors);
@@ -571,9 +568,6 @@ public class EvaluateWaveNode {
                     id, diagnosis.failureType(), diagnosis.reason());
             String reason = "Deployment failed: " + diagnosis.reason();
             FailureStrategy action = task.onFailure() != null ? task.onFailure() : FailureStrategy.RETRY;
-            if (action == FailureStrategy.RETRY && task.iteration() >= task.maxIterations()) {
-                action = FailureStrategy.ESCALATE;
-            }
 
             eventBus.publish(new WorldmindEvent("deployer.failed",
                     state.missionId(), id,
@@ -621,9 +615,10 @@ public class EvaluateWaveNode {
      */
     private String extractDeploymentUrl(String output) {
         if (output == null) return null;
-        // Look for route in cf push output (e.g., "routes: app-name.apps.domain.com")
+        // Look for route in cf push output (e.g., "routes: myapp.example.com" or "routes: app.apps.domain.com").
+        // Requires at least one dot to distinguish routes from plain words.
         var routeMatcher = java.util.regex.Pattern.compile(
-                "routes?:\\s*(\\S+\\.\\S+\\.\\S+)", java.util.regex.Pattern.CASE_INSENSITIVE
+                "routes?:\\s*(\\S+\\.\\S+)", java.util.regex.Pattern.CASE_INSENSITIVE
         ).matcher(output);
         if (routeMatcher.find()) {
             String route = routeMatcher.group(1);

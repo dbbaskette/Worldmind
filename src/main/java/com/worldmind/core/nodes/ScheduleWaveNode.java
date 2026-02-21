@@ -79,7 +79,7 @@ public class ScheduleWaveNode {
             // Log when the DEPLOYER wave is being scheduled
             boolean hasDeployer = waveIds.stream()
                     .flatMap(id -> tasks.stream().filter(t -> t.id().equals(id)))
-                    .anyMatch(t -> "DEPLOYER".equals(t.agent()));
+                    .anyMatch(t -> "DEPLOYER".equalsIgnoreCase(t.agent()));
             if (hasDeployer) {
                 log.info("Scheduling DEPLOYER wave for mission {}", state.missionId());
             }
