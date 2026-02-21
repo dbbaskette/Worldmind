@@ -834,6 +834,114 @@ class PlanMissionNodeTest {
     }
 
     @Test
+    @DisplayName("DEPLOYER instructions use Node.js build commands when runtimeTag is nodejs")
+    void deployerInstructionsUseNodejsBuildForNodeRuntime() {
+        var mockLlm = mock(LlmService.class);
+        var plan = new MissionPlan("Build app", "sequential", List.of(
+                new MissionPlan.TaskPlan("CODER", "Create app", "", "Done", List.of(), List.of("src/index.js"))
+        ));
+        when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
+
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
+        var state = new WorldmindState(Map.of(
+                "request", "Build node app",
+                "classification", new Classification("feature", 3, List.of("app"), "sequential", "nodejs"),
+                "projectContext", new ProjectContext(".", List.of(), "javascript", "express", Map.of(), 5, "test"),
+                "createCfDeployment", true,
+                "missionId", "wmnd-2026-0002"
+        ));
+
+        var result = node.apply(state);
+
+        @SuppressWarnings("unchecked")
+        var tasks = (List<Task>) result.get("tasks");
+        String instructions = tasks.get(tasks.size() - 1).inputContext();
+        // Should use Node.js build commands, not Maven
+        assertTrue(instructions.contains("npm install"));
+        assertTrue(instructions.contains("npm run build"));
+        assertFalse(instructions.contains("mvnw"));
+        assertFalse(instructions.contains("mvn clean"));
+        // Should show Node.js type, not Spring Boot
+        assertTrue(instructions.contains("Type: Node.js"));
+        assertFalse(instructions.contains("Type: Spring Boot"));
+        // Manifest should use nodejs_buildpack
+        assertTrue(instructions.contains("nodejs_buildpack"));
+        assertFalse(instructions.contains("java_buildpack_offline"));
+        // Should NOT include JBP_CONFIG_OPEN_JDK_JRE for non-Java
+        assertFalse(instructions.contains("JBP_CONFIG_OPEN_JDK_JRE"));
+    }
+
+    @Test
+    @DisplayName("DEPLOYER instructions omit --skip-ssl-validation by default")
+    void deployerInstructionsOmitSkipSslByDefault() {
+        var mockLlm = mock(LlmService.class);
+        var plan = new MissionPlan("Build app", "sequential", List.of(
+                new MissionPlan.TaskPlan("CODER", "Create app", "", "Done", List.of(), List.of("src/App.java"))
+        ));
+        when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
+
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
+        var state = new WorldmindState(Map.of(
+                "request", "Build app",
+                "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
+                "projectContext", new ProjectContext(".", List.of(), "java", "spring-boot", Map.of(), 5, "test"),
+                "createCfDeployment", true,
+                "missionId", "wmnd-2026-0001"
+        ));
+
+        var result = node.apply(state);
+
+        @SuppressWarnings("unchecked")
+        var tasks = (List<Task>) result.get("tasks");
+        String instructions = tasks.get(tasks.size() - 1).inputContext();
+        assertFalse(instructions.contains("--skip-ssl-validation"));
+        assertTrue(instructions.contains("cf api $CF_API_URL"));
+    }
+
+    @Test
+    @DisplayName("DEPLOYER instructions include --skip-ssl-validation when configured")
+    void deployerInstructionsIncludeSkipSslWhenConfigured() {
+        var mockLlm = mock(LlmService.class);
+        var plan = new MissionPlan("Build app", "sequential", List.of(
+                new MissionPlan.TaskPlan("CODER", "Create app", "", "Done", List.of(), List.of("src/App.java"))
+        ));
+        when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
+
+        var props = new DeployerProperties();
+        props.setSkipSslValidation(true);
+        var node = new PlanMissionNode(mockLlm, props);
+        var state = new WorldmindState(Map.of(
+                "request", "Build app",
+                "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
+                "projectContext", new ProjectContext(".", List.of(), "java", "spring-boot", Map.of(), 5, "test"),
+                "createCfDeployment", true,
+                "missionId", "wmnd-2026-0001"
+        ));
+
+        var result = node.apply(state);
+
+        @SuppressWarnings("unchecked")
+        var tasks = (List<Task>) result.get("tasks");
+        String instructions = tasks.get(tasks.size() - 1).inputContext();
+        assertTrue(instructions.contains("--skip-ssl-validation"));
+    }
+
+    @Test
+    @DisplayName("deriveAppType returns correct type for known runtimeTags")
+    void deriveAppTypeReturnsCorrectTypes() {
+        assertEquals("Spring Boot", PlanMissionNode.deriveAppType("java"));
+        assertEquals("Spring Boot", PlanMissionNode.deriveAppType("spring-boot"));
+        assertEquals("Node.js", PlanMissionNode.deriveAppType("nodejs"));
+        assertEquals("Node.js", PlanMissionNode.deriveAppType("node"));
+        assertEquals("Python", PlanMissionNode.deriveAppType("python"));
+        assertEquals("Python", PlanMissionNode.deriveAppType("django"));
+        assertEquals("Go", PlanMissionNode.deriveAppType("go"));
+        assertEquals("Static HTML", PlanMissionNode.deriveAppType("html"));
+        assertEquals("Application", PlanMissionNode.deriveAppType("base"));
+        assertEquals("Application", PlanMissionNode.deriveAppType(null));
+    }
+
+    @Test
     @DisplayName("injects CODER task when LLM plan contains only RESEARCHER and REVIEWER")
     void injectsCoderWhenMissing() {
         var mockLlm = mock(LlmService.class);

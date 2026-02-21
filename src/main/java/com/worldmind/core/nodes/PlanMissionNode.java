@@ -46,6 +46,7 @@ public class PlanMissionNode {
             - CODER: Code generation and implementation — creates and modifies source files
             - RESEARCHER: Research and context gathering (analysis only, produces NO code)
             - REFACTORER: Code refactoring — restructures existing code
+            - DEPLOYER: Builds and deploys the application to Cloud Foundry (added automatically when CF deployment is enabled — do NOT plan DEPLOYER tasks yourself)
 
             DO NOT include TESTER or REVIEWER tasks — testing and code review
             are run automatically after each CODER/REFACTORER task completes.
@@ -268,7 +269,10 @@ public class PlanMissionNode {
                 .map(Task::id)
                 .toList();
 
-        String instructions = buildDeployerInstructions(state, manifestCreatedByTask);
+        String runtimeTag = state.classification()
+                .map(Classification::runtimeTag)
+                .orElse("base");
+        String instructions = buildDeployerInstructions(state, manifestCreatedByTask, runtimeTag);
 
         var deployerTask = new Task(
                 "TASK-DEPLOY", "DEPLOYER",
@@ -291,8 +295,10 @@ public class PlanMissionNode {
     /**
      * Builds comprehensive markdown instructions for the DEPLOYER agent.
      * Includes build commands, manifest generation (conditional), CF auth, deploy, and health check.
+     * Build commands and buildpack are derived from the classification's runtimeTag.
      */
-    private String buildDeployerInstructions(WorldmindState state, boolean manifestTaskExists) {
+    private String buildDeployerInstructions(WorldmindState state, boolean manifestTaskExists,
+                                              String runtimeTag) {
         String rawId = state.missionId();
         String missionId = (rawId != null && !rawId.isBlank()) ? rawId : "app";
         String clarifyingAnswers = state.clarifyingAnswers();
@@ -304,9 +310,10 @@ public class PlanMissionNode {
         sb.append("# Deployment Task\n\n");
         sb.append("Deploy the completed application to Cloud Foundry.\n\n");
 
-        // Application details
+        // Application details — derive type from runtimeTag
+        String appType = deriveAppType(runtimeTag);
         sb.append("## Application Details\n");
-        sb.append("- Type: Spring Boot\n");
+        sb.append("- Type: ").append(appType).append("\n");
         sb.append("- Route: ").append(missionId).append(".apps.$CF_APPS_DOMAIN\n\n");
 
         // Service bindings from clarifying answers
@@ -325,21 +332,19 @@ public class PlanMissionNode {
         // Step 1: CF auth
         sb.append("### 1. Authenticate with Cloud Foundry\n");
         sb.append("```bash\n");
-        sb.append("cf api $CF_API_URL --skip-ssl-validation\n");
+        if (deployerProperties.isSkipSslValidation()) {
+            sb.append("cf api $CF_API_URL --skip-ssl-validation\n");
+        } else {
+            sb.append("cf api $CF_API_URL\n");
+        }
         sb.append("cf auth $CF_USERNAME $CF_PASSWORD\n");
         sb.append("cf target -o $CF_ORG -s $CF_SPACE\n");
         sb.append("```\n\n");
 
-        // Step 2: Build
+        // Step 2: Build — conditional on runtime
         sb.append("### 2. Build the application\n");
-        sb.append("If `./mvnw` exists, use it; otherwise fall back to `mvn`:\n");
-        sb.append("```bash\n");
-        sb.append("if [ -f ./mvnw ]; then\n");
-        sb.append("  ./mvnw clean package -DskipTests\n");
-        sb.append("else\n");
-        sb.append("  mvn clean package -DskipTests\n");
-        sb.append("fi\n");
-        sb.append("```\n\n");
+        appendBuildCommands(sb, runtimeTag);
+        sb.append("\n");
 
         // Step 3: Manifest (conditional)
         if (manifestTaskExists) {
@@ -354,15 +359,15 @@ public class PlanMissionNode {
             sb.append("- name: ").append(missionId).append("\n");
             sb.append("  memory: ").append(defaults.getMemory()).append("\n");
             sb.append("  instances: ").append(defaults.getInstances()).append("\n");
-            sb.append("  path: target/*.jar\n");
-            sb.append("  buildpacks:\n");
-            sb.append("  - ").append(defaults.getBuildpack()).append("\n");
+            appendManifestPathAndBuildpack(sb, runtimeTag, defaults);
             sb.append("  routes:\n");
             sb.append("  - route: ").append(missionId)
                     .append(".apps.$CF_APPS_DOMAIN\n");
-            sb.append("  env:\n");
-            sb.append("    JBP_CONFIG_OPEN_JDK_JRE: '{ jre: { version: ")
-                    .append(defaults.getJavaVersion()).append(".+ } }'\n");
+            if (isJavaRuntime(runtimeTag)) {
+                sb.append("  env:\n");
+                sb.append("    JBP_CONFIG_OPEN_JDK_JRE: '{ jre: { version: ")
+                        .append(defaults.getJavaVersion()).append(".+ } }'\n");
+            }
             if (!serviceNames.isEmpty()) {
                 sb.append("  services:\n");
                 for (String svc : serviceNames) {
@@ -444,6 +449,107 @@ public class PlanMissionNode {
             log.warn("Could not parse service names from clarifying answers: {}", e.getMessage());
         }
         return List.of();
+    }
+
+    /**
+     * Derives a human-readable application type from the classification's runtimeTag.
+     */
+    static String deriveAppType(String runtimeTag) {
+        if (runtimeTag == null) return "Application";
+        return switch (runtimeTag.toLowerCase()) {
+            case "java", "spring-boot", "spring" -> "Spring Boot";
+            case "nodejs", "node" -> "Node.js";
+            case "python", "django", "flask" -> "Python";
+            case "go", "golang" -> "Go";
+            case "ruby", "rails" -> "Ruby";
+            case "html", "static" -> "Static HTML";
+            default -> "Application";
+        };
+    }
+
+    private static boolean isJavaRuntime(String runtimeTag) {
+        if (runtimeTag == null) return false;
+        return switch (runtimeTag.toLowerCase()) {
+            case "java", "spring-boot", "spring" -> true;
+            default -> false;
+        };
+    }
+
+    /**
+     * Appends runtime-specific build commands to the deployer instructions.
+     */
+    private static void appendBuildCommands(StringBuilder sb, String runtimeTag) {
+        String rt = runtimeTag != null ? runtimeTag.toLowerCase() : "base";
+        switch (rt) {
+            case "java", "spring-boot", "spring" -> {
+                sb.append("If `./mvnw` exists, use it; otherwise fall back to `mvn`:\n");
+                sb.append("```bash\n");
+                sb.append("if [ -f ./mvnw ]; then\n");
+                sb.append("  ./mvnw clean package -DskipTests\n");
+                sb.append("else\n");
+                sb.append("  mvn clean package -DskipTests\n");
+                sb.append("fi\n");
+                sb.append("```\n");
+            }
+            case "nodejs", "node" -> {
+                sb.append("```bash\n");
+                sb.append("npm install\n");
+                sb.append("npm run build\n");
+                sb.append("```\n");
+            }
+            case "python", "django", "flask" -> {
+                sb.append("```bash\n");
+                sb.append("pip install -r requirements.txt\n");
+                sb.append("```\n");
+            }
+            case "go", "golang" -> {
+                sb.append("```bash\n");
+                sb.append("go build -o app .\n");
+                sb.append("```\n");
+            }
+            case "html", "static" -> {
+                sb.append("No build step required for static content.\n");
+            }
+            default -> {
+                sb.append("Run the project's standard build command.\n");
+            }
+        }
+    }
+
+    /**
+     * Appends runtime-specific path and buildpack entries to the manifest template.
+     */
+    private static void appendManifestPathAndBuildpack(StringBuilder sb, String runtimeTag,
+                                                        DeployerProperties.DeployerDefaults defaults) {
+        String rt = runtimeTag != null ? runtimeTag.toLowerCase() : "base";
+        switch (rt) {
+            case "java", "spring-boot", "spring" -> {
+                sb.append("  path: target/*.jar\n");
+                sb.append("  buildpacks:\n");
+                sb.append("  - ").append(defaults.getBuildpack()).append("\n");
+            }
+            case "nodejs", "node" -> {
+                sb.append("  buildpacks:\n");
+                sb.append("  - nodejs_buildpack\n");
+            }
+            case "python", "django", "flask" -> {
+                sb.append("  buildpacks:\n");
+                sb.append("  - python_buildpack\n");
+            }
+            case "go", "golang" -> {
+                sb.append("  path: app\n");
+                sb.append("  buildpacks:\n");
+                sb.append("  - go_buildpack\n");
+            }
+            case "html", "static" -> {
+                sb.append("  buildpacks:\n");
+                sb.append("  - staticfile_buildpack\n");
+            }
+            default -> {
+                sb.append("  buildpacks:\n");
+                sb.append("  - ").append(defaults.getBuildpack()).append("\n");
+            }
+        }
     }
 
     private String sanitizeServiceName(String name) {
