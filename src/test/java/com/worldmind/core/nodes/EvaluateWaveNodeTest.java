@@ -685,8 +685,8 @@ class EvaluateWaveNodeTest {
         assertEquals(MissionStatus.FAILED.name(), result.get("status"));
         var errors = (List<String>) result.get("errors");
         assertNotNull(errors);
-        assertTrue(errors.stream().anyMatch(e -> e.contains("300s")),
-                "Health check error should mention the 300s timeout");
+        assertTrue(errors.stream().anyMatch(e -> e.contains("Health check timeout")),
+                "Health check error should mention health check timeout");
         assertTrue(errors.stream().anyMatch(e -> e.contains("/actuator/health")),
                 "Health check error should mention the health check endpoint");
     }
@@ -710,6 +710,69 @@ class EvaluateWaveNodeTest {
         assertNotNull(errors);
         assertTrue(errors.stream().anyMatch(e -> e.contains("memory")),
                 "Crash error with OOM should mention memory");
+    }
+
+    @Test
+    @DisplayName("DEPLOYER crash without OOM -> error suggests checking crash logs, not memory")
+    @SuppressWarnings("unchecked")
+    void deployerCrashWithoutOomSuggestsCrashLogs() {
+        var d = deployerTask("TASK-DEPLOY", 0, 3, FailureStrategy.RETRY);
+
+        // Output contains CRASHED but no memory/OOM keywords
+        String output = "Pushing app wmnd-2026-0001...\n"
+                + "Staging app...\n"
+                + "Build succeeded\n"
+                + "Waiting for app to start...\n"
+                + "App instance exited with CRASHED status\n"
+                + "exit status 1";
+        var crashedNoOomResult = new WaveDispatchResult("TASK-DEPLOY", TaskStatus.PASSED, List.of(), output, 30000L);
+
+        var state = new WorldmindState(Map.of(
+                "waveTaskIds", List.of("TASK-DEPLOY"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(crashedNoOomResult)
+        ));
+
+        var result = node.apply(state);
+
+        var tasks = (List<Task>) result.get("tasks");
+        assertNotNull(tasks);
+        Task retryTask = tasks.stream().filter(t -> t.id().equals("TASK-DEPLOY")).findFirst().orElse(null);
+        assertNotNull(retryTask);
+        assertTrue(retryTask.inputContext().contains("crash logs"),
+                "Non-OOM crash context should mention crash logs");
+        assertFalse(retryTask.inputContext().contains("memory"),
+                "Non-OOM crash context should NOT mention memory");
+    }
+
+    @Test
+    @DisplayName("'timed out' without health context -> not matched as HEALTH_CHECK_TIMEOUT")
+    @SuppressWarnings("unchecked")
+    void timedOutWithoutHealthContextNotMatchedAsHealthCheck() {
+        var d = deployerTask("TASK-DEPLOY", 0, 3, FailureStrategy.RETRY);
+
+        // Output contains "timed out" but NOT in a health check context
+        String output = "Pushing app wmnd-2026-0001...\n"
+                + "Running mvn package...\n"
+                + "Connection timed out\n"
+                + "Build succeeded\n"
+                + "App started\n"
+                + "status: running";
+        var timedOutResult = new WaveDispatchResult("TASK-DEPLOY", TaskStatus.PASSED, List.of(), output, 30000L);
+
+        var state = new WorldmindState(Map.of(
+                "waveTaskIds", List.of("TASK-DEPLOY"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(timedOutResult)
+        ));
+
+        var result = node.apply(state);
+
+        // "timed out" without "health" should NOT trigger HEALTH_CHECK_TIMEOUT diagnosis;
+        // since the output also contains "App started" + "status: running", deployment is successful
+        var completedIds = (List<String>) result.get("completedTaskIds");
+        assertTrue(completedIds != null && completedIds.contains("TASK-DEPLOY"),
+                "Deployment with non-health 'timed out' and success markers should be successful");
     }
 
     @Test
