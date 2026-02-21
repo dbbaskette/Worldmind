@@ -450,6 +450,28 @@ class InstructionBuilderTest {
         assertTrue(instruction.contains("10 minutes"));
     }
 
+    @Test
+    void deployerDefaultTimeoutDisplaysAsFiveMinutes() {
+        var task = deployerTask();
+
+        String instruction = InstructionBuilder.buildDeployerInstruction(
+                task, "my-app", "cf.example.com", false, List.of(), "spring-boot", defaultDeployerProps());
+
+        assertTrue(instruction.contains("5 minutes"));
+    }
+
+    @Test
+    void deployerNullPropertiesFallsBackToDefaults() {
+        var task = deployerTask();
+
+        String instruction = InstructionBuilder.buildDeployerInstruction(
+                task, "my-app", "cf.example.com", false, List.of(), "spring-boot", null);
+
+        assertTrue(instruction.contains("5 minutes"));
+        assertTrue(instruction.contains("memory: 1G"));
+        assertTrue(instruction.contains("java_buildpack_offline"));
+    }
+
     // --- Test helpers ---
 
     private DeployerProperties defaultDeployerProps() {

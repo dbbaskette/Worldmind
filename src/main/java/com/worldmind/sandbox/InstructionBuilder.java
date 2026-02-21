@@ -313,6 +313,9 @@ public final class InstructionBuilder {
                                                   boolean manifestCreatedByTask,
                                                   List<String> serviceBindings, String appType,
                                                   DeployerProperties deployerProperties) {
+        if (deployerProperties == null) {
+            deployerProperties = new DeployerProperties();
+        }
         String appName = (missionId != null && !missionId.isBlank()) ? missionId : "app";
         // Falls back to a literal $CF_APPS_DOMAIN placeholder when no domain is provided.
         // The deployer agent must resolve this variable or set the route manually.
@@ -322,7 +325,7 @@ public final class InstructionBuilder {
         List<String> services = (serviceBindings != null) ? serviceBindings : List.of();
 
         var defaults = deployerProperties.getDefaults();
-        int healthTimeoutMinutes = deployerProperties.getHealthTimeout() / 60;
+        int healthTimeoutMinutes = (deployerProperties.getHealthTimeout() + 59) / 60;
 
         var sb = new StringBuilder();
 
