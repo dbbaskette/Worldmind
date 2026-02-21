@@ -275,41 +275,12 @@ public class MissionController {
 
         log.info("Received clarifying answers for mission {}", id);
 
-        // Store answers as JSON string for the spec generator
-        String answersJson = answersRequest.toAnswersString();
-
-        // Build new state with answers, transition to SPECIFYING
-        var newStateMap = new HashMap<String, Object>();
-        newStateMap.put("missionId", state.missionId());
-        newStateMap.put("request", state.request());
-        newStateMap.put("interactionMode", state.interactionMode().name());
+        var newStateMap = copyBaseState(state);
         newStateMap.put("status", MissionStatus.SPECIFYING.name());
-        newStateMap.put("clarifyingAnswers", answersJson);
-        state.classification().ifPresent(c -> newStateMap.put("classification", c));
-        state.projectContext().ifPresent(pc -> newStateMap.put("projectContext", pc));
+        newStateMap.put("clarifyingAnswers", answersRequest.toAnswersString());
         state.clarifyingQuestions().ifPresent(cq -> newStateMap.put("clarifyingQuestions", cq));
-        String pp = state.projectPath();
-        if (pp != null && !pp.isBlank()) newStateMap.put("projectPath", pp);
-        String gru = state.gitRemoteUrl();
-        if (gru != null && !gru.isBlank()) newStateMap.put("gitRemoteUrl", gru);
-        // Preserve user's execution strategy choice through clarification flow
-        String userStrategy = state.<String>value("userExecutionStrategy").orElse(null);
-        if (userStrategy != null && !userStrategy.isBlank()) {
-            newStateMap.put("userExecutionStrategy", userStrategy);
-            log.info("Preserving userExecutionStrategy={} through clarification", userStrategy);
-        }
-        // Preserve other user settings
-        String reasoningLevel = state.<String>value("reasoningLevel").orElse(null);
-        if (reasoningLevel != null && !reasoningLevel.isBlank()) {
-            newStateMap.put("reasoningLevel", reasoningLevel);
-        }
-        if (state.createCfDeployment()) {
-            newStateMap.put("createCfDeployment", true);
-        }
 
         missionStates.put(id, new WorldmindState(newStateMap));
-
-        // Continue mission with the populated state map (includes clarifying answers)
         launchAsyncWithState(id, newStateMap);
 
         return ResponseEntity.ok(Map.of(
@@ -554,29 +525,44 @@ public class MissionController {
     }
 
     /**
-     * Copies all essential fields from an existing state into a mutable map,
-     * overriding interactionMode and status for execution.
+     * Copies all essential fields from an existing state into a mutable map.
+     * Does NOT set status or interactionMode — callers override those as needed.
      */
-    private HashMap<String, Object> buildExecutionStateMap(WorldmindState state) {
+    private HashMap<String, Object> copyBaseState(WorldmindState state) {
         var map = new HashMap<String, Object>();
         map.put("missionId", state.missionId());
         map.put("request", state.request());
-        map.put("interactionMode", InteractionMode.FULL_AUTO.name());
-        map.put("status", MissionStatus.EXECUTING.name());
+        map.put("interactionMode", state.interactionMode().name());
         map.put("executionStrategy", state.executionStrategy().name());
-        // Preserve user's original strategy choice for re-planning scenarios
-        String userStrategy = state.<String>value("userExecutionStrategy").orElse(null);
-        if (userStrategy != null && !userStrategy.isBlank()) {
-            map.put("userExecutionStrategy", userStrategy);
-        }
-        map.put("tasks", state.tasks());
+
         state.classification().ifPresent(c -> map.put("classification", c));
         state.projectContext().ifPresent(pc -> map.put("projectContext", pc));
         state.productSpec().ifPresent(ps -> map.put("productSpec", ps));
-        String pp = state.projectPath();
-        if (pp != null && !pp.isBlank()) map.put("projectPath", pp);
-        String gru = state.gitRemoteUrl();
-        if (gru != null && !gru.isBlank()) map.put("gitRemoteUrl", gru);
+
+        putIfPresent(map, "projectPath", state.projectPath());
+        putIfPresent(map, "gitRemoteUrl", state.gitRemoteUrl());
+        putIfPresent(map, "userExecutionStrategy", state.<String>value("userExecutionStrategy").orElse(null));
+        putIfPresent(map, "reasoningLevel", state.<String>value("reasoningLevel").orElse(null));
+
+        if (state.createCfDeployment()) {
+            map.put("createCfDeployment", true);
+        }
+        return map;
+    }
+
+    private static void putIfPresent(Map<String, Object> map, String key, String value) {
+        if (value != null && !value.isBlank()) map.put(key, value);
+    }
+
+    /**
+     * Copies all essential fields from an existing state, then overrides
+     * interactionMode and status for execution.
+     */
+    private HashMap<String, Object> buildExecutionStateMap(WorldmindState state) {
+        var map = copyBaseState(state);
+        map.put("interactionMode", InteractionMode.FULL_AUTO.name());
+        map.put("status", MissionStatus.EXECUTING.name());
+        map.put("tasks", state.tasks());
         return map;
     }
 

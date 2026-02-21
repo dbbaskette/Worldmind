@@ -110,31 +110,16 @@ public class EvaluateWaveNode {
                 // CODER task that failed at dispatch — apply failure strategy directly
                 if (dispatchResult.status() == TaskStatus.FAILED) {
                     log.info("CODER task {} failed at dispatch — applying failure strategy", id);
-                    String dispatchFailureReason = "CODER task failed during execution";
+                    String reason = "CODER task failed during execution";
                     FailureStrategy action = task.onFailure() != null ? task.onFailure() : FailureStrategy.RETRY;
                     if (action == FailureStrategy.RETRY && task.iteration() >= task.maxIterations()) {
                         action = FailureStrategy.ESCALATE;
                     }
-                    var outcome = applyFailureStrategy(id, task, action, dispatchFailureReason);
-                    completedIds.addAll(outcome.completedIds);
-                    if (!outcome.completedIds.isEmpty()) {
-                        updatedTasks.add(withResult(task, dispatchResult, TaskStatus.SKIPPED));
-                    } else if (outcome.missionFailed) {
-                        updatedTasks.add(withResult(task, dispatchResult, TaskStatus.FAILED));
-                    } else if (outcome.retryContext != null) {
-                        int nextIteration = task.iteration() + 1;
-                        String enhancedContext = enrichFailureContext(task.inputContext(), dispatchFailureReason);
-                        updatedTasks.add(new Task(
-                                task.id(), task.agent(), task.description(),
-                                enhancedContext, task.successCriteria(), task.dependencies(),
-                                TaskStatus.PENDING, nextIteration, task.maxIterations(),
-                                task.onFailure(), task.targetFiles(), List.of(), null));
-                        log.info("Reset {} to PENDING (iteration {}/{}) with failure context for dispatch retry",
-                                id, nextIteration, task.maxIterations());
-                        retryContext = outcome.retryContext;
-                    }
-                    if (outcome.missionFailed) missionStatus = MissionStatus.FAILED;
-                    errors.addAll(outcome.errors);
+                    var result = handleFailure(id, task, dispatchResult, action, reason,
+                            enrichFailureContext(task.inputContext(), reason),
+                            completedIds, updatedTasks, errors);
+                    if (result.retryContext != null) retryContext = result.retryContext;
+                    if (result.missionFailed) missionStatus = MissionStatus.FAILED;
                     continue;
                 }
 
@@ -150,7 +135,6 @@ public class EvaluateWaveNode {
                         .toList();
 
                 // CODER must produce code — if no real files were affected, retry.
-                // The agent may have explored but not written code; retrying often helps.
                 if (fileChanges.isEmpty()) {
                     String outputSnippet = summarizeAgentOutput(dispatchResult.output());
                     log.warn("CODER task {} produced no code files (only logs) — will retry. Agent output: {}",
@@ -162,29 +146,12 @@ public class EvaluateWaveNode {
                                    "agentOutput", outputSnippet),
                             Instant.now()));
 
-                    String failureReason = "CODER task produced no code files. You MUST create/modify actual source files. Agent output:\n" + outputSnippet;
-                    var outcome = applyFailureStrategy(id, task, FailureStrategy.RETRY, failureReason);
-                    completedIds.addAll(outcome.completedIds);
-                    if (!outcome.completedIds.isEmpty()) {
-                        updatedTasks.add(withResult(task, dispatchResult, TaskStatus.SKIPPED));
-                    } else if (outcome.missionFailed) {
-                        updatedTasks.add(withResult(task, dispatchResult, TaskStatus.FAILED));
-                    } else if (outcome.retryContext != null) {
-                        // Enrich task context with the failure details so the agent
-                        // understands what went wrong and can correct on retry.
-                        int nextIteration = task.iteration() + 1;
-                        String enhancedContext = enrichFailureContext(task.inputContext(), failureReason);
-                        updatedTasks.add(new Task(
-                                task.id(), task.agent(), task.description(),
-                                enhancedContext, task.successCriteria(), task.dependencies(),
-                                TaskStatus.PENDING, nextIteration, task.maxIterations(),
-                                task.onFailure(), task.targetFiles(), List.of(), null));
-                        log.info("Reset {} to PENDING (iteration {}/{}) with failure context for no-code retry",
-                                id, nextIteration, task.maxIterations());
-                        retryContext = outcome.retryContext;
-                    }
-                    if (outcome.missionFailed) missionStatus = MissionStatus.FAILED;
-                    errors.addAll(outcome.errors);
+                    String reason = "CODER task produced no code files. You MUST create/modify actual source files. Agent output:\n" + outputSnippet;
+                    var result = handleFailure(id, task, dispatchResult, FailureStrategy.RETRY, reason,
+                            enrichFailureContext(task.inputContext(), reason),
+                            completedIds, updatedTasks, errors);
+                    if (result.retryContext != null) retryContext = result.retryContext;
+                    if (result.missionFailed) missionStatus = MissionStatus.FAILED;
                     continue;
                 }
 
@@ -261,33 +228,16 @@ public class EvaluateWaveNode {
                                    "score", reviewFeedback.score(),
                                    "summary", reviewFeedback.summary() != null ? reviewFeedback.summary() : ""),
                             Instant.now()));
-                    var outcome = applyFailureStrategy(id, task, quality_gateDecision.action(),
-                            quality_gateDecision.reason());
-                    completedIds.addAll(outcome.completedIds);
-                    if (!outcome.completedIds.isEmpty()) {
-                        updatedTasks.add(withResult(task, dispatchResult, TaskStatus.SKIPPED));
-                    } else if (outcome.missionFailed) {
-                        updatedTasks.add(withResult(task, dispatchResult, TaskStatus.FAILED));
-                    } else if (outcome.retryContext != null) {
-                        // RETRY case: reset task to PENDING with incremented iteration
-                        int nextIteration = task.iteration() + 1;
-                        String enhancedContext = enrichRetryContext(task.inputContext(), reviewFeedback);
-                        updatedTasks.add(new Task(
-                                task.id(), task.agent(), task.description(),
-                                enhancedContext, task.successCriteria(), task.dependencies(),
-                                TaskStatus.PENDING, nextIteration, task.maxIterations(),
-                                task.onFailure(), task.targetFiles(), List.of(), null));
-                        log.info("Reset {} to PENDING (iteration {}/{}) for quality gate retry",
-                                id, nextIteration, task.maxIterations());
-                        retryContext = outcome.retryContext;
-                    }
-                    if (outcome.missionFailed) missionStatus = MissionStatus.FAILED;
-                    errors.addAll(outcome.errors);
+                    var result = handleFailure(id, task, dispatchResult,
+                            quality_gateDecision.action(), quality_gateDecision.reason(),
+                            enrichRetryContext(task.inputContext(), reviewFeedback),
+                            completedIds, updatedTasks, errors);
+                    if (result.retryContext != null) retryContext = result.retryContext;
+                    if (result.missionFailed) missionStatus = MissionStatus.FAILED;
                 }
             }
 
-            // Per-wave merge: merge passed CODER/REFACTORER branches into main so next wave can build on them.
-            // Sort by ID to ensure deterministic merge order (TASK-001 before TASK-002, etc.)
+            // Per-wave merge: merge passed CODER/REFACTORER branches into main
             List<String> passedCoderIds = updatedTasks.stream()
                     .filter(d -> d.status() == TaskStatus.PASSED)
                     .filter(d -> "CODER".equalsIgnoreCase(d.agent()) || "REFACTORER".equalsIgnoreCase(d.agent()))
@@ -296,104 +246,9 @@ public class EvaluateWaveNode {
                     .toList();
             
             if (!passedCoderIds.isEmpty() && gitWorkspaceManager != null && cfProperties != null) {
-                log.info("Wave {} complete: merging {} passed CODER/REFACTORER branches into main", 
-                        state.waveCount(), passedCoderIds.size());
-                try {
-                    var mergeResult = gitWorkspaceManager.mergeWaveBranches(
-                            passedCoderIds, 
-                            cfProperties.getGitToken(), 
-                            state.gitRemoteUrl());
-                    
-                    if (mergeResult.hasConflicts()) {
-                        log.warn("Wave merge had {} conflicts: {} — will retry on updated main", 
-                                mergeResult.conflictedIds().size(), mergeResult.conflictedIds());
-                        
-                        // Build detailed context about which files were affected by merged tasks.
-                        // This helps the retrying agent know exactly what files exist in main now.
-                        var mergedFilesContext = new StringBuilder();
-                        if (!mergeResult.mergedIds().isEmpty()) {
-                            mergedFilesContext.append("\n\nFILES ALREADY IN MAIN from merged tasks:\n");
-                            for (String mergedId : mergeResult.mergedIds()) {
-                                Task mergedTask = taskMap.get(mergedId);
-                                if (mergedTask != null && mergedTask.filesAffected() != null && !mergedTask.filesAffected().isEmpty()) {
-                                    mergedFilesContext.append("- ").append(mergedId).append(": ");
-                                    mergedFilesContext.append(mergedTask.filesAffected().stream()
-                                            .map(f -> f.path())
-                                            .collect(java.util.stream.Collectors.joining(", ")));
-                                    mergedFilesContext.append("\n");
-                                }
-                            }
-                            mergedFilesContext.append("\nDO NOT recreate these files from scratch. ");
-                            mergedFilesContext.append("Read them from the filesystem and extend/modify as needed.");
-                        }
-                        
-                        // Mark conflicted tasks for retry so they get re-scheduled
-                        // They'll run again in the next wave, now with access to the merged changes
-                        for (String conflictedId : mergeResult.conflictedIds()) {
-                            // Reset task status to PENDING and add merge conflict context
-                            for (int i = 0; i < updatedTasks.size(); i++) {
-                                Task d = updatedTasks.get(i);
-                                if (d.id().equals(conflictedId)) {
-                                    int nextIteration = d.iteration() + 1;
-                                    
-                                    // Check if we've exhausted retries — escalate instead of retrying
-                                    if (nextIteration > d.maxIterations()) {
-                                        log.warn("Task {} exhausted merge conflict retries ({}/{}), escalating",
-                                                conflictedId, nextIteration - 1, d.maxIterations());
-                                        missionStatus = MissionStatus.FAILED;
-                                        errors.add("Task " + conflictedId + " escalated: merge conflicts after " 
-                                                + (nextIteration - 1) + " attempts");
-                                        updatedTasks.set(i, new Task(
-                                                d.id(), d.agent(), d.description(),
-                                                d.inputContext(), d.successCriteria(), d.dependencies(),
-                                                TaskStatus.FAILED, d.iteration(), d.maxIterations(),
-                                                d.onFailure(), d.targetFiles(), d.filesAffected(), d.elapsedMs()));
-                                        break;
-                                    }
-                                    
-                                    retryingIds.add(conflictedId);  // Add to retry list (excludes from completed)
-                                    completedIds.remove(conflictedId);  // Don't add to completed this wave
-                                    
-                                    // Update targetFiles based on what the task actually modified (not just planned).
-                                    // This helps the scheduler detect file overlaps more accurately on retry.
-                                    List<String> actualTargets = (d.filesAffected() != null && !d.filesAffected().isEmpty())
-                                            ? d.filesAffected().stream().map(f -> f.path()).toList()
-                                            : d.targetFiles();
-                                    
-                                    // Enhance input context with merge conflict information and file list
-                                    String enhancedContext = d.inputContext();
-                                    if (enhancedContext == null) enhancedContext = "";
-                                    enhancedContext = "MERGE CONFLICT RETRY: Your previous branch conflicted with main.\n" +
-                                            "You are starting fresh from the CURRENT main branch (your old branch was deleted).\n" +
-                                            "Review existing files before creating new ones to avoid duplicating work." +
-                                            mergedFilesContext + "\n\n" + enhancedContext;
-                                    
-                                    updatedTasks.set(i, new Task(
-                                            d.id(), d.agent(), d.description(),
-                                            enhancedContext, d.successCriteria(), d.dependencies(),
-                                            TaskStatus.PENDING, nextIteration, d.maxIterations(),
-                                            d.onFailure(), actualTargets, List.of(), null));
-                                    log.info("Reset {} to PENDING (iteration {}) for retry on updated main (target files: {})", 
-                                            conflictedId, nextIteration, actualTargets);
-                                    break;
-                                }
-                            }
-                        }
-                        
-                        errors.add("Merge conflicts on " + mergeResult.conflictedIds() + 
-                                " — retrying on updated main in next wave");
-                    }
-                    
-                    eventBus.publish(new WorldmindEvent("wave.merged",
-                            state.missionId(), null,
-                            Map.of("merged", mergeResult.mergedIds(),
-                                   "conflicted", mergeResult.conflictedIds(),
-                                   "waveNumber", state.waveCount()),
-                            Instant.now()));
-                } catch (Exception e) {
-                    log.error("Failed to merge wave branches: {}", e.getMessage(), e);
-                    errors.add("Wave merge failed: " + e.getMessage());
-                }
+                var mergeOutcome = mergeWaveAndHandleConflicts(
+                        state, passedCoderIds, taskMap, updatedTasks, completedIds, retryingIds, errors);
+                if (mergeOutcome.missionFailed) missionStatus = MissionStatus.FAILED;
             }
 
             // Build state updates
@@ -425,6 +280,151 @@ public class EvaluateWaveNode {
                 result != null && result.filesAffected() != null ? result.filesAffected() : d.filesAffected(),
                 result != null ? result.elapsedMs() : d.elapsedMs()
         );
+    }
+
+    /**
+     * Merges passed CODER/REFACTORER branches into main after the wave completes.
+     * If merge conflicts occur, marks conflicted tasks for retry with enriched context.
+     */
+    private FailureOutcome mergeWaveAndHandleConflicts(
+            WorldmindState state, List<String> passedCoderIds,
+            Map<String, Task> taskMap, List<Task> updatedTasks,
+            List<String> completedIds, List<String> retryingIds, List<String> errors) {
+
+        var outcome = new FailureOutcome();
+        log.info("Wave {} complete: merging {} passed CODER/REFACTORER branches into main",
+                state.waveCount(), passedCoderIds.size());
+        try {
+            var mergeResult = gitWorkspaceManager.mergeWaveBranches(
+                    passedCoderIds, cfProperties.getGitToken(), state.gitRemoteUrl());
+
+            if (mergeResult.hasConflicts()) {
+                log.warn("Wave merge had {} conflicts: {} — will retry on updated main",
+                        mergeResult.conflictedIds().size(), mergeResult.conflictedIds());
+
+                String mergedFilesContext = buildMergedFilesContext(mergeResult.mergedIds(), taskMap);
+                outcome.missionFailed = resetConflictedTasks(
+                        mergeResult.conflictedIds(), mergedFilesContext,
+                        updatedTasks, completedIds, retryingIds, errors);
+
+                errors.add("Merge conflicts on " + mergeResult.conflictedIds()
+                        + " — retrying on updated main in next wave");
+            }
+
+            eventBus.publish(new WorldmindEvent("wave.merged",
+                    state.missionId(), null,
+                    Map.of("merged", mergeResult.mergedIds(),
+                           "conflicted", mergeResult.conflictedIds(),
+                           "waveNumber", state.waveCount()),
+                    Instant.now()));
+        } catch (Exception e) {
+            log.error("Failed to merge wave branches: {}", e.getMessage(), e);
+            errors.add("Wave merge failed: " + e.getMessage());
+        }
+        return outcome;
+    }
+
+    private String buildMergedFilesContext(List<String> mergedIds, Map<String, Task> taskMap) {
+        if (mergedIds.isEmpty()) return "";
+        var sb = new StringBuilder("\n\nFILES ALREADY IN MAIN from merged tasks:\n");
+        for (String mergedId : mergedIds) {
+            Task mergedTask = taskMap.get(mergedId);
+            if (mergedTask == null || mergedTask.filesAffected() == null || mergedTask.filesAffected().isEmpty()) {
+                continue;
+            }
+            sb.append("- ").append(mergedId).append(": ");
+            sb.append(mergedTask.filesAffected().stream()
+                    .map(FileRecord::path)
+                    .collect(java.util.stream.Collectors.joining(", ")));
+            sb.append("\n");
+        }
+        sb.append("\nDO NOT recreate these files from scratch. ");
+        sb.append("Read them from the filesystem and extend/modify as needed.");
+        return sb.toString();
+    }
+
+    /**
+     * Resets conflicted tasks to PENDING for retry, or marks them FAILED if retries exhausted.
+     * @return true if any task was escalated (mission should fail)
+     */
+    private boolean resetConflictedTasks(List<String> conflictedIds, String mergedFilesContext,
+                                         List<Task> updatedTasks, List<String> completedIds,
+                                         List<String> retryingIds, List<String> errors) {
+        boolean anyEscalated = false;
+        for (String conflictedId : conflictedIds) {
+            for (int i = 0; i < updatedTasks.size(); i++) {
+                Task d = updatedTasks.get(i);
+                if (!d.id().equals(conflictedId)) continue;
+
+                int nextIteration = d.iteration() + 1;
+                if (nextIteration > d.maxIterations()) {
+                    log.warn("Task {} exhausted merge conflict retries ({}/{}), escalating",
+                            conflictedId, d.iteration(), d.maxIterations());
+                    anyEscalated = true;
+                    errors.add("Task " + conflictedId + " escalated: merge conflicts after "
+                            + d.iteration() + " attempts");
+                    updatedTasks.set(i, new Task(
+                            d.id(), d.agent(), d.description(),
+                            d.inputContext(), d.successCriteria(), d.dependencies(),
+                            TaskStatus.FAILED, d.iteration(), d.maxIterations(),
+                            d.onFailure(), d.targetFiles(), d.filesAffected(), d.elapsedMs()));
+                    break;
+                }
+
+                retryingIds.add(conflictedId);
+                completedIds.remove(conflictedId);
+
+                List<String> actualTargets = (d.filesAffected() != null && !d.filesAffected().isEmpty())
+                        ? d.filesAffected().stream().map(FileRecord::path).toList()
+                        : d.targetFiles();
+
+                String base = d.inputContext() != null ? d.inputContext() : "";
+                String enhancedContext = "MERGE CONFLICT RETRY: Your previous branch conflicted with main.\n"
+                        + "You are starting fresh from the CURRENT main branch (your old branch was deleted).\n"
+                        + "Review existing files before creating new ones to avoid duplicating work."
+                        + mergedFilesContext + "\n\n" + base;
+
+                updatedTasks.set(i, new Task(
+                        d.id(), d.agent(), d.description(),
+                        enhancedContext, d.successCriteria(), d.dependencies(),
+                        TaskStatus.PENDING, nextIteration, d.maxIterations(),
+                        d.onFailure(), actualTargets, List.of(), null));
+                log.info("Reset {} to PENDING (iteration {}) for retry on updated main (target files: {})",
+                        conflictedId, nextIteration, actualTargets);
+                break;
+            }
+        }
+        return anyEscalated;
+    }
+
+    /**
+     * Applies failure strategy and updates the shared collections (completedIds, updatedTasks, errors).
+     * Returns the outcome so the caller can propagate retryContext and missionFailed.
+     *
+     * @param enhancedContext pre-built context for the retry attempt (failure-specific or review-based)
+     */
+    private FailureOutcome handleFailure(String id, Task task, WaveDispatchResult dispatchResult,
+                                         FailureStrategy action, String reason, String enhancedContext,
+                                         List<String> completedIds, List<Task> updatedTasks, List<String> errors) {
+        var outcome = applyFailureStrategy(id, task, action, reason);
+        completedIds.addAll(outcome.completedIds);
+
+        if (!outcome.completedIds.isEmpty()) {
+            updatedTasks.add(withResult(task, dispatchResult, TaskStatus.SKIPPED));
+        } else if (outcome.missionFailed) {
+            updatedTasks.add(withResult(task, dispatchResult, TaskStatus.FAILED));
+        } else if (outcome.retryContext != null) {
+            int nextIteration = task.iteration() + 1;
+            updatedTasks.add(new Task(
+                    task.id(), task.agent(), task.description(),
+                    enhancedContext, task.successCriteria(), task.dependencies(),
+                    TaskStatus.PENDING, nextIteration, task.maxIterations(),
+                    task.onFailure(), task.targetFiles(), List.of(), null));
+            log.info("Reset {} to PENDING (iteration {}/{}) for retry", id, nextIteration, task.maxIterations());
+        }
+
+        errors.addAll(outcome.errors);
+        return outcome;
     }
 
     private FailureOutcome applyFailureStrategy(String id, Task task,
