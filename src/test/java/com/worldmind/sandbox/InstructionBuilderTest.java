@@ -280,6 +280,29 @@ class InstructionBuilderTest {
     }
 
     @Test
+    void deployerOmitsSkipSslByDefault() {
+        var task = deployerTask();
+
+        String instruction = InstructionBuilder.buildDeployerInstruction(
+                task, "my-app", "cf.example.com", false, List.of(), "spring-boot", defaultDeployerProps());
+
+        assertFalse(instruction.contains("--skip-ssl-validation"));
+        assertTrue(instruction.contains("cf api $CF_API_URL\n"));
+    }
+
+    @Test
+    void deployerIncludesSkipSslWhenEnabled() {
+        var task = deployerTask();
+        var props = new DeployerProperties();
+        props.setSkipSslValidation(true);
+
+        String instruction = InstructionBuilder.buildDeployerInstruction(
+                task, "my-app", "cf.example.com", false, List.of(), "spring-boot", props);
+
+        assertTrue(instruction.contains("cf api $CF_API_URL --skip-ssl-validation"));
+    }
+
+    @Test
     void deployerIncludesBuildCommands() {
         var task = deployerTask();
 
@@ -326,8 +349,20 @@ class InstructionBuilderTest {
                 task, "my-app", "cf.example.com", false, services, "spring-boot", defaultDeployerProps());
 
         assertTrue(instruction.contains("services:"));
-        assertTrue(instruction.contains("  - todo-db"));
-        assertTrue(instruction.contains("  - redis-cache"));
+        assertTrue(instruction.contains("  - \"todo-db\""));
+        assertTrue(instruction.contains("  - \"redis-cache\""));
+    }
+
+    @Test
+    void deployerQuotesServiceNamesWithSpecialCharacters() {
+        var task = deployerTask();
+        var services = List.of("svc:with-colon", "normal-svc");
+
+        String instruction = InstructionBuilder.buildDeployerInstruction(
+                task, "my-app", "cf.example.com", false, services, "spring-boot", defaultDeployerProps());
+
+        assertTrue(instruction.contains("  - \"svc:with-colon\""));
+        assertTrue(instruction.contains("  - \"normal-svc\""));
     }
 
     @Test
