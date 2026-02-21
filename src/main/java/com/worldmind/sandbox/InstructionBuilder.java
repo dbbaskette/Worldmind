@@ -314,6 +314,8 @@ public final class InstructionBuilder {
                                                   List<String> serviceBindings, String appType,
                                                   DeployerProperties deployerProperties) {
         String appName = (missionId != null && !missionId.isBlank()) ? missionId : "app";
+        // Falls back to a literal $CF_APPS_DOMAIN placeholder when no domain is provided.
+        // The deployer agent must resolve this variable or set the route manually.
         String domain = (cfAppsDomain != null && !cfAppsDomain.isBlank()) ? cfAppsDomain : "$CF_APPS_DOMAIN";
         String route = appName + ".apps." + domain;
         String type = (appType != null && !appType.isBlank()) ? appType : "spring-boot";
@@ -336,7 +338,11 @@ public final class InstructionBuilder {
         // Section 2: CF Authentication
         sb.append("## CF Authentication\n\n");
         sb.append("```bash\n");
-        sb.append("cf api $CF_API_URL --skip-ssl-validation\n");
+        sb.append("cf api $CF_API_URL");
+        if (deployerProperties.isSkipSslValidation()) {
+            sb.append(" --skip-ssl-validation");
+        }
+        sb.append("\n");
         sb.append("cf auth $CF_USERNAME $CF_PASSWORD\n");
         sb.append("cf target -o $CF_ORG -s $CF_SPACE\n");
         sb.append("```\n\n");
@@ -376,7 +382,7 @@ public final class InstructionBuilder {
             if (!services.isEmpty()) {
                 sb.append("  services:\n");
                 for (String svc : services) {
-                    sb.append("  - ").append(svc).append("\n");
+                    sb.append("  - \"").append(svc).append("\"\n");
                 }
             }
             sb.append("```\n\n");
