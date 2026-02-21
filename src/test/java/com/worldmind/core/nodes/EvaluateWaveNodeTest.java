@@ -623,6 +623,117 @@ class EvaluateWaveNodeTest {
     }
 
     @Test
+    @DisplayName("DEPLOYER retries exhausted -> error message includes actionable failure reason")
+    @SuppressWarnings("unchecked")
+    void deployerRetriesExhaustedIncludesActionableError() {
+        var d = deployerTask("TASK-DEPLOY", 3, 3, FailureStrategy.RETRY);
+
+        var state = new WorldmindState(Map.of(
+                "waveTaskIds", List.of("TASK-DEPLOY"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(deployerBuildFailureResult("TASK-DEPLOY"))
+        ));
+
+        var result = node.apply(state);
+
+        assertEquals(MissionStatus.FAILED.name(), result.get("status"));
+        var errors = (List<String>) result.get("errors");
+        assertNotNull(errors);
+        assertFalse(errors.isEmpty());
+        // Should include "Deployment failed" with actionable context
+        assertTrue(errors.stream().anyMatch(e -> e.contains("Deployment failed")),
+                "Error should mention deployment failure");
+        assertTrue(errors.stream().anyMatch(e -> e.contains("pom.xml")),
+                "Build failure error should mention pom.xml dependencies");
+    }
+
+    @Test
+    @DisplayName("DEPLOYER service binding exhausted -> error includes service name")
+    @SuppressWarnings("unchecked")
+    void deployerServiceBindingExhaustedIncludesServiceName() {
+        var d = deployerTask("TASK-DEPLOY", 3, 3, FailureStrategy.RETRY);
+
+        var state = new WorldmindState(Map.of(
+                "waveTaskIds", List.of("TASK-DEPLOY"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(deployerServiceBindingFailureResult("TASK-DEPLOY"))
+        ));
+
+        var result = node.apply(state);
+
+        assertEquals(MissionStatus.FAILED.name(), result.get("status"));
+        var errors = (List<String>) result.get("errors");
+        assertNotNull(errors);
+        assertTrue(errors.stream().anyMatch(e -> e.contains("my-db")),
+                "Service binding error should include the actual service name 'my-db'");
+    }
+
+    @Test
+    @DisplayName("DEPLOYER health check exhausted -> error mentions timeout and endpoint")
+    @SuppressWarnings("unchecked")
+    void deployerHealthCheckExhaustedMentionsTimeout() {
+        var d = deployerTask("TASK-DEPLOY", 3, 3, FailureStrategy.RETRY);
+
+        var state = new WorldmindState(Map.of(
+                "waveTaskIds", List.of("TASK-DEPLOY"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(deployerHealthCheckTimeoutResult("TASK-DEPLOY"))
+        ));
+
+        var result = node.apply(state);
+
+        assertEquals(MissionStatus.FAILED.name(), result.get("status"));
+        var errors = (List<String>) result.get("errors");
+        assertNotNull(errors);
+        assertTrue(errors.stream().anyMatch(e -> e.contains("300s")),
+                "Health check error should mention the 300s timeout");
+        assertTrue(errors.stream().anyMatch(e -> e.contains("/actuator/health")),
+                "Health check error should mention the health check endpoint");
+    }
+
+    @Test
+    @DisplayName("DEPLOYER crash with OOM exhausted -> error suggests memory increase")
+    @SuppressWarnings("unchecked")
+    void deployerCrashOomExhaustedSuggestsMemory() {
+        var d = deployerTask("TASK-DEPLOY", 3, 3, FailureStrategy.RETRY);
+
+        var state = new WorldmindState(Map.of(
+                "waveTaskIds", List.of("TASK-DEPLOY"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(deployerCrashedResult("TASK-DEPLOY"))
+        ));
+
+        var result = node.apply(state);
+
+        assertEquals(MissionStatus.FAILED.name(), result.get("status"));
+        var errors = (List<String>) result.get("errors");
+        assertNotNull(errors);
+        assertTrue(errors.stream().anyMatch(e -> e.contains("memory")),
+                "Crash error with OOM should mention memory");
+    }
+
+    @Test
+    @DisplayName("DEPLOYER staging failure exhausted -> error mentions staging logs")
+    @SuppressWarnings("unchecked")
+    void deployerStagingFailureExhaustedMentionsStagingLogs() {
+        var d = deployerTask("TASK-DEPLOY", 3, 3, FailureStrategy.RETRY);
+
+        var state = new WorldmindState(Map.of(
+                "waveTaskIds", List.of("TASK-DEPLOY"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(deployerStagingFailureResult("TASK-DEPLOY"))
+        ));
+
+        var result = node.apply(state);
+
+        assertEquals(MissionStatus.FAILED.name(), result.get("status"));
+        var errors = (List<String>) result.get("errors");
+        assertNotNull(errors);
+        assertTrue(errors.stream().anyMatch(e -> e.contains("staging")),
+                "Staging failure error should mention staging");
+    }
+
+    @Test
     @DisplayName("DEPLOYER failure with success+failure markers -> failure takes precedence")
     @SuppressWarnings("unchecked")
     void deployerFailureMarkersTakePrecedence() {

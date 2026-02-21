@@ -4,6 +4,8 @@ import { StatusBadge } from './StatusBadge'
 import { AGENT_ACCENT } from '../utils/constants'
 import { formatDuration } from '../utils/formatting'
 
+/* ── Phase definitions ─────────────────────────────────────────────── */
+
 const PHASES = ['CODER', 'TESTER', 'REVIEWER', 'QUALITY_GATE'] as const
 type Phase = typeof PHASES[number]
 
@@ -18,7 +20,7 @@ const DEPLOYER_PHASES = ['BUILD', 'PUSH', 'VERIFY'] as const
 type DeployerPhase = typeof DEPLOYER_PHASES[number]
 
 const DEPLOYER_PHASE_ACTIVITY: Record<DeployerPhase, string> = {
-  BUILD: 'Building application',
+  BUILD: 'Deploying to CF\u2026',
   PUSH: 'Pushing to CF',
   VERIFY: 'Verifying health',
 }
@@ -29,254 +31,242 @@ const DEPLOYER_PHASE_LABELS: Record<DeployerPhase, string> = {
   VERIFY: 'Verify',
 }
 
-interface TaskCardProps {
-  task: TaskResponse
-  events: WorldmindEvent[]
-  onRetry?: (id: string) => void
-  index?: number
-  total?: number
+/* ── Generic phase-state derivation ────────────────────────────────── */
+
+type PhaseState<T extends string> = {
+  active: T | null
+  completed: Set<T>
+  failed: T | null
 }
 
-function derivePhase(events: WorldmindEvent[], status: string): { active: Phase | null; completed: Set<Phase>; failed: Phase | null } {
-  const completed = new Set<Phase>()
-  let active: Phase | null = null
-  let failed: Phase | null = null
+/**
+ * Shared phase-derivation logic for CODER and DEPLOYER pipelines.
+ * Status-based early returns (FULFILLED, PENDING, etc.) are handled here;
+ * event-specific logic is delegated to the processEvent callback.
+ */
+function derivePhaseState<T extends string>(
+  phases: readonly T[],
+  events: WorldmindEvent[],
+  status: string,
+  processEvent: (event: WorldmindEvent, state: PhaseState<T>, phases: readonly T[]) => void,
+  extraStatusCheck?: (status: string) => PhaseState<T> | null,
+): PhaseState<T> {
+  const defaultPhase = phases[0]
 
-  // First check task status to handle page refresh (no events available yet)
-  // This ensures status lights show correctly even before SSE events arrive
   if (status === 'FULFILLED') {
-    PHASES.forEach(p => completed.add(p))
-    return { active: null, completed, failed: null }
+    return { active: null, completed: new Set(phases), failed: null }
   }
-  if (status === 'VERIFYING') {
-    // CODER complete, running quality gates (TESTER/REVIEWER)
-    completed.add('CODER')
-    return { active: 'TESTER', completed, failed: null }
+  if (extraStatusCheck) {
+    const override = extraStatusCheck(status)
+    if (override) return override
   }
   if (status === 'FAILED' && events.length === 0) {
-    // Without events we don't know which phase failed, show CODER as failed
-    return { active: null, completed, failed: 'CODER' }
+    return { active: null, completed: new Set(), failed: defaultPhase }
   }
   if (status === 'EXECUTING' && events.length === 0) {
-    // Executing but no events yet - show CODER as active
-    return { active: 'CODER', completed, failed: null }
+    return { active: defaultPhase, completed: new Set(), failed: null }
   }
   if (status === 'PENDING') {
-    // Not started yet
-    return { active: null, completed, failed: null }
+    return { active: null, completed: new Set(), failed: null }
   }
 
-  // Process events to get more precise phase info
+  const state: PhaseState<T> = { active: null, completed: new Set(), failed: null }
   for (const event of events) {
-    if (event.eventType === 'task.started') {
-      active = 'CODER'
-    }
-    if (event.eventType === 'task.phase') {
-      const phase = event.payload?.phase as Phase
-      if (phase) {
-        const idx = PHASES.indexOf(phase)
-        for (let i = 0; i < idx; i++) completed.add(PHASES[i])
-        active = phase
+    processEvent(event, state, phases)
+  }
+
+  if (status === 'FAILED' && !state.failed && !state.active) {
+    state.failed = defaultPhase
+  }
+  return state
+}
+
+function deriveCoderPhase(events: WorldmindEvent[], status: string) {
+  return derivePhaseState<Phase>(
+    PHASES,
+    events,
+    status,
+    (event, state, phases) => {
+      if (event.eventType === 'task.started') {
+        state.active = 'CODER'
       }
-    }
-    if (event.eventType === 'quality_gate.granted') {
-      PHASES.forEach(p => completed.add(p))
-      active = null
-    }
-    if (event.eventType === 'quality_gate.denied') {
-      completed.add('CODER')
-      completed.add('TESTER')
-      completed.add('REVIEWER')
-      failed = 'QUALITY_GATE'
-      active = null
-    }
-    if (event.eventType === 'task.failed') {
-      failed = active || 'CODER'
-      active = null
-    }
-  }
+      if (event.eventType === 'task.phase') {
+        const phase = event.payload?.phase as Phase
+        if (phase) {
+          const idx = phases.indexOf(phase)
+          for (let i = 0; i < idx; i++) state.completed.add(phases[i])
+          state.active = phase
+        }
+      }
+      if (event.eventType === 'quality_gate.granted') {
+        phases.forEach(p => state.completed.add(p))
+        state.active = null
+      }
+      if (event.eventType === 'quality_gate.denied') {
+        state.completed.add('CODER')
+        state.completed.add('TESTER')
+        state.completed.add('REVIEWER')
+        state.failed = 'QUALITY_GATE'
+        state.active = null
+      }
+      if (event.eventType === 'task.failed') {
+        state.failed = state.active || 'CODER'
+        state.active = null
+      }
+    },
+    (status) => {
+      if (status === 'VERIFYING') {
+        const completed = new Set<Phase>()
+        completed.add('CODER')
+        return { active: 'TESTER' as Phase, completed, failed: null }
+      }
+      return null
+    },
+  )
+}
 
-  // Final status-based overrides
-  if (status === 'FULFILLED') {
-    PHASES.forEach(p => completed.add(p))
-    active = null
-    failed = null
-  }
+function deriveDeployerPhase(events: WorldmindEvent[], status: string) {
+  return derivePhaseState<DeployerPhase>(
+    DEPLOYER_PHASES,
+    events,
+    status,
+    (event, state, phases) => {
+      if (event.eventType === 'task.started') {
+        state.active = 'BUILD'
+      }
+      if (event.eventType === 'task.phase' || event.eventType === 'deployer.phase') {
+        const phase = (event.payload?.phase as string)?.toUpperCase() as DeployerPhase
+        if (phase && (phases as readonly string[]).includes(phase)) {
+          const idx = phases.indexOf(phase)
+          for (let i = 0; i < idx; i++) state.completed.add(phases[i])
+          state.active = phase
+        }
+      }
+      if (event.eventType === 'deployer.deployed' || event.eventType === 'task.fulfilled') {
+        phases.forEach(p => state.completed.add(p))
+        state.active = null
+      }
+      if (event.eventType === 'task.failed') {
+        state.failed = state.active || 'BUILD'
+        state.active = null
+      }
+    },
+  )
+}
 
-  if (status === 'FAILED' && !failed && !active) {
-    failed = 'CODER'
-  }
+/* ── Generic pipeline component ────────────────────────────────────── */
 
-  return { active, completed, failed }
+interface PipelineColorConfig {
+  bg: string
+  text: string
+  border: string
+  dot: string
+}
+
+interface PipelineConfig<T extends string> {
+  phases: readonly T[]
+  labels: Record<T, string>
+  activityText: Record<T, string>
+  activeColor: PipelineColorConfig
+}
+
+const CODER_PIPELINE_CONFIG: PipelineConfig<Phase> = {
+  phases: PHASES,
+  labels: { CODER: 'CODER', TESTER: 'TESTER', REVIEWER: 'REVIEWER', QUALITY_GATE: 'Q_GATE' },
+  activityText: PHASE_ACTIVITY,
+  activeColor: {
+    bg: 'bg-blue-500/20', text: 'text-blue-400', border: 'border-blue-500/40', dot: 'bg-blue-400',
+  },
+}
+
+const DEPLOYER_PIPELINE_CONFIG: PipelineConfig<DeployerPhase> = {
+  phases: DEPLOYER_PHASES,
+  labels: DEPLOYER_PHASE_LABELS,
+  activityText: DEPLOYER_PHASE_ACTIVITY,
+  activeColor: {
+    bg: 'bg-teal-500/20', text: 'text-teal-400', border: 'border-teal-500/40', dot: 'bg-teal-400',
+  },
+}
+
+function PhaseStepsPipeline<T extends string>({
+  config,
+  state,
+  status,
+}: {
+  config: PipelineConfig<T>
+  state: PhaseState<T>
+  status: string
+}) {
+  const { phases, labels, activityText, activeColor } = config
+  const { active, completed, failed } = state
+
+  return (
+    <div className="flex items-center gap-0.5 mb-3">
+      {phases.map((phase, idx) => {
+        const isCompleted = completed.has(phase)
+        const isActive = active === phase
+        const isFailed = failed === phase
+
+        return (
+          <div key={phase} className="flex items-center">
+            <div className="flex flex-col items-center gap-0.5">
+              <div
+                className={`w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-bold transition-all ${
+                  isCompleted
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                    : isActive
+                    ? `${activeColor.bg} ${activeColor.text} border ${activeColor.border} animate-glow-pulse`
+                    : isFailed
+                    ? 'bg-red-500/20 text-red-400 border border-red-500/40'
+                    : 'bg-wm-elevated text-wm_text-muted border border-wm-border'
+                }`}
+              >
+                {isCompleted ? '\u2713' : isFailed ? '\u2717' : (idx + 1)}
+              </div>
+              <span className={`text-[8px] font-mono uppercase tracking-wider ${
+                isActive ? activeColor.text : isFailed ? 'text-red-400' : isCompleted ? 'text-emerald-400/60' : 'text-wm_text-muted'
+              }`}>
+                {labels[phase]}
+              </span>
+            </div>
+            {idx < phases.length - 1 && (
+              <div className={`w-4 h-px mx-0.5 transition-all ${
+                completed.has(phases[idx + 1]) || active === phases[idx + 1]
+                  ? 'bg-emerald-500/50'
+                  : 'bg-wm-border'
+              }`} />
+            )}
+          </div>
+        )
+      })}
+
+      {active && (status === 'EXECUTING' || status === 'VERIFYING' || status === 'RUNNING') && (
+        <div className={`ml-3 flex items-center gap-1.5 text-[10px] ${activeColor.text}`}>
+          <span className={`w-1 h-1 rounded-full ${activeColor.dot} animate-glow-pulse`} />
+          {activityText[active]}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function PhasePipeline({ task, events }: { task: TaskResponse; events: WorldmindEvent[] }) {
   if (task.agent !== 'CODER') return null
-
-  const { active, completed, failed } = derivePhase(events, task.status)
-
-  return (
-    <div className="flex items-center gap-0.5 mb-3">
-      {PHASES.map((phase, idx) => {
-        const isCompleted = completed.has(phase)
-        const isActive = active === phase
-        const isFailed = failed === phase
-
-        return (
-          <div key={phase} className="flex items-center">
-            <div className="flex flex-col items-center gap-0.5">
-              <div
-                className={`w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-bold transition-all ${
-                  isCompleted
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                    : isActive
-                    ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40 animate-researcher'
-                    : isFailed
-                    ? 'bg-red-500/20 text-red-400 border border-red-500/40'
-                    : 'bg-wm-elevated text-wm_text-muted border border-wm-border'
-                }`}
-              >
-                {isCompleted ? '\u2713' : isFailed ? '\u2717' : (idx + 1)}
-              </div>
-              <span className={`text-[8px] font-mono uppercase tracking-wider ${
-                isActive ? 'text-blue-400' : isFailed ? 'text-red-400' : isCompleted ? 'text-emerald-400/60' : 'text-wm_text-muted'
-              }`}>
-                {phase}
-              </span>
-            </div>
-            {idx < PHASES.length - 1 && (
-              <div className={`w-4 h-px mx-0.5 transition-all ${
-                completed.has(PHASES[idx + 1]) || active === PHASES[idx + 1]
-                  ? 'bg-emerald-500/50'
-                  : 'bg-wm-border'
-              }`} />
-            )}
-          </div>
-        )
-      })}
-
-      {active && (task.status === 'EXECUTING' || task.status === 'VERIFYING') && (
-        <div className="ml-3 flex items-center gap-1.5 text-[10px] text-blue-400">
-          <span className="w-1 h-1 rounded-full bg-blue-400 animate-researcher" />
-          {PHASE_ACTIVITY[active]}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function deriveDeployerPhase(events: WorldmindEvent[], status: string): { active: DeployerPhase | null; completed: Set<DeployerPhase>; failed: DeployerPhase | null } {
-  const completed = new Set<DeployerPhase>()
-  let active: DeployerPhase | null = null
-  let failed: DeployerPhase | null = null
-
-  if (status === 'FULFILLED') {
-    DEPLOYER_PHASES.forEach(p => completed.add(p))
-    return { active: null, completed, failed: null }
-  }
-  if (status === 'FAILED' && events.length === 0) {
-    return { active: null, completed, failed: 'BUILD' }
-  }
-  if (status === 'EXECUTING' && events.length === 0) {
-    return { active: 'BUILD', completed, failed: null }
-  }
-  if (status === 'PENDING') {
-    return { active: null, completed, failed: null }
-  }
-
-  for (const event of events) {
-    if (event.eventType === 'task.started') {
-      active = 'BUILD'
-    }
-    if (event.eventType === 'task.phase' || event.eventType === 'deployer.phase') {
-      const phase = (event.payload?.phase as string)?.toUpperCase() as DeployerPhase
-      if (phase && DEPLOYER_PHASES.includes(phase as DeployerPhase)) {
-        const idx = DEPLOYER_PHASES.indexOf(phase)
-        for (let i = 0; i < idx; i++) completed.add(DEPLOYER_PHASES[i])
-        active = phase
-      }
-    }
-    if (event.eventType === 'deployer.deployed' || event.eventType === 'task.fulfilled') {
-      DEPLOYER_PHASES.forEach(p => completed.add(p))
-      active = null
-    }
-    if (event.eventType === 'task.failed') {
-      failed = active || 'BUILD'
-      active = null
-    }
-  }
-
-  if (status === 'FULFILLED') {
-    DEPLOYER_PHASES.forEach(p => completed.add(p))
-    active = null
-    failed = null
-  }
-
-  if (status === 'FAILED' && !failed && !active) {
-    failed = 'BUILD'
-  }
-
-  return { active, completed, failed }
+  const state = deriveCoderPhase(events, task.status)
+  return <PhaseStepsPipeline config={CODER_PIPELINE_CONFIG} state={state} status={task.status} />
 }
 
 function DeployerPipeline({ task, events }: { task: TaskResponse; events: WorldmindEvent[] }) {
   if (task.agent !== 'DEPLOYER') return null
-
-  const { active, completed, failed } = deriveDeployerPhase(events, task.status)
-
-  return (
-    <div className="flex items-center gap-0.5 mb-3">
-      {DEPLOYER_PHASES.map((phase, idx) => {
-        const isCompleted = completed.has(phase)
-        const isActive = active === phase
-        const isFailed = failed === phase
-
-        return (
-          <div key={phase} className="flex items-center">
-            <div className="flex flex-col items-center gap-0.5">
-              <div
-                className={`w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-bold transition-all ${
-                  isCompleted
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                    : isActive
-                    ? 'bg-teal-500/20 text-teal-400 border border-teal-500/40 animate-researcher'
-                    : isFailed
-                    ? 'bg-red-500/20 text-red-400 border border-red-500/40'
-                    : 'bg-wm-elevated text-wm_text-muted border border-wm-border'
-                }`}
-              >
-                {isCompleted ? '\u2713' : isFailed ? '\u2717' : (idx + 1)}
-              </div>
-              <span className={`text-[8px] font-mono uppercase tracking-wider ${
-                isActive ? 'text-teal-400' : isFailed ? 'text-red-400' : isCompleted ? 'text-emerald-400/60' : 'text-wm_text-muted'
-              }`}>
-                {DEPLOYER_PHASE_LABELS[phase]}
-              </span>
-            </div>
-            {idx < DEPLOYER_PHASES.length - 1 && (
-              <div className={`w-4 h-px mx-0.5 transition-all ${
-                completed.has(DEPLOYER_PHASES[idx + 1]) || active === DEPLOYER_PHASES[idx + 1]
-                  ? 'bg-emerald-500/50'
-                  : 'bg-wm-border'
-              }`} />
-            )}
-          </div>
-        )
-      })}
-
-      {active && (task.status === 'EXECUTING' || task.status === 'RUNNING') && (
-        <div className="ml-3 flex items-center gap-1.5 text-[10px] text-teal-400">
-          <span className="w-1 h-1 rounded-full bg-teal-400 animate-researcher" />
-          {DEPLOYER_PHASE_ACTIVITY[active]}
-        </div>
-      )}
-    </div>
-  )
+  const state = deriveDeployerPhase(events, task.status)
+  return <PhaseStepsPipeline config={DEPLOYER_PIPELINE_CONFIG} state={state} status={task.status} />
 }
+
+/* ── Deployment URL display ────────────────────────────────────────── */
 
 function DeploymentUrl({ events, task }: { events: WorldmindEvent[]; task: TaskResponse }) {
   const url = useMemo(() => {
-    // Check for explicit deployment URL in events
+    // Prefer explicit deployment URL from structured events
     for (let i = events.length - 1; i >= 0; i--) {
       const e = events[i]
       if (e.eventType === 'deployer.deployed' && e.payload?.url) {
@@ -286,20 +276,17 @@ function DeploymentUrl({ events, task }: { events: WorldmindEvent[]; task: TaskR
         return e.payload.deploymentUrl as string
       }
     }
-    // Try to extract URL from task description (route convention: {mission-id}.apps.{domain})
-    const urlPattern = /[\w-]+\.apps\.[\w.-]+/
+    // Fallback: scan event output for CF CLI route markers (e.g. "routes: app.apps.domain")
+    const cfRoutePattern = /(?:routes?:|urls?:)\s*([\w-]+\.apps\.[\w.-]+)/i
     for (let i = events.length - 1; i >= 0; i--) {
       const e = events[i]
       if (e.payload?.output) {
-        const match = (e.payload.output as string).match(urlPattern)
-        if (match) return match[0]
+        const match = (e.payload.output as string).match(cfRoutePattern)
+        if (match) return match[1]
       }
     }
-    // Check task description for route
-    const descMatch = task.description?.match(urlPattern)
-    if (descMatch) return descMatch[0]
     return null
-  }, [events, task.description])
+  }, [events])
 
   if (!url || task.status !== 'FULFILLED') return null
 
@@ -325,19 +312,27 @@ function DeploymentUrl({ events, task }: { events: WorldmindEvent[]; task: TaskR
   )
 }
 
+/* ── Deployer retry info ───────────────────────────────────────────── */
+
 function DeployerRetryInfo({ task }: { task: TaskResponse }) {
   if (task.agent !== 'DEPLOYER') return null
-  if (task.max_iterations <= 1) return null
 
   const attempt = task.iteration + 1
-  const isFinal = task.status === 'FAILED' && attempt >= task.max_iterations
+  const maxIter = task.max_iterations
+
+  // Only suppress for data anomalies (0 or negative)
+  if (maxIter <= 0) return null
+
+  const isFinal = task.status === 'FAILED' && attempt >= maxIter
 
   return (
     <span className={`font-mono ${isFinal ? 'text-red-400' : 'text-amber-400/70'}`}>
-      deploy attempt {attempt}/{task.max_iterations}
+      deploy attempt {attempt}/{maxIter}
     </span>
   )
 }
+
+/* ── Failure reason display ────────────────────────────────────────── */
 
 function FailureReason({ events }: { events: WorldmindEvent[] }) {
   const failedEvent = events.find(e => e.eventType === 'task.failed' && e.payload?.reason)
@@ -369,6 +364,8 @@ function FailureReason({ events }: { events: WorldmindEvent[] }) {
   )
 }
 
+/* ── Quality score badge ───────────────────────────────────────────── */
+
 function QualityScore({ score, summary }: { score: number | null; summary: string | null }) {
   if (score == null) return null
 
@@ -381,6 +378,16 @@ function QualityScore({ score, summary }: { score: number | null; summary: strin
       {summary && <span className="text-[10px] text-wm_text-muted truncate max-w-[180px]">{summary}</span>}
     </div>
   )
+}
+
+/* ── Main TaskCard ─────────────────────────────────────────────────── */
+
+interface TaskCardProps {
+  task: TaskResponse
+  events: WorldmindEvent[]
+  onRetry?: (id: string) => void
+  index?: number
+  total?: number
 }
 
 export function TaskCard({ task, events, onRetry, index, total }: TaskCardProps) {
@@ -489,19 +496,19 @@ export function TaskCard({ task, events, onRetry, index, total }: TaskCardProps)
   )
 }
 
-function ReviewFeedbackPanel({ 
-  issues, 
-  suggestions, 
-  score 
-}: { 
+function ReviewFeedbackPanel({
+  issues,
+  suggestions,
+  score
+}: {
   issues: string[] | null
   suggestions: string[] | null
   score: number | null
 }) {
   const [expanded, setExpanded] = useState(score != null && score < 7)
-  
+
   if (!issues?.length && !suggestions?.length) return null
-  
+
   return (
     <div className="mt-2 border-t border-wm-border pt-2">
       <button
@@ -511,7 +518,7 @@ function ReviewFeedbackPanel({
         {expanded ? '\u25BE' : '\u25B8'} Review Details
         {issues?.length ? <span className="text-red-400/70">({issues.length} issues)</span> : null}
       </button>
-      
+
       {expanded && (
         <div className="mt-2 space-y-2 animate-fade-in">
           {issues && issues.length > 0 && (
@@ -526,7 +533,7 @@ function ReviewFeedbackPanel({
               </ul>
             </div>
           )}
-          
+
           {suggestions && suggestions.length > 0 && (
             <div>
               <div className="text-[10px] font-semibold text-blue-400 mb-1">Suggestions:</div>

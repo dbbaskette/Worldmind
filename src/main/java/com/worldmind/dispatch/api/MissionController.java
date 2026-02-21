@@ -693,6 +693,9 @@ public class MissionController {
                 .map(m -> m.wavesExecuted())
                 .orElse(state.waveCount());
 
+        String deploymentUrl = state.deploymentUrl();
+        if (deploymentUrl != null && deploymentUrl.isBlank()) deploymentUrl = null;
+
         return new MissionResponse(
                 state.missionId(),
                 state.status().name(),
@@ -706,7 +709,8 @@ public class MissionController {
                 state.quality_gateGranted(),
                 state.metrics().orElse(null),
                 state.errors(),
-                waveCount
+                waveCount,
+                deploymentUrl
         );
     }
 

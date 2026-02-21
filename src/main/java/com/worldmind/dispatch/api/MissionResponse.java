@@ -21,7 +21,8 @@ public record MissionResponse(
     @JsonProperty("quality_gate_granted") boolean quality_gateGranted,
     MissionMetrics metrics,
     List<String> errors,
-    @JsonProperty("wave_count") int waveCount
+    @JsonProperty("wave_count") int waveCount,
+    @JsonProperty("deployment_url") String deploymentUrl
 ) {
 
     /**
