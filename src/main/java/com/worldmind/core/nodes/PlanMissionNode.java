@@ -553,7 +553,7 @@ public class PlanMissionNode {
     }
 
     private String sanitizeServiceName(String name) {
-        return name.replaceAll("[\\r\\n:{}|>]", "");
+        return name.replaceAll("[^a-zA-Z0-9\\-]", "");
     }
 
     private String buildUserPrompt(String request, Classification classification,

@@ -942,6 +942,106 @@ class PlanMissionNodeTest {
     }
 
     @Test
+    @DisplayName("sanitizeServiceName strips YAML injection characters like # & * !")
+    void sanitizeServiceNameStripsYamlInjectionChars() {
+        var mockLlm = mock(LlmService.class);
+        var plan = new MissionPlan("Build app", "sequential", List.of(
+                new MissionPlan.TaskPlan("CODER", "Create app", "", "Done", List.of(), List.of("src/App.java"))
+        ));
+        when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
+
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
+        // Service name with YAML comment, anchor, alias, and tag markers
+        var state = new WorldmindState(Map.of(
+                "request", "Build app",
+                "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
+                "projectContext", new ProjectContext(".", List.of(), "java", "spring-boot", Map.of(), 5, "test"),
+                "createCfDeployment", true,
+                "missionId", "wmnd-2026-0001",
+                "clarifyingAnswers", "{\"cf_service_bindings\": \"my-db #injected, svc&anchor, *alias, !tag\"}"
+        ));
+
+        var result = node.apply(state);
+
+        @SuppressWarnings("unchecked")
+        var tasks = (List<Task>) result.get("tasks");
+        String instructions = tasks.get(tasks.size() - 1).inputContext();
+        // Whitelist approach: only alphanumerics and hyphens survive
+        assertTrue(instructions.contains("my-db"));
+        // The sanitized names should not contain YAML injection characters
+        assertFalse(instructions.contains("my-db #injected"));
+        assertFalse(instructions.contains("svc&anchor"));
+        assertFalse(instructions.contains("*alias"));
+        assertFalse(instructions.contains("!tag"));
+        // Sanitized names should be present without the special chars
+        assertTrue(instructions.contains("injected"));
+        assertTrue(instructions.contains("svcanchor"));
+        assertTrue(instructions.contains("alias"));
+        assertTrue(instructions.contains("tag"));
+    }
+
+    @Test
+    @DisplayName("extractServiceNames filters out entries with blank instanceName in structured JSON")
+    void extractServiceNamesFiltersBlankInstanceNames() {
+        var mockLlm = mock(LlmService.class);
+        var plan = new MissionPlan("Build app", "sequential", List.of(
+                new MissionPlan.TaskPlan("CODER", "Create app", "", "Done", List.of(), List.of("src/App.java"))
+        ));
+        when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
+
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
+        // One binding has a valid instanceName, one has an empty instanceName
+        var state = new WorldmindState(Map.of(
+                "request", "Build app",
+                "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
+                "projectContext", new ProjectContext(".", List.of(), "java", "spring-boot", Map.of(), 5, "test"),
+                "createCfDeployment", true,
+                "missionId", "wmnd-2026-0001",
+                "clarifyingAnswers", "{\"cf_service_bindings\": \"[{\\\"type\\\":\\\"postgresql\\\",\\\"instanceName\\\":\\\"my-db\\\"},{\\\"type\\\":\\\"redis\\\",\\\"instanceName\\\":\\\"\\\"}]\"}"
+        ));
+
+        var result = node.apply(state);
+
+        @SuppressWarnings("unchecked")
+        var tasks = (List<Task>) result.get("tasks");
+        String instructions = tasks.get(tasks.size() - 1).inputContext();
+        assertTrue(instructions.contains("my-db"));
+        // The redis binding with blank instanceName should be filtered out by extractServiceNames
+        // and not produce any garbage entries
+        assertTrue(instructions.contains("Service Bindings"));
+    }
+
+    @Test
+    @DisplayName("sanitizeServiceName uses whitelist allowing only alphanumerics and hyphens")
+    void sanitizeServiceNameWhitelistApproach() {
+        var mockLlm = mock(LlmService.class);
+        var plan = new MissionPlan("Build app", "sequential", List.of(
+                new MissionPlan.TaskPlan("CODER", "Create app", "", "Done", List.of(), List.of("src/App.java"))
+        ));
+        when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
+
+        var node = new PlanMissionNode(mockLlm, new DeployerProperties());
+        // Service name with spaces, colons, and special chars
+        var state = new WorldmindState(Map.of(
+                "request", "Build app",
+                "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
+                "projectContext", new ProjectContext(".", List.of(), "java", "spring-boot", Map.of(), 5, "test"),
+                "createCfDeployment", true,
+                "missionId", "wmnd-2026-0001",
+                "clarifyingAnswers", "{\"cf_service_bindings\": \"my db:instance, valid-name-123\"}"
+        ));
+
+        var result = node.apply(state);
+
+        @SuppressWarnings("unchecked")
+        var tasks = (List<Task>) result.get("tasks");
+        String instructions = tasks.get(tasks.size() - 1).inputContext();
+        // Spaces and colons should be stripped by whitelist
+        assertTrue(instructions.contains("mydbinstance"));
+        assertTrue(instructions.contains("valid-name-123"));
+    }
+
+    @Test
     @DisplayName("injects CODER task when LLM plan contains only RESEARCHER and REVIEWER")
     void injectsCoderWhenMissing() {
         var mockLlm = mock(LlmService.class);

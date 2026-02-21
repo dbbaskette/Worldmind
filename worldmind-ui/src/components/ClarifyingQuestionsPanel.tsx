@@ -64,16 +64,11 @@ function parseDetectedServices(suggestedOptions?: string[]): ServiceBinding[] {
 
 /** Format service bindings as JSON array string for the answer payload */
 function formatServiceBindingsAnswer(bindings: ServiceBinding[]): string {
-  const enabled = bindings.filter(b => b.enabled)
+  const enabled = bindings.filter(b => b.enabled && b.instanceName.trim() !== '')
   if (enabled.length === 0) return 'No services needed'
   return JSON.stringify(
     enabled.map(b => ({ type: b.type, instanceName: b.instanceName }))
   )
-}
-
-let nextId = 0
-function generateId(): string {
-  return `svc-${Date.now()}-${nextId++}`
 }
 
 const categoryColors: Record<string, string> = {
@@ -143,7 +138,7 @@ function ServiceBindingEditor({
     updateBindings(prev => [
       ...prev,
       {
-        id: generateId(),
+        id: crypto.randomUUID(),
         type: availableType,
         instanceName: '',
         enabled: true,
@@ -352,7 +347,23 @@ export function ClarifyingQuestionsPanel({ missionId, questions, onRefresh }: Cl
 
   const allRequiredAnswered = questions.questions
     .filter(q => q.required)
-    .every(q => (answers[q.id] || '').trim() !== '')
+    .every(q => {
+      const answer = (answers[q.id] || '').trim()
+      if (answer === '') return false
+      if (q.id === CF_SERVICE_BINDINGS_ID && answer !== 'No services needed') {
+        try {
+          const parsed = JSON.parse(answer)
+          if (Array.isArray(parsed)) {
+            return parsed.length > 0 && parsed.every(
+              (b: { instanceName?: string }) => b.instanceName && b.instanceName.trim() !== ''
+            )
+          }
+        } catch {
+          // Not JSON — accept as-is (legacy format)
+        }
+      }
+      return true
+    })
 
   return (
     <div className="mb-5 rounded-lg border border-wm-border bg-wm-card p-4">
