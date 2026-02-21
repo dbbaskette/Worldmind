@@ -1,13 +1,15 @@
 package com.worldmind.sandbox;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.stereotype.Component;
 
 /**
  * Configuration properties for the deployer agent.
  * Bound from {@code deployer.*} in application YAML.
+ * <p>
+ * Not annotated with {@code @Component} — enabled via
+ * {@code @EnableConfigurationProperties} in {@code DeployerConfig},
+ * matching the {@code CloudFoundryProperties} convention.
  */
-@Component
 @ConfigurationProperties(prefix = "deployer")
 public class DeployerProperties {
 

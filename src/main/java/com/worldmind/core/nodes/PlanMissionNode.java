@@ -304,7 +304,7 @@ public class PlanMissionNode {
         String clarifyingAnswers = state.clarifyingAnswers();
 
         var defaults = deployerProperties.getDefaults();
-        int healthTimeoutMinutes = deployerProperties.getHealthTimeout() / 60;
+        int healthTimeoutMinutes = (deployerProperties.getHealthTimeout() + 59) / 60;
 
         var sb = new StringBuilder();
         sb.append("# Deployment Task\n\n");
