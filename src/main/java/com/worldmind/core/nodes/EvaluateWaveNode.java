@@ -606,7 +606,9 @@ public class EvaluateWaveNode {
         return lower.contains("app started")
                 || lower.contains("instances running")
                 || (lower.contains("requested state") && lower.contains("running"))
-                || lower.contains("status: running");
+                || lower.contains("status: running")
+                || lower.contains("push successful")
+                || lower.contains("\nok\n");
     }
 
     /**
@@ -677,8 +679,10 @@ public class EvaluateWaveNode {
                     extractRelevantLogs(output, "staging", "error", "buildpack"));
         }
 
-        // App crashes
-        if (lower.contains("crashed") || lower.contains("exit status")) {
+        // App crashes — require non-zero exit status to avoid matching benign "exit status: 0" lines
+        if (lower.contains("crashed")
+                || lower.contains("exit status 1") || lower.contains("exit status 2")
+                || lower.contains("exit status 137") || lower.contains("exit status 143")) {
             boolean memoryRelated = lower.contains("out of memory") || lower.contains("oom") || lower.contains("memory");
             String reason = memoryRelated
                     ? "App crashed on start — likely out of memory"

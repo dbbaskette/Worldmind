@@ -408,8 +408,8 @@ class EvaluateWaveNodeTest {
     }
 
     @Test
-    @DisplayName("DEPLOYER health check failure -> retry with enriched context")
-    void deployerHealthCheckFailureRetry() {
+    @DisplayName("DEPLOYER app crash failure -> retry with enriched context")
+    void deployerAppCrashFailureRetry() {
         var d = deployerTask("TASK-DEPLOY", 0, 3, FailureStrategy.RETRY);
 
         var state = new WorldmindState(Map.of(
@@ -826,6 +826,123 @@ class EvaluateWaveNodeTest {
         String url = (String) result.get("deploymentUrl");
         assertNotNull(url, "Single-subdomain route should be captured");
         assertTrue(url.contains("myapp.example.com"), "URL should contain the single-subdomain route");
+    }
+
+    @Test
+    @DisplayName("DEPLOYER with null output -> UNKNOWN diagnosis and retry")
+    @SuppressWarnings("unchecked")
+    void deployerNullOutputRetry() {
+        var d = deployerTask("TASK-DEPLOY", 0, 3, FailureStrategy.RETRY);
+
+        var nullOutputResult = new WaveDispatchResult("TASK-DEPLOY", TaskStatus.PASSED, List.of(), null, 30000L);
+
+        var state = new WorldmindState(Map.of(
+                "waveTaskIds", List.of("TASK-DEPLOY"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(nullOutputResult)
+        ));
+
+        var result = node.apply(state);
+
+        // Null output -> isDeploymentSuccessful returns false -> diagnoseDeploymentFailure returns UNKNOWN
+        var completedIds = (List<String>) result.get("completedTaskIds");
+        assertTrue(completedIds == null || !completedIds.contains("TASK-DEPLOY"),
+                "DEPLOYER with null output should not be completed");
+        assertTrue(((String) result.get("retryContext")).contains("TASK-DEPLOY"));
+
+        var tasks = (List<Task>) result.get("tasks");
+        assertNotNull(tasks);
+        Task retryTask = tasks.stream().filter(t -> t.id().equals("TASK-DEPLOY")).findFirst().orElse(null);
+        assertNotNull(retryTask);
+        assertTrue(retryTask.inputContext().contains("UNKNOWN"),
+                "Null output should produce UNKNOWN diagnosis");
+    }
+
+    @Test
+    @DisplayName("DEPLOYER with empty output -> UNKNOWN diagnosis and retry")
+    @SuppressWarnings("unchecked")
+    void deployerEmptyOutputRetry() {
+        var d = deployerTask("TASK-DEPLOY", 0, 3, FailureStrategy.RETRY);
+
+        var emptyOutputResult = new WaveDispatchResult("TASK-DEPLOY", TaskStatus.PASSED, List.of(), "   ", 30000L);
+
+        var state = new WorldmindState(Map.of(
+                "waveTaskIds", List.of("TASK-DEPLOY"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(emptyOutputResult)
+        ));
+
+        var result = node.apply(state);
+
+        var completedIds = (List<String>) result.get("completedTaskIds");
+        assertTrue(completedIds == null || !completedIds.contains("TASK-DEPLOY"),
+                "DEPLOYER with empty output should not be completed");
+        assertTrue(((String) result.get("retryContext")).contains("TASK-DEPLOY"));
+
+        var tasks = (List<Task>) result.get("tasks");
+        assertNotNull(tasks);
+        Task retryTask = tasks.stream().filter(t -> t.id().equals("TASK-DEPLOY")).findFirst().orElse(null);
+        assertNotNull(retryTask);
+        assertTrue(retryTask.inputContext().contains("UNKNOWN"),
+                "Empty output should produce UNKNOWN diagnosis");
+    }
+
+    @Test
+    @DisplayName("Benign 'exit status 0' does not trigger APP_CRASHED")
+    @SuppressWarnings("unchecked")
+    void benignExitStatusZeroNotAppCrashed() {
+        var d = deployerTask("TASK-DEPLOY", 0, 3, FailureStrategy.RETRY);
+
+        // Output contains "exit status" in a benign context (exit status 0 = success)
+        String output = "Pushing app wmnd-2026-0001...\n"
+                + "Staging app...\n"
+                + "Build succeeded\n"
+                + "checking exit status: 0\n"
+                + "exit status code verified\n"
+                + "App started\n"
+                + "status: running";
+        var benignExitResult = new WaveDispatchResult("TASK-DEPLOY", TaskStatus.PASSED, List.of(), output, 30000L);
+
+        var state = new WorldmindState(Map.of(
+                "waveTaskIds", List.of("TASK-DEPLOY"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(benignExitResult)
+        ));
+
+        var result = node.apply(state);
+
+        // Should succeed — benign "exit status" mentions should not trigger APP_CRASHED
+        var completedIds = (List<String>) result.get("completedTaskIds");
+        assertTrue(completedIds != null && completedIds.contains("TASK-DEPLOY"),
+                "Benign 'exit status 0' should not prevent successful deployment");
+    }
+
+    @Test
+    @DisplayName("DEPLOYER success via 'OK' status line from cf push")
+    @SuppressWarnings("unchecked")
+    void deployerSuccessViaOkStatus() {
+        var d = deployerTask("TASK-DEPLOY", 0, 3, FailureStrategy.RETRY);
+
+        // cf push output with bare "OK" status line
+        String output = "Pushing app wmnd-2026-0001...\n"
+                + "Staging app...\n"
+                + "OK\n"
+                + "routes: wmnd-2026-0001.apps.example.com";
+        var okResult = new WaveDispatchResult("TASK-DEPLOY", TaskStatus.PASSED, List.of(), output, 30000L);
+
+        var state = new WorldmindState(Map.of(
+                "waveTaskIds", List.of("TASK-DEPLOY"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(okResult)
+        ));
+
+        var result = node.apply(state);
+
+        var completedIds = (List<String>) result.get("completedTaskIds");
+        assertTrue(completedIds != null && completedIds.contains("TASK-DEPLOY"),
+                "Deployment with 'OK' status line should be successful");
+        String url = (String) result.get("deploymentUrl");
+        assertNotNull(url, "Deployment URL should be captured");
     }
 
     @Test
