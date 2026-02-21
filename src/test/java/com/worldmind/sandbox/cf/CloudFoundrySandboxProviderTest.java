@@ -430,7 +430,7 @@ class CloudFoundrySandboxProviderTest {
         cfProperties.setCfPassword("cf-pass");
         cfProperties.setAppsDomain("tas-tdc.kuhn-labs.com");
 
-        for (var agentType : List.of("coder", "tester", "reviewer", "researcher")) {
+        for (var agentType : List.of("coder", "tester", "reviewer", "researcher", "refactorer")) {
             stubApiClient.createTaskCalls.clear();
             var request = makeRequest(agentType, "TASK-001");
 

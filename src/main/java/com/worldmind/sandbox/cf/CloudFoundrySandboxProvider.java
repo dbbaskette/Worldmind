@@ -134,15 +134,17 @@ public class CloudFoundrySandboxProvider implements SandboxProvider {
                 .map(e -> "export %s='%s'".formatted(e.getKey(), e.getValue().replace("'", "'\\''")))
                 .collect(Collectors.joining(" && "));
 
-        // SPEC DIVERGENCE: The original spec called for CF credentials to be
-        // "included in the env vars passed to the CF task" (via CF API environment_variables).
-        // Instead, we inject them as bash export statements within the task command.
-        // This is more secure: CF API environment_variables are visible in `cf tasks`
-        // output and audit logs, whereas command-embedded exports are not exposed separately.
+        // ACCEPTED RISK: CF credentials are injected as bash export statements within
+        // the task command string. This means they are visible to any user with
+        // permission to list tasks (`cf tasks <app>`) or access CF Cloud Controller
+        // audit logs. maskSensitiveData() only protects local application logs, not
+        // the CF platform-level audit trail. A future improvement could use CredHub
+        // references or a secrets service to avoid embedding plaintext credentials.
         //
         // For DEPLOYER tasks only: inject CF credentials so the agent can
         // authenticate and deploy to the target CF environment.
-        // Other agent types (coder, tester, reviewer) do not need CF credentials.
+        // Other agent types (coder, tester, reviewer, refactorer, researcher) do not
+        // need CF credentials.
         if ("deployer".equals(type)) {
             var cfCredExports = new StringBuilder();
             appendExport(cfCredExports, "CF_API_URL", cfProperties.getApiUrl());
@@ -490,16 +492,6 @@ public class CloudFoundrySandboxProvider implements SandboxProvider {
     }
 
     /**
-     * Masks sensitive data (credentials, API keys, tokens) in a string for safe logging.
-     * Replaces:
-     * - Embedded URL credentials like https://user:token@host with https://***@host
-     * - Environment variables like API_KEY=secret with API_KEY=***
-     * - Export statements like export OPENAI_API_KEY='secret' with export OPENAI_API_KEY='***'
-     *
-     * @param input the string that may contain sensitive data
-     * @return the string with sensitive data masked
-     */
-    /**
      * Appends a bash export statement to the builder if the value is non-blank.
      */
     private static void appendExport(StringBuilder sb, String key, String value) {
@@ -509,6 +501,16 @@ public class CloudFoundrySandboxProvider implements SandboxProvider {
         }
     }
 
+    /**
+     * Masks sensitive data (credentials, API keys, tokens) in a string for safe logging.
+     * Replaces:
+     * - Embedded URL credentials like https://user:token@host with https://***@host
+     * - Environment variables like API_KEY=secret with API_KEY=***
+     * - Export statements like export OPENAI_API_KEY='secret' with export OPENAI_API_KEY='***'
+     *
+     * @param input the string that may contain sensitive data
+     * @return the string with sensitive data masked
+     */
     static String maskSensitiveData(String input) {
         if (input == null) return null;
         String result = SENSITIVE_URL_PATTERN.matcher(input).replaceAll("$1***@");
