@@ -23,3 +23,7 @@ pnpm-debug.log*
 # OS files
 .DS_Store
 Thumbs.db
+
+# Node.js binary — managed by the frontend-maven-plugin (or nvm/fnm).
+# The binary should not be tracked in git; use a node version manager instead.
+node/

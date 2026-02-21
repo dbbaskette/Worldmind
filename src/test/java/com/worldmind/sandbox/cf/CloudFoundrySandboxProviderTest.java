@@ -482,6 +482,47 @@ class CloudFoundrySandboxProviderTest {
     }
 
     @Test
+    void singleQuoteEscapingAppliesToAllAgentTypes() {
+        // The bash escaping fix (replace("'", "'\\''")) applies globally to all agent
+        // types, not just coder. This test documents the cross-agent scope: any agent
+        // type whose env var values contain single quotes will have them escaped correctly.
+        for (var agentType : List.of("coder", "tester", "reviewer", "deployer", "researcher")) {
+            stubApiClient.createTaskCalls.clear();
+            var request = new AgentRequest(
+                    agentType,
+                    agentType.equals("tester") ? "TASK-001-TESTER"
+                            : agentType.equals("reviewer") ? "TASK-001-REVIEWER"
+                            : "TASK-001",
+                    Path.of("/tmp/project"),
+                    "Build something", Map.of("APP_NAME", "Bob's App"),
+                    4096, 2, "", "base", 0
+            );
+
+            provider.openSandbox(request);
+
+            var call = stubApiClient.createTaskCalls.get(0);
+            assertTrue(call.command.contains("Bob'\\''s App"),
+                    agentType.toUpperCase() + " should escape single quotes in env vars: " + call.command);
+        }
+    }
+
+    @Test
+    void deployerCfCredentialSingleQuotesAreEscaped() {
+        // CF credentials containing single quotes must also be escaped.
+        // This verifies the appendExport helper uses the same escaping logic.
+        cfProperties.setCfUsername("user");
+        cfProperties.setCfPassword("pass'word");
+
+        var request = makeRequest("deployer", "TASK-001");
+
+        provider.openSandbox(request);
+
+        var call = stubApiClient.createTaskCalls.get(0);
+        assertTrue(call.command.contains("pass'\\''word"),
+                "DEPLOYER CF_PASSWORD with single quote should be escaped: " + call.command);
+    }
+
+    @Test
     void researcherTaskStaysOnDefaultBranch() {
         var request = makeRequest("researcher", "TASK-001");
 
