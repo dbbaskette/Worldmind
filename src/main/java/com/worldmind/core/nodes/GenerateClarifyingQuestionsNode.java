@@ -186,6 +186,9 @@ public class GenerateClarifyingQuestionsNode {
             suggestedOptions.add("No services needed");
             suggestedOptions.add("Other (please describe)");
 
+            // Note: defaultAnswer is pre-filled with detected service placeholders.
+            // If the user selects "No services needed" from suggestedOptions, the UI
+            // must use that selection as the answer, overriding/clearing the defaultAnswer.
             defaultAnswer = detectedServices.stream()
                     .map(s -> s.serviceType() + ": <instance-name>")
                     .collect(Collectors.joining("\n"));

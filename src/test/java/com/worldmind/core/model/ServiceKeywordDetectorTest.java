@@ -51,12 +51,30 @@ class ServiceKeywordDetectorTest {
     }
 
     @Test
-    @DisplayName("detects Redis from 'cache' keyword")
-    void detectsRedisFromCache() {
+    @DisplayName("detects Redis from 'distributed cache' keyword")
+    void detectsRedisFromDistributedCache() {
         var result = ServiceKeywordDetector.detect("The app needs a distributed cache");
         assertEquals(1, result.size());
         assertEquals("redis", result.get(0).serviceType());
-        assertTrue(result.get(0).matchedKeywords().contains("cache"));
+        assertTrue(result.get(0).matchedKeywords().contains("distributed cache"));
+    }
+
+    @Test
+    @DisplayName("detects Redis from 'in-memory cache' keyword")
+    void detectsRedisFromInMemoryCache() {
+        var result = ServiceKeywordDetector.detect("Use an in-memory cache for fast lookups");
+        assertEquals(1, result.size());
+        assertEquals("redis", result.get(0).serviceType());
+        assertTrue(result.get(0).matchedKeywords().contains("in-memory cache"));
+    }
+
+    @Test
+    @DisplayName("detects Redis from 'redis cache' keyword")
+    void detectsRedisFromRedisCache() {
+        var result = ServiceKeywordDetector.detect("Add a redis cache layer");
+        assertEquals(1, result.size());
+        assertEquals("redis", result.get(0).serviceType());
+        assertTrue(result.get(0).matchedKeywords().contains("redis cache"));
     }
 
     @Test
@@ -255,5 +273,59 @@ class ServiceKeywordDetectorTest {
         var types = result.stream().map(ServiceKeywordDetector.DetectedService::serviceType).toList();
         assertTrue(types.contains("postgresql"));
         assertTrue(types.contains("redis"));
+    }
+
+    @Test
+    @DisplayName("does not false-positive on generic 'cache' without qualifier")
+    void noFalsePositiveOnGenericCache() {
+        var result = ServiceKeywordDetector.detect(
+                "Set cache-control headers and enable browser cache for static assets");
+        var types = result.stream().map(ServiceKeywordDetector.DetectedService::serviceType).toList();
+        assertFalse(types.contains("redis"));
+    }
+
+    @Test
+    @DisplayName("does not false-positive on 'Spring @Cacheable' without Redis context")
+    void noFalsePositiveOnSpringCacheable() {
+        var result = ServiceKeywordDetector.detect(
+                "Use Spring @Cacheable annotation with EhCache for method-level caching");
+        var types = result.stream().map(ServiceKeywordDetector.DetectedService::serviceType).toList();
+        assertFalse(types.contains("redis"));
+    }
+
+    @Test
+    @DisplayName("does not false-positive 'mongo' as substring in other words")
+    void noFalsePositiveOnMongoSubstring() {
+        var result = ServiceKeywordDetector.detect(
+                "The mongoose library processes data in mongolia");
+        var types = result.stream().map(ServiceKeywordDetector.DetectedService::serviceType).toList();
+        assertFalse(types.contains("mongodb"));
+    }
+
+    @Test
+    @DisplayName("does not false-positive 's3' as substring in other tokens")
+    void noFalsePositiveOnS3Substring() {
+        var result = ServiceKeywordDetector.detect(
+                "The AS3 class handles DNS3 configuration");
+        var types = result.stream().map(ServiceKeywordDetector.DetectedService::serviceType).toList();
+        assertFalse(types.contains("s3"));
+    }
+
+    @Test
+    @DisplayName("still detects 's3' as a standalone word")
+    void detectsS3AsStandaloneWord() {
+        var result = ServiceKeywordDetector.detect("Upload user avatars to S3");
+        assertEquals(1, result.size());
+        assertEquals("s3", result.get(0).serviceType());
+        assertTrue(result.get(0).matchedKeywords().contains("s3"));
+    }
+
+    @Test
+    @DisplayName("still detects 'mongo' as a standalone word")
+    void detectsMongoAsStandaloneWord() {
+        var result = ServiceKeywordDetector.detect("Connect to Mongo for persistence");
+        assertEquals(1, result.size());
+        assertEquals("mongodb", result.get(0).serviceType());
+        assertTrue(result.get(0).matchedKeywords().contains("mongo"));
     }
 }

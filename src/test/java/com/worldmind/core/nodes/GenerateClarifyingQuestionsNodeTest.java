@@ -109,6 +109,7 @@ class GenerateClarifyingQuestionsNodeTest {
         assertTrue(cfQuestion.question().contains("detected from:"));
         assertTrue(cfQuestion.suggestedOptions().stream()
                 .anyMatch(opt -> opt.startsWith("postgresql:")));
+        assertTrue(cfQuestion.defaultAnswer().contains("postgresql: <instance-name>"));
     }
 
     @Test
@@ -334,5 +335,30 @@ class GenerateClarifyingQuestionsNodeTest {
         assertEquals("q1", questions.questions().get(0).id());
         assertEquals("q2", questions.questions().get(1).id());
         assertEquals("cf_service_bindings", questions.questions().get(2).id());
+    }
+
+    @Test
+    @DisplayName("handles null questions list from LLM when CF deployment enabled")
+    void handlesNullQuestionsFromLlm() {
+        var mockLlm = mock(LlmService.class);
+        var llmQuestions = new ClarifyingQuestions(null, "Building an app");
+        when(mockLlm.structuredCall(anyString(), anyString(), eq(ClarifyingQuestions.class)))
+                .thenReturn(llmQuestions);
+
+        var node = new GenerateClarifyingQuestionsNode(mockLlm);
+        var state = new WorldmindState(Map.of(
+                "request", "Build a todo app with PostgreSQL",
+                "classification", DEFAULT_CLASSIFICATION,
+                "projectContext", DEFAULT_PROJECT_CONTEXT,
+                "createCfDeployment", true
+        ));
+
+        var result = node.apply(state);
+        var questions = (ClarifyingQuestions) result.get("clarifyingQuestions");
+
+        assertNotNull(questions.questions());
+        assertEquals(1, questions.questions().size());
+        assertEquals("cf_service_bindings", questions.questions().get(0).id());
+        assertTrue(questions.questions().get(0).defaultAnswer().contains("postgresql: <instance-name>"));
     }
 }

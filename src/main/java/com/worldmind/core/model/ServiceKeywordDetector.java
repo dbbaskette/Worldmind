@@ -2,6 +2,8 @@ package com.worldmind.core.model;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Scans text content (PRD documents, mission requests) for keywords
@@ -28,6 +30,13 @@ public final class ServiceKeywordDetector {
         List<String> keywords
     ) {}
 
+    /**
+     * Keywords that require word-boundary matching to avoid false positives.
+     * Short or ambiguous tokens (e.g. "s3", "mongo") could otherwise match
+     * unrelated content like filenames or longer words.
+     */
+    private static final Set<String> WORD_BOUNDARY_KEYWORDS = Set.of("mongo", "s3");
+
     private static final List<ServicePattern> SERVICE_PATTERNS = List.of(
             new ServicePattern("postgresql", "PostgreSQL Database",
                     List.of("postgresql", "postgres", "psql", "relational database", "jpa", "spring-data-jpa")),
@@ -36,7 +45,7 @@ public final class ServiceKeywordDetector {
             new ServicePattern("mongodb", "MongoDB Database",
                     List.of("mongodb", "mongo", "document database")),
             new ServicePattern("redis", "Redis Cache",
-                    List.of("redis", "cache", "session store")),
+                    List.of("redis", "redis cache", "distributed cache", "in-memory cache", "session store")),
             new ServicePattern("rabbitmq", "RabbitMQ Message Queue",
                     List.of("rabbitmq", "message queue", "amqp")),
             new ServicePattern("s3", "S3/Blob Storage",
@@ -63,7 +72,7 @@ public final class ServiceKeywordDetector {
         for (var pattern : SERVICE_PATTERNS) {
             var matched = new ArrayList<String>();
             for (String keyword : pattern.keywords()) {
-                if (lowerText.contains(keyword.toLowerCase())) {
+                if (matchesKeyword(lowerText, keyword)) {
                     matched.add(keyword);
                 }
             }
@@ -73,5 +82,13 @@ public final class ServiceKeywordDetector {
         }
 
         return detected;
+    }
+
+    private static boolean matchesKeyword(String lowerText, String keyword) {
+        if (WORD_BOUNDARY_KEYWORDS.contains(keyword)) {
+            return Pattern.compile("\\b" + Pattern.quote(keyword) + "\\b")
+                    .matcher(lowerText).find();
+        }
+        return lowerText.contains(keyword);
     }
 }
