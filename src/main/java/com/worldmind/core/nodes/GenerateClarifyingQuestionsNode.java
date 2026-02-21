@@ -5,6 +5,7 @@ import com.worldmind.core.model.ClarifyingQuestions;
 import com.worldmind.core.model.Classification;
 import com.worldmind.core.model.MissionStatus;
 import com.worldmind.core.model.ProjectContext;
+import com.worldmind.core.model.ServiceKeywordDetector;
 import com.worldmind.core.state.WorldmindState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Generates clarifying questions to gather more context before creating the PRD.
@@ -111,9 +113,14 @@ public class GenerateClarifyingQuestionsNode {
         String userPrompt = buildUserPrompt(request, classification, projectContext);
         ClarifyingQuestions questions = llmService.structuredCall(SYSTEM_PROMPT, userPrompt, ClarifyingQuestions.class);
         
-        // If CF deployment is requested, inject service binding question
+        // If CF deployment is requested, inject service binding question with auto-detection
         if (state.createCfDeployment()) {
-            questions = injectCfServiceBindingQuestion(questions);
+            String contentToScan = request;
+            String prdDocument = state.prdDocument();
+            if (prdDocument != null && !prdDocument.isBlank()) {
+                contentToScan = contentToScan + "\n" + prdDocument;
+            }
+            questions = injectCfServiceBindingQuestion(questions, contentToScan);
             log.info("Injected CF service binding question (createCfDeployment=true)");
         }
         
@@ -138,33 +145,83 @@ public class GenerateClarifyingQuestionsNode {
 
     /**
      * Injects a CF service binding question when CF deployment is requested.
-     * This allows users to specify what services (databases, message queues, etc.)
-     * should be bound to the deployed application.
+     * Scans the provided content (request + PRD) for service keywords and
+     * presents detected services as pre-filled suggestions.
+     *
+     * @param original the LLM-generated clarifying questions to append to
+     * @param contentToScan combined request and PRD text for keyword detection
      */
-    private ClarifyingQuestions injectCfServiceBindingQuestion(ClarifyingQuestions original) {
+    private ClarifyingQuestions injectCfServiceBindingQuestion(ClarifyingQuestions original, String contentToScan) {
+        List<ServiceKeywordDetector.DetectedService> detectedServices = ServiceKeywordDetector.detect(contentToScan);
+
+        String questionText;
+        List<String> suggestedOptions;
+        String defaultAnswer;
+
+        if (!detectedServices.isEmpty()) {
+            log.info("Auto-detected {} service(s) from content: {}", detectedServices.size(),
+                    detectedServices.stream().map(ServiceKeywordDetector.DetectedService::serviceType)
+                            .collect(Collectors.joining(", ")));
+
+            var sb = new StringBuilder();
+            sb.append("We detected your application may need these Cloud Foundry services:\n");
+            for (var service : detectedServices) {
+                sb.append("- ").append(service.displayName())
+                        .append(" (detected from: ")
+                        .append(service.matchedKeywords().stream()
+                                .map(k -> "\"" + k + "\"")
+                                .collect(Collectors.joining(", ")))
+                        .append(")\n");
+            }
+            sb.append("\nPlease provide the pre-created service instance names, ");
+            sb.append("remove incorrect detections, or add additional services.\n\n");
+            sb.append("Format: service-type: instance-name (one per line)\n");
+            sb.append("Example: postgresql: my-todo-db");
+            questionText = sb.toString();
+
+            suggestedOptions = new ArrayList<>();
+            for (var service : detectedServices) {
+                suggestedOptions.add(service.serviceType() + ": <instance-name>");
+            }
+            suggestedOptions.add("No services needed");
+            suggestedOptions.add("Other (please describe)");
+
+            defaultAnswer = detectedServices.stream()
+                    .map(s -> s.serviceType() + ": <instance-name>")
+                    .collect(Collectors.joining("\n"));
+        } else {
+            questionText = "Does your application need to bind to any Cloud Foundry services? "
+                    + "If yes, please specify the service name(s) and type(s).\n\n"
+                    + "Format: service-type: instance-name (one per line)\n"
+                    + "Example: postgresql: my-todo-db";
+            suggestedOptions = List.of(
+                    "No services needed",
+                    "PostgreSQL database (specify instance name)",
+                    "MySQL database (specify instance name)",
+                    "Redis cache (specify instance name)",
+                    "RabbitMQ (specify instance name)",
+                    "Other (please describe)"
+            );
+            defaultAnswer = "No services needed";
+        }
+
         var cfQuestion = new ClarifyingQuestions.Question(
                 "cf_service_bindings",
-                "Does your application need to bind to any Cloud Foundry services? If yes, please specify the service name(s) and type(s).",
+                questionText,
                 "integration",
-                "Cloud Foundry apps often need databases, caches, or message queues. Specifying these now ensures the manifest.yml includes the correct service bindings.",
-                List.of(
-                        "No services needed",
-                        "PostgreSQL database (specify instance name)",
-                        "MySQL database (specify instance name)",
-                        "Redis cache (specify instance name)",
-                        "RabbitMQ (specify instance name)",
-                        "Other (please describe)"
-                ),
+                "Cloud Foundry apps often need databases, caches, or message queues. "
+                        + "Specifying these now ensures the manifest.yml includes the correct service bindings.",
+                suggestedOptions,
                 false,
-                "No services needed"
+                defaultAnswer
         );
-        
+
         List<ClarifyingQuestions.Question> allQuestions = new ArrayList<>();
         if (original.questions() != null) {
             allQuestions.addAll(original.questions());
         }
         allQuestions.add(cfQuestion);
-        
+
         return new ClarifyingQuestions(allQuestions, original.summary());
     }
 
