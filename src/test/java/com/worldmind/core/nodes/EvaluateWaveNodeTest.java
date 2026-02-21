@@ -110,7 +110,7 @@ class EvaluateWaveNodeTest {
         var result = node.apply(state);
 
         var completedIds = (List<String>) result.get("completedTaskIds");
-        assertFalse(completedIds.contains("TASK-001"));
+        assertTrue(completedIds == null || !completedIds.contains("TASK-001"));
         assertTrue(((String) result.get("retryContext")).contains("TASK-001"));
     }
 
@@ -226,7 +226,7 @@ class EvaluateWaveNodeTest {
 
         // RETRY: should NOT be in completedIds, and retryContext should be set
         var completedIds = (List<String>) result.get("completedTaskIds");
-        assertFalse(completedIds.contains("TASK-001"));
+        assertTrue(completedIds == null || !completedIds.contains("TASK-001"));
         assertTrue(((String) result.get("retryContext")).contains("TASK-001"));
         // No TESTER/REVIEWER dispatch for a failed task
         verify(mockBridge, never()).executeTask(any(), any(), any(), any(), any());
@@ -258,14 +258,15 @@ class EvaluateWaveNodeTest {
 
         var result = node.apply(state);
 
-        // Should still produce a result (not crash)
-        assertNotNull(result.get("completedTaskIds"));
+        // Should still produce a result (not crash) — retryContext is set for RETRY
+        assertNotNull(result);
+        assertTrue(result.containsKey("retryContext") || result.containsKey("completedTaskIds"),
+                "Result should contain either retryContext or completedTaskIds");
     }
 
     @Test
-    @DisplayName("CODER with no file changes -> immediately ESCALATES to FAILED (no retry)")
-    void coderNoFileChangesEscalatesImmediately() {
-        // Even on first iteration with RETRY strategy, empty CODER should escalate
+    @DisplayName("CODER with no file changes -> retries (TESTER/REVIEWER not dispatched)")
+    void coderNoFileChangesRetries() {
         var d = coderTask("TASK-001", 0, 3, FailureStrategy.RETRY);
 
         var state = new WorldmindState(Map.of(
@@ -276,8 +277,8 @@ class EvaluateWaveNodeTest {
 
         var result = node.apply(state);
 
-        // Should immediately FAIL the mission — no point retrying when agent wrote nothing
-        assertEquals(MissionStatus.FAILED.name(), result.get("status"));
+        // Should retry — gives the agent another chance to produce code
+        assertTrue(((String) result.get("retryContext")).contains("TASK-001"));
         // Should NOT run TESTER/REVIEWER on empty output
         verify(mockBridge, never()).executeTask(any(), any(), any(), any(), any());
     }
@@ -400,6 +401,10 @@ class EvaluateWaveNodeTest {
         verify(mockBridge, never()).executeTask(any(), any(), any(), any(), any());
         // No mission failure
         assertNull(result.get("status"));
+        // Deployment URL is captured in task output on success
+        String url = (String) result.get("deploymentUrl");
+        assertNotNull(url, "Deployment URL should be captured on DEPLOYER success");
+        assertTrue(url.contains("wmnd-2026-0001"), "Deployment URL should contain the app route");
     }
 
     @Test
@@ -794,6 +799,33 @@ class EvaluateWaveNodeTest {
         assertNotNull(errors);
         assertTrue(errors.stream().anyMatch(e -> e.contains("staging")),
                 "Staging failure error should mention staging");
+    }
+
+    @Test
+    @DisplayName("DEPLOYER success with single-subdomain route -> URL captured")
+    void deployerSuccessSingleSubdomainRoute() {
+        var d = deployerTask("TASK-DEPLOY", 0, 3, FailureStrategy.RETRY);
+
+        // Single-subdomain route (e.g., myapp.example.com — only one dot)
+        String output = "Pushing app myapp...\n"
+                + "Staging app...\n"
+                + "Build succeeded\n"
+                + "routes: myapp.example.com\n"
+                + "status: running\n"
+                + "App started";
+        var singleSubdomainResult = new WaveDispatchResult("TASK-DEPLOY", TaskStatus.PASSED, List.of(), output, 30000L);
+
+        var state = new WorldmindState(Map.of(
+                "waveTaskIds", List.of("TASK-DEPLOY"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(singleSubdomainResult)
+        ));
+
+        var result = node.apply(state);
+
+        String url = (String) result.get("deploymentUrl");
+        assertNotNull(url, "Single-subdomain route should be captured");
+        assertTrue(url.contains("myapp.example.com"), "URL should contain the single-subdomain route");
     }
 
     @Test

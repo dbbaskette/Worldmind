@@ -289,6 +289,34 @@ class TaskSchedulerTest {
     }
 
     @Test
+    @DisplayName("DEPLOYER with mixed CODER and REFACTORER deps waits for all")
+    void deployerWaitsForMixedCoderAndRefactorerDeps() {
+        var tasks = List.of(
+                taskWithAgent("C1", "CODER", List.of(), List.of("src/A.java")),
+                taskWithAgent("R1", "REFACTORER", List.of(), List.of("src/B.java")),
+                taskWithAgent("C2", "CODER", List.of(), List.of("src/C.java")),
+                taskWithAgent("DEPLOY", "DEPLOYER", List.of("C1", "R1", "C2"), List.of("manifest.yml"))
+        );
+
+        // No tasks complete — DEPLOYER not eligible
+        var wave1 = scheduler.computeNextWave(tasks, Set.of(), ExecutionStrategy.PARALLEL, 10);
+        assertEquals(3, wave1.size());
+        assertTrue(wave1.containsAll(List.of("C1", "R1", "C2")));
+        assertFalse(wave1.contains("DEPLOY"));
+
+        // Only CODERs complete, REFACTORER not — DEPLOYER still not eligible
+        var wave2 = scheduler.computeNextWave(tasks, Set.of("C1", "C2"), ExecutionStrategy.PARALLEL, 10);
+        assertEquals(1, wave2.size());
+        assertTrue(wave2.contains("R1"));
+        assertFalse(wave2.contains("DEPLOY"));
+
+        // All deps complete (CODER + REFACTORER) — DEPLOYER now eligible
+        var wave3 = scheduler.computeNextWave(tasks, Set.of("C1", "R1", "C2"), ExecutionStrategy.PARALLEL, 10);
+        assertEquals(1, wave3.size());
+        assertTrue(wave3.contains("DEPLOY"));
+    }
+
+    @Test
     @DisplayName("DEPLOYER runs as single-task wave after all coders")
     void deployerRunsAsSingleTaskWave() {
         var tasks = List.of(
