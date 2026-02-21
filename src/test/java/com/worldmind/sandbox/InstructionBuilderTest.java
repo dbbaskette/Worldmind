@@ -240,7 +240,171 @@ class InstructionBuilderTest {
         assertTrue(instruction.contains("No baseline tests available"));
     }
 
+    // --- Deployer instruction tests ---
+
+    @Test
+    void deployerIncludesTaskIdAndHeader() {
+        var task = deployerTask();
+
+        String instruction = InstructionBuilder.buildDeployerInstruction(
+                task, "my-todo-app", "cf.example.com", false, List.of(), "spring-boot");
+
+        assertTrue(instruction.contains("Deployment Task: TASK-DEPLOY"));
+        assertTrue(instruction.contains("Deploy the completed application to Cloud Foundry"));
+    }
+
+    @Test
+    void deployerIncludesApplicationDetails() {
+        var task = deployerTask();
+
+        String instruction = InstructionBuilder.buildDeployerInstruction(
+                task, "my-todo-app", "cf.example.com", false, List.of(), "spring-boot");
+
+        assertTrue(instruction.contains("spring-boot"));
+        assertTrue(instruction.contains("target/*.jar"));
+        assertTrue(instruction.contains("my-todo-app.apps.cf.example.com"));
+    }
+
+    @Test
+    void deployerIncludesCfAuthWithEnvVars() {
+        var task = deployerTask();
+
+        String instruction = InstructionBuilder.buildDeployerInstruction(
+                task, "my-app", "cf.example.com", false, List.of(), "spring-boot");
+
+        assertTrue(instruction.contains("$CF_API_URL"));
+        assertTrue(instruction.contains("$CF_USERNAME"));
+        assertTrue(instruction.contains("$CF_PASSWORD"));
+        assertTrue(instruction.contains("$CF_ORG"));
+        assertTrue(instruction.contains("$CF_SPACE"));
+    }
+
+    @Test
+    void deployerIncludesBuildCommands() {
+        var task = deployerTask();
+
+        String instruction = InstructionBuilder.buildDeployerInstruction(
+                task, "my-app", "cf.example.com", false, List.of(), "spring-boot");
+
+        assertTrue(instruction.contains("./mvnw clean package -DskipTests"));
+        assertTrue(instruction.contains("mvn clean package -DskipTests"));
+    }
+
+    @Test
+    void deployerGeneratesManifestWhenNotCreatedByTask() {
+        var task = deployerTask();
+
+        String instruction = InstructionBuilder.buildDeployerInstruction(
+                task, "my-todo-app", "cf.example.com", false, List.of(), "spring-boot");
+
+        assertTrue(instruction.contains("name: my-todo-app"));
+        assertTrue(instruction.contains("memory: 1G"));
+        assertTrue(instruction.contains("instances: 1"));
+        assertTrue(instruction.contains("java_buildpack_offline"));
+        assertTrue(instruction.contains("route: my-todo-app.apps.cf.example.com"));
+        assertTrue(instruction.contains("JBP_CONFIG_OPEN_JDK_JRE: '{ jre: { version: 21.+ } }'"));
+    }
+
+    @Test
+    void deployerUsesExistingManifestWhenCreatedByTask() {
+        var task = deployerTask();
+
+        String instruction = InstructionBuilder.buildDeployerInstruction(
+                task, "my-app", "cf.example.com", true, List.of(), "spring-boot");
+
+        assertTrue(instruction.contains("Use the existing manifest as-is"));
+        assertFalse(instruction.contains("name: my-app\n"));
+        assertFalse(instruction.contains("java_buildpack_offline"));
+    }
+
+    @Test
+    void deployerIncludesServiceBindingsInManifest() {
+        var task = deployerTask();
+        var services = List.of("todo-db", "redis-cache");
+
+        String instruction = InstructionBuilder.buildDeployerInstruction(
+                task, "my-app", "cf.example.com", false, services, "spring-boot");
+
+        assertTrue(instruction.contains("services:"));
+        assertTrue(instruction.contains("  - todo-db"));
+        assertTrue(instruction.contains("  - redis-cache"));
+    }
+
+    @Test
+    void deployerOmitsServicesWhenEmpty() {
+        var task = deployerTask();
+
+        String instruction = InstructionBuilder.buildDeployerInstruction(
+                task, "my-app", "cf.example.com", false, List.of(), "spring-boot");
+
+        assertFalse(instruction.contains("services:"));
+    }
+
+    @Test
+    void deployerOmitsServicesWhenNull() {
+        var task = deployerTask();
+
+        String instruction = InstructionBuilder.buildDeployerInstruction(
+                task, "my-app", "cf.example.com", false, null, "spring-boot");
+
+        assertFalse(instruction.contains("services:"));
+    }
+
+    @Test
+    void deployerIncludesDeployCommand() {
+        var task = deployerTask();
+
+        String instruction = InstructionBuilder.buildDeployerInstruction(
+                task, "my-app", "cf.example.com", false, List.of(), "spring-boot");
+
+        assertTrue(instruction.contains("cf push -f manifest.yml"));
+    }
+
+    @Test
+    void deployerIncludesVerificationAndSuccessCriteria() {
+        var task = deployerTask();
+
+        String instruction = InstructionBuilder.buildDeployerInstruction(
+                task, "my-app", "cf.example.com", false, List.of(), "spring-boot");
+
+        assertTrue(instruction.contains("cf app my-app"));
+        assertTrue(instruction.contains("running"));
+        assertTrue(instruction.contains("health check"));
+        assertTrue(instruction.contains("no crashes"));
+    }
+
+    @Test
+    void deployerUsesDefaultsForNullParameters() {
+        var task = deployerTask();
+
+        String instruction = InstructionBuilder.buildDeployerInstruction(
+                task, null, null, false, null, null);
+
+        assertTrue(instruction.contains("name: app"));
+        assertTrue(instruction.contains("$CF_APPS_DOMAIN"));
+        assertTrue(instruction.contains("spring-boot"));
+    }
+
+    @Test
+    void deployerRouteFollowsConvention() {
+        var task = deployerTask();
+
+        String instruction = InstructionBuilder.buildDeployerInstruction(
+                task, "snake-game", "apps.internal.io", false, List.of(), "spring-boot");
+
+        assertTrue(instruction.contains("route: snake-game.apps.apps.internal.io"));
+    }
+
     // --- Test helpers ---
+
+    private Task deployerTask() {
+        return new Task(
+            "TASK-DEPLOY", "DEPLOYER", "Build and deploy application to Cloud Foundry",
+            "", "App deployed, started, and health check passes within 5 minutes",
+            List.of("TASK-001"), TaskStatus.PENDING, 0, 3,
+            FailureStrategy.RETRY, List.of("manifest.yml"), List.of(), null
+        );
+    }
 
     private Task coderTask(String id, String description) {
         return new Task(

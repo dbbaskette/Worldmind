@@ -296,6 +296,110 @@ public final class InstructionBuilder {
     }
 
     /**
+     * Builds deployment instructions for the DEPLOYER agent.
+     * Generates step-by-step markdown that Goose follows to build and deploy the application
+     * to Cloud Foundry, including CF auth, build, manifest generation, deploy, and verification.
+     *
+     * @param task                  the DEPLOYER task
+     * @param missionId             mission identifier used for app name and route
+     * @param cfAppsDomain          CF apps domain for route generation
+     * @param manifestCreatedByTask whether a preceding task already created manifest.yml
+     * @param serviceBindings       service instance names to bind (may be null or empty)
+     * @param appType               application type, e.g. "spring-boot"
+     * @return markdown instruction string for the DEPLOYER agent
+     */
+    public static String buildDeployerInstruction(Task task, String missionId, String cfAppsDomain,
+                                                  boolean manifestCreatedByTask,
+                                                  List<String> serviceBindings, String appType) {
+        String appName = (missionId != null && !missionId.isBlank()) ? missionId : "app";
+        String domain = (cfAppsDomain != null && !cfAppsDomain.isBlank()) ? cfAppsDomain : "$CF_APPS_DOMAIN";
+        String route = appName + ".apps." + domain;
+        String type = (appType != null && !appType.isBlank()) ? appType : "spring-boot";
+        List<String> services = (serviceBindings != null) ? serviceBindings : List.of();
+
+        var sb = new StringBuilder();
+
+        sb.append("# Deployment Task: ").append(task.id()).append("\n\n");
+        sb.append("Deploy the completed application to Cloud Foundry.\n\n");
+
+        // Section 1: Application Details
+        sb.append("## Application Details\n\n");
+        sb.append("- **Type:** ").append(type).append("\n");
+        sb.append("- **Artifact path:** target/*.jar\n");
+        sb.append("- **Route:** ").append(route).append("\n\n");
+
+        // Section 2: CF Authentication
+        sb.append("## CF Authentication\n\n");
+        sb.append("```bash\n");
+        sb.append("cf api $CF_API_URL --skip-ssl-validation\n");
+        sb.append("cf auth $CF_USERNAME $CF_PASSWORD\n");
+        sb.append("cf target -o $CF_ORG -s $CF_SPACE\n");
+        sb.append("```\n\n");
+
+        // Section 3: Build
+        sb.append("## Build\n\n");
+        sb.append("If `./mvnw` exists, use it; otherwise fall back to `mvn`:\n");
+        sb.append("```bash\n");
+        sb.append("if [ -f ./mvnw ]; then\n");
+        sb.append("  ./mvnw clean package -DskipTests\n");
+        sb.append("else\n");
+        sb.append("  mvn clean package -DskipTests\n");
+        sb.append("fi\n");
+        sb.append("```\n\n");
+
+        // Section 4: Manifest
+        if (manifestCreatedByTask) {
+            sb.append("## Manifest\n\n");
+            sb.append("A preceding task has already created `manifest.yml`. ");
+            sb.append("Use the existing manifest as-is for deployment.\n\n");
+        } else {
+            sb.append("## Manifest\n\n");
+            sb.append("No task created a manifest. Create `manifest.yml` with this content:\n");
+            sb.append("```yaml\n");
+            sb.append("applications:\n");
+            sb.append("- name: ").append(appName).append("\n");
+            sb.append("  memory: 1G\n");
+            sb.append("  instances: 1\n");
+            sb.append("  path: target/*.jar\n");
+            sb.append("  buildpacks:\n");
+            sb.append("  - java_buildpack_offline\n");
+            sb.append("  routes:\n");
+            sb.append("  - route: ").append(route).append("\n");
+            sb.append("  env:\n");
+            sb.append("    JBP_CONFIG_OPEN_JDK_JRE: '{ jre: { version: 21.+ } }'\n");
+            if (!services.isEmpty()) {
+                sb.append("  services:\n");
+                for (String svc : services) {
+                    sb.append("  - ").append(svc).append("\n");
+                }
+            }
+            sb.append("```\n\n");
+        }
+
+        // Section 5: Deploy
+        sb.append("## Deploy\n\n");
+        sb.append("```bash\n");
+        sb.append("cf push -f manifest.yml\n");
+        sb.append("```\n\n");
+
+        // Section 6: Verification
+        sb.append("## Verification\n\n");
+        sb.append("Check the app status and verify the health check passes:\n");
+        sb.append("```bash\n");
+        sb.append("cf app ").append(appName).append("\n");
+        sb.append("```\n");
+        sb.append("Confirm the app shows `running` status and the health check passes within 5 minutes.\n\n");
+
+        // Section 7: Success Criteria
+        sb.append("## Success Criteria\n\n");
+        sb.append("- App is running with no crashes\n");
+        sb.append("- Health check passes\n");
+        sb.append("- App is accessible at `").append(route).append("`\n");
+
+        return sb.toString();
+    }
+
+    /**
      * Prepends a runtime environment preamble when runtimeTag is "base",
      * informing the agent that it may need to install tools at runtime.
      */
