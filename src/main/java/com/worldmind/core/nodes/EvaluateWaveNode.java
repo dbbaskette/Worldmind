@@ -89,6 +89,7 @@ public class EvaluateWaveNode {
             var errors = new ArrayList<String>();
             String retryContext = null;
             MissionStatus missionStatus = null;
+            String deploymentUrl = null;
 
             for (var id : waveIds) {
                 var task = taskMap.get(id);
@@ -105,6 +106,7 @@ public class EvaluateWaveNode {
                             completedIds, updatedTasks, errors);
                     if (deployResult.retryContext != null) retryContext = deployResult.retryContext;
                     if (deployResult.missionFailed) missionStatus = MissionStatus.FAILED;
+                    if (deployResult.deploymentUrl != null) deploymentUrl = deployResult.deploymentUrl;
                     continue;
                 }
 
@@ -270,6 +272,7 @@ public class EvaluateWaveNode {
             if (!sandboxInfos.isEmpty()) updates.put("sandboxes", sandboxInfos);
             if (!errors.isEmpty()) updates.put("errors", errors);
             if (retryContext != null) updates.put("retryContext", retryContext);
+            if (deploymentUrl != null) updates.put("deploymentUrl", deploymentUrl);
             if (missionStatus != null) updates.put("status", missionStatus.name());
 
             return updates;
@@ -525,13 +528,14 @@ public class EvaluateWaveNode {
         // DEPLOYER that failed at dispatch — apply failure strategy
         if (dispatchResult.status() == TaskStatus.FAILED) {
             log.info("DEPLOYER task {} failed at dispatch — applying failure strategy", id);
-            String reason = "Deployment failed during execution";
+            var diagnosis = diagnoseDeploymentFailure(dispatchResult.output());
+            String reason = "Deployment failed: " + diagnosis.reason();
             FailureStrategy action = task.onFailure() != null ? task.onFailure() : FailureStrategy.RETRY;
             if (action == FailureStrategy.RETRY && task.iteration() >= task.maxIterations()) {
                 action = FailureStrategy.ESCALATE;
             }
             return handleFailure(id, task, dispatchResult, action, reason,
-                    enrichDeployerRetryContext(task.inputContext(), reason, dispatchResult.output()),
+                    enrichDeployerRetryContext(task.inputContext(), diagnosis),
                     completedIds, updatedTasks, errors);
         }
 
@@ -540,20 +544,25 @@ public class EvaluateWaveNode {
         boolean deploymentSuccessful = isDeploymentSuccessful(output);
 
         if (deploymentSuccessful) {
-            String deploymentUrl = extractDeploymentUrl(output);
-            log.info("DEPLOYER task {} succeeded. Deployment URL: {}", id, deploymentUrl);
+            String url = extractDeploymentUrl(output);
+            log.info("DEPLOYER task {} succeeded. Deployment URL: {}", id, url);
             completedIds.add(id);
             updatedTasks.add(withResult(task, dispatchResult, TaskStatus.PASSED));
 
+            var outcome = new FailureOutcome();
+            outcome.deploymentUrl = url;
+
             eventBus.publish(new WorldmindEvent("deployer.success",
                     state.missionId(), id,
-                    Map.of("deploymentUrl", deploymentUrl != null ? deploymentUrl : ""),
+                    Map.of("deploymentUrl", url != null ? url : ""),
                     Instant.now()));
 
-            return new FailureOutcome();
+            return outcome;
         } else {
-            log.warn("DEPLOYER task {} failed health check — evaluating retry", id);
-            String reason = "Deployment health check failed. Check cf push output for staging errors or crash logs.";
+            var diagnosis = diagnoseDeploymentFailure(output);
+            log.warn("DEPLOYER task {} failed [{}]: {} — evaluating retry",
+                    id, diagnosis.failureType(), diagnosis.reason());
+            String reason = "Deployment failed: " + diagnosis.reason();
             FailureStrategy action = task.onFailure() != null ? task.onFailure() : FailureStrategy.RETRY;
             if (action == FailureStrategy.RETRY && task.iteration() >= task.maxIterations()) {
                 action = FailureStrategy.ESCALATE;
@@ -562,21 +571,37 @@ public class EvaluateWaveNode {
             eventBus.publish(new WorldmindEvent("deployer.failed",
                     state.missionId(), id,
                     Map.of("reason", reason,
+                           "failureType", diagnosis.failureType(),
+                           "suggestion", diagnosis.suggestion(),
                            "output", summarizeAgentOutput(output)),
                     Instant.now()));
 
             return handleFailure(id, task, dispatchResult, action, reason,
-                    enrichDeployerRetryContext(task.inputContext(), reason, output),
+                    enrichDeployerRetryContext(task.inputContext(), diagnosis),
                     completedIds, updatedTasks, errors);
         }
     }
 
     /**
      * Checks deployment output for success markers indicating the app started and is healthy.
+     * Failure markers take precedence — if the output contains both success and failure
+     * indicators (e.g., a transient "app started" followed by "CRASHED"), the deployment
+     * is considered failed.
      */
     private boolean isDeploymentSuccessful(String output) {
         if (output == null || output.isBlank()) return false;
         String lower = output.toLowerCase();
+
+        // Failure markers take precedence over success markers
+        if (lower.contains("crashed")
+                || lower.contains("staging error") || lower.contains("staging failed")
+                || lower.contains("failed to stage")
+                || lower.contains("health check timeout")
+                || lower.contains("build failure") || lower.contains("build failed")
+                || lower.contains("could not find service") || lower.contains("service binding failed")) {
+            return false;
+        }
+
         return lower.contains("app started")
                 || lower.contains("instances running")
                 || (lower.contains("requested state") && lower.contains("running"))
@@ -607,19 +632,112 @@ public class EvaluateWaveNode {
         return null;
     }
 
+    private record DeploymentDiagnosis(String failureType, String reason, String suggestion, String relevantLogs) {}
+
     /**
-     * Enriches DEPLOYER retry context with deployment failure details.
+     * Analyzes deployment output to produce a specific failure diagnosis with actionable suggestions.
      */
-    private String enrichDeployerRetryContext(String baseContext, String failureReason, String deployOutput) {
+    private DeploymentDiagnosis diagnoseDeploymentFailure(String output) {
+        if (output == null || output.isBlank()) {
+            return new DeploymentDiagnosis("UNKNOWN",
+                    "No deployment output available",
+                    "Check agent logs for execution errors", "");
+        }
+        String lower = output.toLowerCase();
+
+        // Maven/Gradle build failures (happen before cf push)
+        if (lower.contains("build failure") || lower.contains("build failed")) {
+            return new DeploymentDiagnosis("BUILD_FAILURE",
+                    "Maven/Gradle build failed before deployment",
+                    "Fix compilation errors or dependency issues in pom.xml/build.gradle",
+                    extractRelevantLogs(output, "BUILD FAILURE", "build failed", "ERROR"));
+        }
+
+        // Service binding failures
+        if (lower.contains("could not find service") || lower.contains("service binding failed")
+                || (lower.contains("service instance") && lower.contains("not found"))) {
+            return new DeploymentDiagnosis("SERVICE_BINDING_FAILURE",
+                    "Cloud Foundry service binding failed — required service instance does not exist",
+                    "Pre-create the required service instance using 'cf create-service' before deploying",
+                    extractRelevantLogs(output, "service", "binding", "not found"));
+        }
+
+        // CF staging failures
+        if (lower.contains("staging error") || lower.contains("staging failed")
+                || lower.contains("failed to stage")) {
+            return new DeploymentDiagnosis("STAGING_FAILURE",
+                    "Cloud Foundry staging failed — the buildpack could not compile the application",
+                    "Check buildpack compatibility and application configuration",
+                    extractRelevantLogs(output, "staging", "error", "buildpack"));
+        }
+
+        // App crashes
+        if (lower.contains("crashed") || lower.contains("exit status")) {
+            String suggestion = lower.contains("out of memory") || lower.contains("oom") || lower.contains("memory")
+                    ? "Increase memory allocation in manifest.yml (e.g., memory: 1G)"
+                    : "Review crash logs for missing configuration or port binding issues";
+            return new DeploymentDiagnosis("APP_CRASHED",
+                    "Application crashed on startup",
+                    suggestion,
+                    extractRelevantLogs(output, "crash", "CRASHED", "exit"));
+        }
+
+        // Health check timeout
+        if (lower.contains("health check timeout") || lower.contains("timed out")
+                || (lower.contains("health check") && lower.contains("fail"))) {
+            return new DeploymentDiagnosis("HEALTH_CHECK_TIMEOUT",
+                    "Application failed to pass health check within the timeout period",
+                    "Increase health-check-timeout in manifest.yml or verify the health check endpoint is correct",
+                    extractRelevantLogs(output, "health", "timeout", "check"));
+        }
+
+        return new DeploymentDiagnosis("UNKNOWN",
+                "Deployment failed for an unrecognized reason",
+                "Review the full deployment output for error details",
+                summarizeAgentOutput(output));
+    }
+
+    /**
+     * Extracts log lines surrounding the first occurrence of any keyword for diagnostics.
+     */
+    private String extractRelevantLogs(String output, String... keywords) {
+        String[] lines = output.split("\n");
+        int matchIndex = -1;
+        for (int i = 0; i < lines.length && matchIndex < 0; i++) {
+            String lineLower = lines[i].toLowerCase();
+            for (String kw : keywords) {
+                if (lineLower.contains(kw.toLowerCase())) {
+                    matchIndex = i;
+                    break;
+                }
+            }
+        }
+        if (matchIndex < 0) return summarizeAgentOutput(output);
+
+        int start = Math.max(0, matchIndex - 5);
+        int end = Math.min(lines.length, matchIndex + 10);
+        var sb = new StringBuilder();
+        for (int i = start; i < end; i++) {
+            sb.append(lines[i]).append("\n");
+        }
+        return sb.toString().strip();
+    }
+
+    /**
+     * Enriches DEPLOYER retry context with specific deployment failure diagnosis and suggestions.
+     */
+    private String enrichDeployerRetryContext(String baseContext, DeploymentDiagnosis diagnosis) {
         var sb = new StringBuilder(baseContext != null ? baseContext : "");
         sb.append("\n\n## PREVIOUS DEPLOYMENT ATTEMPT FAILED\n\n");
-        sb.append(failureReason).append("\n\n");
-        if (deployOutput != null && !deployOutput.isBlank()) {
-            sb.append("**Deployment output (last 2000 chars):**\n```\n");
-            sb.append(summarizeAgentOutput(deployOutput));
+        sb.append("**Failure type:** ").append(diagnosis.failureType()).append("\n");
+        sb.append("**Reason:** ").append(diagnosis.reason()).append("\n");
+        sb.append("**Suggested fix:** ").append(diagnosis.suggestion()).append("\n\n");
+        if (diagnosis.relevantLogs() != null && !diagnosis.relevantLogs().isBlank()) {
+            sb.append("**Relevant logs:**\n```\n");
+            sb.append(diagnosis.relevantLogs());
             sb.append("\n```\n\n");
         }
-        sb.append("Review the error output above and fix the issue before retrying deployment.\n");
+        sb.append("Address the above issue before retrying deployment.\n");
         return sb.toString();
     }
 
@@ -667,5 +785,6 @@ public class EvaluateWaveNode {
         List<String> errors = new ArrayList<>();
         String retryContext;
         boolean missionFailed;
+        String deploymentUrl;
     }
 }

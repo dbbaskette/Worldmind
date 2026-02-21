@@ -336,6 +336,50 @@ class EvaluateWaveNodeTest {
         return new WaveDispatchResult(id, TaskStatus.PASSED, List.of(), output, 30000L);
     }
 
+    private WaveDispatchResult deployerBuildFailureResult(String id) {
+        String output = "Running mvn package...\n"
+                + "[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin\n"
+                + "[ERROR] BUILD FAILURE\n"
+                + "[ERROR] Total time: 5.2 s\n"
+                + "[ERROR] Compilation failure: cannot find symbol";
+        return new WaveDispatchResult(id, TaskStatus.PASSED, List.of(), output, 15000L);
+    }
+
+    private WaveDispatchResult deployerStagingFailureResult(String id) {
+        String output = "Pushing app wmnd-2026-0001...\n"
+                + "Staging app...\n"
+                + "Staging error: Unable to detect buildpack\n"
+                + "Error staging application: StagingError";
+        return new WaveDispatchResult(id, TaskStatus.PASSED, List.of(), output, 20000L);
+    }
+
+    private WaveDispatchResult deployerCrashedResult(String id) {
+        String output = "Pushing app wmnd-2026-0001...\n"
+                + "Staging app...\n"
+                + "Build succeeded\n"
+                + "Waiting for app to start...\n"
+                + "App instance exited with CRASHED status\n"
+                + "Out of memory: Java heap space";
+        return new WaveDispatchResult(id, TaskStatus.PASSED, List.of(), output, 30000L);
+    }
+
+    private WaveDispatchResult deployerHealthCheckTimeoutResult(String id) {
+        String output = "Pushing app wmnd-2026-0001...\n"
+                + "Staging app...\n"
+                + "Build succeeded\n"
+                + "Waiting for app to start...\n"
+                + "health check timeout after 300 seconds";
+        return new WaveDispatchResult(id, TaskStatus.PASSED, List.of(), output, 300000L);
+    }
+
+    private WaveDispatchResult deployerServiceBindingFailureResult(String id) {
+        String output = "Pushing app wmnd-2026-0001...\n"
+                + "Binding service my-db...\n"
+                + "FAILED\n"
+                + "Could not find service my-db in org my-org / space my-space";
+        return new WaveDispatchResult(id, TaskStatus.PASSED, List.of(), output, 10000L);
+    }
+
     @Test
     @DisplayName("DEPLOYER success -> completedIds updated, no TESTER/REVIEWER dispatched")
     @SuppressWarnings("unchecked")
@@ -432,5 +476,180 @@ class EvaluateWaveNodeTest {
         // Verify NO bridge calls at all — DEPLOYER skips TESTER and REVIEWER
         verify(mockBridge, never()).executeTask(any(), any(), any(), any(), any());
         verify(mockQualityGateService, never()).evaluateQualityGate(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("DEPLOYER success -> deployment URL captured in result")
+    void deployerSuccessCapturesUrl() {
+        var d = deployerTask("TASK-DEPLOY", 0, 3, FailureStrategy.RETRY);
+
+        var state = new WorldmindState(Map.of(
+                "waveTaskIds", List.of("TASK-DEPLOY"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(deployerSuccessResult("TASK-DEPLOY"))
+        ));
+
+        var result = node.apply(state);
+
+        String url = (String) result.get("deploymentUrl");
+        assertNotNull(url, "Deployment URL should be captured on success");
+        assertTrue(url.contains("wmnd-2026-0001.apps.tas-tdc.kuhn-labs.com"));
+    }
+
+    @Test
+    @DisplayName("DEPLOYER Maven BUILD FAILURE -> retry with build failure diagnosis")
+    @SuppressWarnings("unchecked")
+    void deployerBuildFailureRetry() {
+        var d = deployerTask("TASK-DEPLOY", 0, 3, FailureStrategy.RETRY);
+
+        var state = new WorldmindState(Map.of(
+                "waveTaskIds", List.of("TASK-DEPLOY"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(deployerBuildFailureResult("TASK-DEPLOY"))
+        ));
+
+        var result = node.apply(state);
+
+        var completedIds = (List<String>) result.get("completedTaskIds");
+        assertTrue(completedIds == null || !completedIds.contains("TASK-DEPLOY"));
+        String ctx = (String) result.get("retryContext");
+        assertTrue(ctx.contains("TASK-DEPLOY"));
+
+        // Verify updated task has enriched context mentioning build failure
+        var tasks = (List<Task>) result.get("tasks");
+        assertNotNull(tasks);
+        Task retryTask = tasks.stream().filter(t -> t.id().equals("TASK-DEPLOY")).findFirst().orElse(null);
+        assertNotNull(retryTask);
+        assertTrue(retryTask.inputContext().contains("BUILD_FAILURE"),
+                "Retry context should include BUILD_FAILURE diagnosis");
+        assertTrue(retryTask.inputContext().contains("pom.xml"),
+                "Retry context should suggest fixing dependencies");
+    }
+
+    @Test
+    @DisplayName("DEPLOYER staging failure -> retry with staging failure diagnosis")
+    @SuppressWarnings("unchecked")
+    void deployerStagingFailureRetry() {
+        var d = deployerTask("TASK-DEPLOY", 0, 3, FailureStrategy.RETRY);
+
+        var state = new WorldmindState(Map.of(
+                "waveTaskIds", List.of("TASK-DEPLOY"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(deployerStagingFailureResult("TASK-DEPLOY"))
+        ));
+
+        var result = node.apply(state);
+
+        var tasks = (List<Task>) result.get("tasks");
+        assertNotNull(tasks);
+        Task retryTask = tasks.stream().filter(t -> t.id().equals("TASK-DEPLOY")).findFirst().orElse(null);
+        assertNotNull(retryTask);
+        assertTrue(retryTask.inputContext().contains("STAGING_FAILURE"),
+                "Retry context should include STAGING_FAILURE diagnosis");
+        assertTrue(retryTask.inputContext().contains("buildpack"),
+                "Retry context should mention buildpack");
+    }
+
+    @Test
+    @DisplayName("DEPLOYER app CRASHED with OOM -> retry with memory increase suggestion")
+    @SuppressWarnings("unchecked")
+    void deployerCrashedWithOomRetry() {
+        var d = deployerTask("TASK-DEPLOY", 0, 3, FailureStrategy.RETRY);
+
+        var state = new WorldmindState(Map.of(
+                "waveTaskIds", List.of("TASK-DEPLOY"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(deployerCrashedResult("TASK-DEPLOY"))
+        ));
+
+        var result = node.apply(state);
+
+        var tasks = (List<Task>) result.get("tasks");
+        assertNotNull(tasks);
+        Task retryTask = tasks.stream().filter(t -> t.id().equals("TASK-DEPLOY")).findFirst().orElse(null);
+        assertNotNull(retryTask);
+        assertTrue(retryTask.inputContext().contains("APP_CRASHED"),
+                "Retry context should include APP_CRASHED diagnosis");
+        assertTrue(retryTask.inputContext().contains("memory"),
+                "Retry context should suggest increasing memory");
+    }
+
+    @Test
+    @DisplayName("DEPLOYER health check timeout -> retry with timeout suggestion")
+    @SuppressWarnings("unchecked")
+    void deployerHealthCheckTimeoutRetry() {
+        var d = deployerTask("TASK-DEPLOY", 0, 3, FailureStrategy.RETRY);
+
+        var state = new WorldmindState(Map.of(
+                "waveTaskIds", List.of("TASK-DEPLOY"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(deployerHealthCheckTimeoutResult("TASK-DEPLOY"))
+        ));
+
+        var result = node.apply(state);
+
+        var tasks = (List<Task>) result.get("tasks");
+        assertNotNull(tasks);
+        Task retryTask = tasks.stream().filter(t -> t.id().equals("TASK-DEPLOY")).findFirst().orElse(null);
+        assertNotNull(retryTask);
+        assertTrue(retryTask.inputContext().contains("HEALTH_CHECK_TIMEOUT"),
+                "Retry context should include HEALTH_CHECK_TIMEOUT diagnosis");
+        assertTrue(retryTask.inputContext().contains("health-check-timeout"),
+                "Retry context should suggest increasing timeout");
+    }
+
+    @Test
+    @DisplayName("DEPLOYER service binding failure -> retry with pre-create service suggestion")
+    @SuppressWarnings("unchecked")
+    void deployerServiceBindingFailureRetry() {
+        var d = deployerTask("TASK-DEPLOY", 0, 3, FailureStrategy.RETRY);
+
+        var state = new WorldmindState(Map.of(
+                "waveTaskIds", List.of("TASK-DEPLOY"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(deployerServiceBindingFailureResult("TASK-DEPLOY"))
+        ));
+
+        var result = node.apply(state);
+
+        var tasks = (List<Task>) result.get("tasks");
+        assertNotNull(tasks);
+        Task retryTask = tasks.stream().filter(t -> t.id().equals("TASK-DEPLOY")).findFirst().orElse(null);
+        assertNotNull(retryTask);
+        assertTrue(retryTask.inputContext().contains("SERVICE_BINDING_FAILURE"),
+                "Retry context should include SERVICE_BINDING_FAILURE diagnosis");
+        assertTrue(retryTask.inputContext().contains("cf create-service"),
+                "Retry context should suggest pre-creating the service instance");
+    }
+
+    @Test
+    @DisplayName("DEPLOYER failure with success+failure markers -> failure takes precedence")
+    @SuppressWarnings("unchecked")
+    void deployerFailureMarkersTakePrecedence() {
+        var d = deployerTask("TASK-DEPLOY", 0, 3, FailureStrategy.RETRY);
+
+        // Output contains both "app started" AND "CRASHED" — failure should win
+        String output = "Pushing app wmnd-2026-0001...\n"
+                + "App started\n"
+                + "instances: 1/1\n"
+                + "status: running\n"
+                + "App instance exited with CRASHED status\n"
+                + "Process has crashed with type: web";
+        var mixedResult = new WaveDispatchResult("TASK-DEPLOY", TaskStatus.PASSED, List.of(), output, 30000L);
+
+        var state = new WorldmindState(Map.of(
+                "waveTaskIds", List.of("TASK-DEPLOY"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(mixedResult)
+        ));
+
+        var result = node.apply(state);
+
+        // Should NOT be in completedIds — failure markers override success
+        var completedIds = (List<String>) result.get("completedTaskIds");
+        assertTrue(completedIds == null || !completedIds.contains("TASK-DEPLOY"),
+                "Task should not be completed when failure markers are present");
+        assertNull(result.get("deploymentUrl"),
+                "No deployment URL on failure");
     }
 }
