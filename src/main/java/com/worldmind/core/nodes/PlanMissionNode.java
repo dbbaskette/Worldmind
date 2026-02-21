@@ -187,7 +187,7 @@ public class PlanMissionNode {
         boolean manifestTaskExists = tasks.stream()
                 .filter(t -> t.targetFiles() != null)
                 .flatMap(t -> t.targetFiles().stream())
-                .anyMatch(f -> f.endsWith("manifest.yml"));
+                .anyMatch(f -> f.endsWith("/manifest.yml") || f.equals("manifest.yml"));
 
         // If user requested CF deployment, append a final DEPLOYER task
         if (state.createCfDeployment()) {
