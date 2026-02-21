@@ -22,8 +22,8 @@ public record ClarifyingAnswersRequest(
 
     /**
      * Converts answers to a JSON string keyed by question ID.
-     * This format is consumed by both spec generation (human-readable JSON)
-     * and service name extraction (machine-parseable).
+     * This format is consumed by {@code PlanMissionNode.extractServiceNames}
+     * for Cloud Foundry service binding configuration.
      */
     public String toAnswersString() {
         if (answers == null || answers.isEmpty()) {
