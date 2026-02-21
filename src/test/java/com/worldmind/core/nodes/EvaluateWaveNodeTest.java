@@ -781,6 +781,149 @@ class EvaluateWaveNodeTest {
     }
 
     @Test
+    @DisplayName("DEPLOYER service binding failure with unrecognized format -> null serviceName handled gracefully")
+    @SuppressWarnings("unchecked")
+    void deployerServiceBindingFailureNullServiceName() {
+        var d = deployerTask("TASK-DEPLOY", 0, 3, FailureStrategy.RETRY);
+
+        // Output triggers the service binding condition ("service binding failed")
+        // but does NOT match either extractServiceName regex pattern, so
+        // extractServiceName returns null. The diagnosis must not NPE or interpolate "null".
+        String output = "Pushing app wmnd-2026-0001...\n"
+                + "Binding services...\n"
+                + "FAILED\n"
+                + "Server error, status code: 502, error code: 10001, "
+                + "message: Service binding failed due to internal platform error";
+        var bindingFailedResult = new WaveDispatchResult("TASK-DEPLOY", TaskStatus.PASSED, List.of(), output, 10000L);
+
+        var state = new WorldmindState(Map.of(
+                "waveTaskIds", List.of("TASK-DEPLOY"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(bindingFailedResult)
+        ));
+
+        var result = node.apply(state);
+
+        // Should retry (not crash with NPE)
+        var completedIds = (List<String>) result.get("completedTaskIds");
+        assertTrue(completedIds == null || !completedIds.contains("TASK-DEPLOY"),
+                "Service binding failure should not be completed");
+        assertTrue(((String) result.get("retryContext")).contains("TASK-DEPLOY"));
+
+        // Verify the retry context uses the generic fallback message (no "null" interpolation)
+        var tasks = (List<Task>) result.get("tasks");
+        assertNotNull(tasks);
+        Task retryTask = tasks.stream().filter(t -> t.id().equals("TASK-DEPLOY")).findFirst().orElse(null);
+        assertNotNull(retryTask);
+        assertTrue(retryTask.inputContext().contains("SERVICE_BINDING_FAILURE"),
+                "Retry context should include SERVICE_BINDING_FAILURE diagnosis");
+        assertFalse(retryTask.inputContext().contains("Service 'null'"),
+                "Null service name must not produce 'Service 'null'' in the message");
+        assertTrue(retryTask.inputContext().contains("CF service binding failed"),
+                "Should use the generic fallback message when service name is null");
+    }
+
+    @Test
+    @DisplayName("Realistic CF CLI health-check timeout -> HEALTH_CHECK_TIMEOUT diagnosis")
+    @SuppressWarnings("unchecked")
+    void deployerRealisticCfHealthCheckTimeout() {
+        var d = deployerTask("TASK-DEPLOY", 0, 3, FailureStrategy.RETRY);
+
+        // Realistic CF CLI output for a health-check timeout — modeled on actual
+        // 'cf push' output when the app starts but the health check never passes.
+        String output = "Pushing app my-java-app to org myorg / space dev as admin...\n"
+                + "Mapping routes...\n"
+                + "Comparing local files to remote cache...\n"
+                + "Packaging files to upload...\n"
+                + "Uploading files...\n"
+                + " 539.35 KiB / 539.35 KiB [=========================================] 100.00% 1s\n"
+                + "Waiting for API to complete processing files...\n"
+                + "\n"
+                + "Staging app and tracing logs...\n"
+                + "   Downloading java_buildpack...\n"
+                + "   Downloaded java_buildpack\n"
+                + "   Cell abc-123 creating container for instance xyz-456\n"
+                + "   Cell abc-123 successfully created container for instance xyz-456\n"
+                + "   Downloading app package...\n"
+                + "   Downloaded app package (12.3M)\n"
+                + "   -----> Java Buildpack v4.50\n"
+                + "   -----> Downloading Open JDK JRE 11.0.15_10\n"
+                + "   Exit status 0\n"
+                + "   Uploading droplet, build artifacts cache...\n"
+                + "   Uploading droplet...\n"
+                + "   Uploaded droplet (78.2M)\n"
+                + "   Uploading complete\n"
+                + "\n"
+                + "Waiting for app my-java-app to start...\n"
+                + "\n"
+                + "Start unsuccessful\n"
+                + "\n"
+                + "TIP: use 'cf logs my-java-app --recent' for more information\n"
+                + "\n"
+                + "FAILED\n"
+                + "\n"
+                + "Error: Start app timeout\n"
+                + "\n"
+                + "Timed out waiting for health check to pass for app instance\n";
+        var realisticHealthCheckResult = new WaveDispatchResult("TASK-DEPLOY", TaskStatus.PASSED, List.of(), output, 300000L);
+
+        var state = new WorldmindState(Map.of(
+                "waveTaskIds", List.of("TASK-DEPLOY"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(realisticHealthCheckResult)
+        ));
+
+        var result = node.apply(state);
+
+        // Should be diagnosed as HEALTH_CHECK_TIMEOUT
+        var tasks = (List<Task>) result.get("tasks");
+        assertNotNull(tasks);
+        Task retryTask = tasks.stream().filter(t -> t.id().equals("TASK-DEPLOY")).findFirst().orElse(null);
+        assertNotNull(retryTask);
+        assertTrue(retryTask.inputContext().contains("HEALTH_CHECK_TIMEOUT"),
+                "Realistic CF health check timeout output should be diagnosed as HEALTH_CHECK_TIMEOUT");
+        assertTrue(retryTask.inputContext().contains("health-check-timeout"),
+                "Retry context should suggest increasing health-check-timeout in manifest.yml");
+    }
+
+    @Test
+    @DisplayName("CF health check failure variant -> HEALTH_CHECK_TIMEOUT diagnosis")
+    @SuppressWarnings("unchecked")
+    void deployerCfHealthCheckFailureVariant() {
+        var d = deployerTask("TASK-DEPLOY", 0, 3, FailureStrategy.RETRY);
+
+        // Another realistic variant: CF reports health check explicitly failed
+        String output = "Pushing app my-spring-app to org prod / space production...\n"
+                + "Staging app...\n"
+                + "Build succeeded\n"
+                + "Waiting for app to start...\n"
+                + "   instances starting...\n"
+                + "   instances starting...\n"
+                + "   instances starting...\n"
+                + "health check for process \"web\" did not pass: fail\n"
+                + "\n"
+                + "TIP: use 'cf logs my-spring-app --recent'\n"
+                + "FAILED\n";
+        var healthCheckFailResult = new WaveDispatchResult("TASK-DEPLOY", TaskStatus.PASSED, List.of(), output, 180000L);
+
+        var state = new WorldmindState(Map.of(
+                "waveTaskIds", List.of("TASK-DEPLOY"),
+                "tasks", List.of(d),
+                "waveDispatchResults", List.of(healthCheckFailResult)
+        ));
+
+        var result = node.apply(state);
+
+        // Should be diagnosed as HEALTH_CHECK_TIMEOUT via the (health check + fail) condition
+        var tasks = (List<Task>) result.get("tasks");
+        assertNotNull(tasks);
+        Task retryTask = tasks.stream().filter(t -> t.id().equals("TASK-DEPLOY")).findFirst().orElse(null);
+        assertNotNull(retryTask);
+        assertTrue(retryTask.inputContext().contains("HEALTH_CHECK_TIMEOUT"),
+                "Health check failure variant should be diagnosed as HEALTH_CHECK_TIMEOUT");
+    }
+
+    @Test
     @DisplayName("DEPLOYER staging failure exhausted -> error mentions staging logs")
     @SuppressWarnings("unchecked")
     void deployerStagingFailureExhaustedMentionsStagingLogs() {
