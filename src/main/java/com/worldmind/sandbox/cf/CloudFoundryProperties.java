@@ -62,6 +62,9 @@ public class CloudFoundryProperties {
     /** CF password for API authentication */
     private String cfPassword = "";
 
+    /** CF apps domain for route generation (e.g. "tas-tdc.kuhn-labs.com") */
+    private String appsDomain = "";
+
     /** Orchestrator base URL, used by CF tasks to fetch instructions via HTTP */
     private String orchestratorUrl = "";
 
@@ -153,6 +156,14 @@ public class CloudFoundryProperties {
 
     public void setCfPassword(String cfPassword) {
         this.cfPassword = cfPassword;
+    }
+
+    public String getAppsDomain() {
+        return appsDomain;
+    }
+
+    public void setAppsDomain(String appsDomain) {
+        this.appsDomain = appsDomain;
     }
 
     public String getOrchestratorUrl() {

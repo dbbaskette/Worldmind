@@ -400,12 +400,56 @@ class CloudFoundrySandboxProviderTest {
     }
 
     @Test
-    void deployerTaskDoesNotInjectCfCredentialsInCommand() {
-        // CF credentials come from the deployer app's env (set in manifest.yml),
-        // NOT from the task command string — avoids exposing credentials in
-        // `cf tasks` output and CF audit logs.
+    void deployerTaskInjectsCfCredentialsInCommand() {
         cfProperties.setCfUsername("cf-user");
         cfProperties.setCfPassword("cf-pass");
+        cfProperties.setAppsDomain("tas-tdc.kuhn-labs.com");
+
+        var request = makeRequest("deployer", "TASK-001");
+
+        provider.openSandbox(request);
+
+        var call = stubApiClient.createTaskCalls.get(0);
+        assertTrue(call.command.contains("export CF_API_URL='https://api.cf.example.com'"),
+                "DEPLOYER should export CF_API_URL: " + call.command);
+        assertTrue(call.command.contains("export CF_USERNAME='cf-user'"),
+                "DEPLOYER should export CF_USERNAME: " + call.command);
+        assertTrue(call.command.contains("export CF_PASSWORD='cf-pass'"),
+                "DEPLOYER should export CF_PASSWORD: " + call.command);
+        assertTrue(call.command.contains("export CF_ORG='worldmind-org'"),
+                "DEPLOYER should export CF_ORG: " + call.command);
+        assertTrue(call.command.contains("export CF_SPACE='production'"),
+                "DEPLOYER should export CF_SPACE: " + call.command);
+        assertTrue(call.command.contains("export CF_APPS_DOMAIN='tas-tdc.kuhn-labs.com'"),
+                "DEPLOYER should export CF_APPS_DOMAIN: " + call.command);
+    }
+
+    @Test
+    void nonDeployerTasksDoNotReceiveCfCredentials() {
+        cfProperties.setCfUsername("cf-user");
+        cfProperties.setCfPassword("cf-pass");
+        cfProperties.setAppsDomain("tas-tdc.kuhn-labs.com");
+
+        for (var agentType : List.of("coder", "tester", "reviewer", "researcher")) {
+            stubApiClient.createTaskCalls.clear();
+            var request = makeRequest(agentType, "TASK-001");
+
+            provider.openSandbox(request);
+
+            var call = stubApiClient.createTaskCalls.get(0);
+            assertFalse(call.command.contains("CF_USERNAME"),
+                    agentType.toUpperCase() + " should NOT receive CF_USERNAME: " + call.command);
+            assertFalse(call.command.contains("CF_PASSWORD"),
+                    agentType.toUpperCase() + " should NOT receive CF_PASSWORD: " + call.command);
+            assertFalse(call.command.contains("CF_APPS_DOMAIN"),
+                    agentType.toUpperCase() + " should NOT receive CF_APPS_DOMAIN: " + call.command);
+        }
+    }
+
+    @Test
+    void deployerTaskOmitsBlankCfCredentials() {
+        // Leave cfUsername and cfPassword at default empty values
+        cfProperties.setAppsDomain("");
 
         var request = makeRequest("deployer", "TASK-001");
 
@@ -413,13 +457,11 @@ class CloudFoundrySandboxProviderTest {
 
         var call = stubApiClient.createTaskCalls.get(0);
         assertFalse(call.command.contains("CF_USERNAME"),
-                "DEPLOYER should NOT inject CF_USERNAME in command: " + call.command);
+                "DEPLOYER should NOT export blank CF_USERNAME: " + call.command);
         assertFalse(call.command.contains("CF_PASSWORD"),
-                "DEPLOYER should NOT inject CF_PASSWORD in command: " + call.command);
-        assertFalse(call.command.contains("cf-user"),
-                "DEPLOYER should NOT contain CF username value in command: " + call.command);
-        assertFalse(call.command.contains("cf-pass"),
-                "DEPLOYER should NOT contain CF password value in command: " + call.command);
+                "DEPLOYER should NOT export blank CF_PASSWORD: " + call.command);
+        assertFalse(call.command.contains("CF_APPS_DOMAIN"),
+                "DEPLOYER should NOT export blank CF_APPS_DOMAIN: " + call.command);
     }
 
     @Test

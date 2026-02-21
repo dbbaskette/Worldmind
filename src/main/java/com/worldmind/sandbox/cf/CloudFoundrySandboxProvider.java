@@ -130,12 +130,25 @@ public class CloudFoundrySandboxProvider implements SandboxProvider {
 
         // Export all env vars into the CF task shell so entrypoint.sh can read
         // GOOSE_PROVIDER, GOOSE_MODEL, provider API keys, and MCP server configs.
-        // Note: CF credentials for the DEPLOYER agent are set via manifest.yml on the
-        // deployer app directly — CF tasks inherit the app's env vars, so no command-line
-        // injection is needed (which would expose credentials in `cf tasks` output and audit logs).
         var envExports = request.envVars().entrySet().stream()
                 .map(e -> "export %s='%s'".formatted(e.getKey(), e.getValue().replace("'", "'\\''")))
                 .collect(Collectors.joining(" && "));
+
+        // For DEPLOYER tasks only: inject CF credentials so the agent can
+        // authenticate and deploy to the target CF environment.
+        // Other agent types (coder, tester, reviewer) do not need CF credentials.
+        if ("deployer".equals(type)) {
+            var cfCredExports = new StringBuilder();
+            appendExport(cfCredExports, "CF_API_URL", cfProperties.getApiUrl());
+            appendExport(cfCredExports, "CF_USERNAME", cfProperties.getCfUsername());
+            appendExport(cfCredExports, "CF_PASSWORD", cfProperties.getCfPassword());
+            appendExport(cfCredExports, "CF_ORG", cfProperties.getOrg());
+            appendExport(cfCredExports, "CF_SPACE", cfProperties.getSpace());
+            appendExport(cfCredExports, "CF_APPS_DOMAIN", cfProperties.getAppsDomain());
+            if (!cfCredExports.isEmpty()) {
+                envExports = envExports.isEmpty() ? cfCredExports.toString() : envExports + " && " + cfCredExports;
+            }
+        }
 
         // Determine branch setup and post-Goose git commands based on agent type.
         // CODER/REFACTORER create their own branch and push changes.
@@ -480,6 +493,16 @@ public class CloudFoundrySandboxProvider implements SandboxProvider {
      * @param input the string that may contain sensitive data
      * @return the string with sensitive data masked
      */
+    /**
+     * Appends a bash export statement to the builder if the value is non-blank.
+     */
+    private static void appendExport(StringBuilder sb, String key, String value) {
+        if (value != null && !value.isBlank()) {
+            if (!sb.isEmpty()) sb.append(" && ");
+            sb.append("export %s='%s'".formatted(key, value.replace("'", "'\\''")));
+        }
+    }
+
     static String maskSensitiveData(String input) {
         if (input == null) return null;
         String result = SENSITIVE_URL_PATTERN.matcher(input).replaceAll("$1***@");
