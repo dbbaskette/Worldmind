@@ -271,7 +271,10 @@ class ModelTest {
                 "tasks", "currentTaskIndex", "sandboxes",
                 "testResults", "reviewFeedback", "quality_gateGranted",
                 "retryContext", "metrics", "errors", "projectPath", "gitRemoteUrl",
-                "completedTaskIds", "waveTaskIds", "waveCount", "waveDispatchResults"
+                "completedTaskIds", "waveTaskIds", "waveCount", "waveDispatchResults",
+                "reasoningLevel", "userExecutionStrategy", "createCfDeployment",
+                "clarifyingQuestions", "clarifyingAnswers", "prdDocument",
+                "retryingTaskIds", "manifestCreatedByTask"
             );
             for (String key : expected) {
                 assertTrue(keys.contains(key), "SCHEMA missing key: " + key);
@@ -457,6 +460,20 @@ class ModelTest {
             assertEquals(2, state2.testResults().size());
             assertTrue(state2.testResults().get(0).passed());
             assertFalse(state2.testResults().get(1).passed());
+        }
+
+        @Test
+        @DisplayName("manifestCreatedByTask defaults to false")
+        void manifestCreatedByTaskDefaultsFalse() {
+            var state = new WorldmindState(Map.of());
+            assertFalse(state.manifestCreatedByTask());
+        }
+
+        @Test
+        @DisplayName("manifestCreatedByTask can be set to true")
+        void manifestCreatedByTaskSetTrue() {
+            var state = new WorldmindState(Map.of("manifestCreatedByTask", true));
+            assertTrue(state.manifestCreatedByTask());
         }
 
         @Test

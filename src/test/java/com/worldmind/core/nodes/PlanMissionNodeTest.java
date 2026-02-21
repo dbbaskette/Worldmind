@@ -249,10 +249,11 @@ class PlanMissionNodeTest {
 
         var result = node.apply(state);
 
-        assertEquals(3, result.size());
+        assertEquals(4, result.size());
         assertTrue(result.containsKey("tasks"));
         assertTrue(result.containsKey("executionStrategy"));
         assertTrue(result.containsKey("status"));
+        assertTrue(result.containsKey("manifestCreatedByTask"));
     }
 
     @Test
@@ -306,6 +307,80 @@ class PlanMissionNodeTest {
                 ),
                 eq(MissionPlan.class)
         );
+    }
+
+    @Test
+    @DisplayName("sets manifestCreatedByTask true when a task targets manifest.yml")
+    void setsManifestCreatedByTaskTrue() {
+        var mockLlm = mock(LlmService.class);
+        var plan = new MissionPlan(
+                "Build app",
+                "sequential",
+                List.of(
+                        new MissionPlan.TaskPlan("CODER", "Create app", "", "App works", List.of(), List.of("src/App.java")),
+                        new MissionPlan.TaskPlan("CODER", "Create manifest", "", "Manifest valid", List.of(), List.of("manifest.yml"))
+                )
+        );
+        when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
+
+        var node = new PlanMissionNode(mockLlm);
+        var state = new WorldmindState(Map.of(
+                "request", "Build app with deployment",
+                "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
+                "projectContext", new ProjectContext(".", List.of(), "java", "spring-boot", Map.of(), 5, "test")
+        ));
+
+        var result = node.apply(state);
+        assertTrue((Boolean) result.get("manifestCreatedByTask"));
+    }
+
+    @Test
+    @DisplayName("sets manifestCreatedByTask false when no task targets manifest.yml")
+    void setsManifestCreatedByTaskFalse() {
+        var mockLlm = mock(LlmService.class);
+        var plan = new MissionPlan(
+                "Build app",
+                "sequential",
+                List.of(
+                        new MissionPlan.TaskPlan("CODER", "Create app", "", "App works", List.of(), List.of("src/App.java")),
+                        new MissionPlan.TaskPlan("CODER", "Create tests", "", "Tests pass", List.of(), List.of("src/AppTest.java"))
+                )
+        );
+        when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
+
+        var node = new PlanMissionNode(mockLlm);
+        var state = new WorldmindState(Map.of(
+                "request", "Build app",
+                "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
+                "projectContext", new ProjectContext(".", List.of(), "java", "spring-boot", Map.of(), 5, "test")
+        ));
+
+        var result = node.apply(state);
+        assertFalse((Boolean) result.get("manifestCreatedByTask"));
+    }
+
+    @Test
+    @DisplayName("detects manifest.yml in subdirectory target files")
+    void detectsManifestInSubdirectory() {
+        var mockLlm = mock(LlmService.class);
+        var plan = new MissionPlan(
+                "Build app",
+                "sequential",
+                List.of(
+                        new MissionPlan.TaskPlan("CODER", "Create app", "", "App works", List.of(), List.of("deploy/manifest.yml"))
+                )
+        );
+        when(mockLlm.structuredCall(anyString(), anyString(), eq(MissionPlan.class))).thenReturn(plan);
+
+        var node = new PlanMissionNode(mockLlm);
+        var state = new WorldmindState(Map.of(
+                "request", "Build app",
+                "classification", new Classification("feature", 3, List.of("app"), "sequential", "java"),
+                "projectContext", new ProjectContext(".", List.of(), "java", "spring-boot", Map.of(), 5, "test")
+        ));
+
+        var result = node.apply(state);
+        assertTrue((Boolean) result.get("manifestCreatedByTask"));
     }
 
     @Test
