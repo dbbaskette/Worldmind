@@ -296,7 +296,7 @@ Deploy the completed application to Cloud Foundry.
 
 **Service binding detection** is already partially implemented:
 - `GenerateClarifyingQuestionsNode` (line 115) already injects a CF service binding question when `createCfDeployment=true`
-- `PlanMissionNode.extractServiceBindingInstruction()` already parses `cf_service_bindings` from clarifying answers
+- `PlanMissionNode.extractServiceNames()` already parses `cf_service_bindings` from clarifying answers
 - Enhancement: improve auto-detection from PRD keywords (see Appendix) and present them as pre-filled suggestions
 
 **WorldmindState additions**:
