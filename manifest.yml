@@ -123,6 +123,9 @@ applications:
       GOOSE_MODEL: gpt-5-nano
 
   # --- Agent: Deployer (CF deployment) ---
+  # CF credentials below are set as persistent app env vars so they are available
+  # when the orchestrator runs CF tasks against this app. The orchestrator may also
+  # inject per-task overrides at runtime.
   - name: ((agent-deployer-app))
     docker:
       image: ((agent-image-registry))/agent-deployer:latest

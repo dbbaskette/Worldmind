@@ -68,4 +68,35 @@ class CloudFoundryPropertiesTest {
         assertEquals(1, props.getAgentApps().size());
         assertEquals("my-coder-app", props.getAgentApps().get("coder"));
     }
+
+    @Test
+    void applyDefaultsPopulatesAllAgentTypes() {
+        var props = new CloudFoundryProperties();
+
+        props.applyDefaults();
+
+        Map<String, String> apps = props.getAgentApps();
+        assertEquals(6, apps.size());
+        assertEquals("agent-coder", apps.get("coder"));
+        assertEquals("agent-tester", apps.get("tester"));
+        assertEquals("agent-reviewer", apps.get("reviewer"));
+        assertEquals("agent-researcher", apps.get("researcher"));
+        assertEquals("agent-refactorer", apps.get("refactorer"));
+        assertEquals("agent-deployer", apps.get("deployer"));
+    }
+
+    @Test
+    void applyDefaultsDoesNotOverrideExistingEntries() {
+        var props = new CloudFoundryProperties();
+        props.getAgentApps().put("coder", "custom-coder");
+        props.getAgentApps().put("deployer", "custom-deployer");
+
+        props.applyDefaults();
+
+        Map<String, String> apps = props.getAgentApps();
+        assertEquals(6, apps.size());
+        assertEquals("custom-coder", apps.get("coder"));
+        assertEquals("custom-deployer", apps.get("deployer"));
+        assertEquals("agent-tester", apps.get("tester"));
+    }
 }
