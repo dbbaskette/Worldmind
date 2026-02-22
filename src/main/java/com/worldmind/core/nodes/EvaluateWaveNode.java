@@ -107,8 +107,18 @@ public class EvaluateWaveNode {
                     continue;
                 }
 
-                // DEPLOYER task — evaluate deployment health (no quality gate)
+                // DEPLOYER task — run pre-deploy build verification, then evaluate deployment
                 if ("DEPLOYER".equalsIgnoreCase(task.agent())) {
+                    // Pre-deploy build verification: compile the merged code on main before deploying
+                    boolean buildVerified = runPreDeployVerification(state, projectContext, projectPath, sandboxInfos);
+                    if (!buildVerified) {
+                        log.error("Pre-deploy build verification FAILED for mission {} — skipping deployment", state.missionId());
+                        errors.add("Pre-deploy build verification failed: merged code does not compile or manifest is invalid");
+                        updatedTasks.add(withResult(task, dispatchResult, TaskStatus.FAILED));
+                        missionStatus = MissionStatus.FAILED;
+                        continue;
+                    }
+
                     var deployResult = evaluateDeployerResult(id, task, dispatchResult, state,
                             completedIds, updatedTasks, errors);
                     if (deployResult.retryContext != null) retryContext = deployResult.retryContext;
@@ -544,6 +554,68 @@ public class EvaluateWaveNode {
             }
         }
         return sb.toString();
+    }
+
+    /**
+     * Runs a pre-deploy build verification on the merged main branch.
+     * Dispatches a TESTER agent to compile the project and validate the manifest.
+     * Returns true if the build passes, false if it fails.
+     */
+    private boolean runPreDeployVerification(WorldmindState state, ProjectContext projectContext,
+                                             String projectPath, List<SandboxInfo> sandboxInfos) {
+        String runtimeTag = state.runtimeTag();
+        boolean cfDeploy = state.createCfDeployment();
+
+        log.info("Running pre-deploy build verification (runtime={}, cfDeploy={})", runtimeTag, cfDeploy);
+        eventBus.publish(new WorldmindEvent("task.phase",
+                state.missionId(), "TASK-DEPLOY",
+                Map.of("phase", "VERIFY_BUILD"), Instant.now()));
+
+        String instruction = InstructionBuilder.buildFinalVerificationInstruction(runtimeTag, cfDeploy);
+        var verifyTask = new Task(
+                "VERIFY-BUILD", "TESTER",
+                "Final integration build verification",
+                instruction,
+                "Project compiles and manifest is valid",
+                List.of(), TaskStatus.PENDING,
+                0, 1, FailureStrategy.SKIP, List.of(), List.of(), null
+        );
+
+        try {
+            var result = bridge.executeTask(verifyTask, projectContext,
+                    Path.of(projectPath), state.gitRemoteUrl(), runtimeTag, state.reasoningLevel());
+            sandboxInfos.add(result.sandboxInfo());
+
+            String output = result.output() != null ? result.output() : "";
+            boolean buildPassed = output.contains("BUILD: PASS");
+            boolean buildFailed = output.contains("BUILD: FAIL");
+            boolean manifestFailed = output.contains("MANIFEST: FAIL") || output.contains("MANIFEST: MISSING");
+
+            if (buildFailed) {
+                log.error("Pre-deploy verification: BUILD FAILED\n{}", summarizeAgentOutput(output));
+                return false;
+            }
+            if (manifestFailed) {
+                log.error("Pre-deploy verification: MANIFEST INVALID\n{}", summarizeAgentOutput(output));
+                return false;
+            }
+            if (buildPassed) {
+                log.info("Pre-deploy verification: BUILD PASSED");
+                return true;
+            }
+
+            // If structured output wasn't found, check if the task itself failed
+            if (result.task().status() == TaskStatus.FAILED) {
+                log.warn("Pre-deploy verification task failed (no structured output). Treating as build failure.");
+                return false;
+            }
+
+            log.info("Pre-deploy verification completed (no explicit BUILD: PASS/FAIL in output). Proceeding with deploy.");
+            return true;
+        } catch (Exception e) {
+            log.error("Pre-deploy verification dispatch failed: {}. Proceeding with deploy anyway.", e.getMessage());
+            return true;
+        }
     }
 
     /**

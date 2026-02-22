@@ -553,6 +553,88 @@ public final class InstructionBuilder {
         }
     }
 
+    /**
+     * Builds a final integration verification instruction for a TESTER agent.
+     * Runs the project build on the merged main branch and validates the CF manifest
+     * before the DEPLOYER task runs. Read-only — does not modify any files.
+     *
+     * @param runtimeTag  classification runtime tag (java, nodejs, python, etc.)
+     * @param cfDeploy    whether CF deployment is enabled (triggers manifest checks)
+     */
+    public static String buildFinalVerificationInstruction(String runtimeTag, boolean cfDeploy) {
+        String rt = runtimeTag != null ? runtimeTag.toLowerCase() : "base";
+        var sb = new StringBuilder();
+
+        sb.append("# Final Integration Build Verification\n\n");
+        sb.append("All code tasks have been merged into the main branch. ");
+        sb.append("Your job is to verify the combined project compiles and the deployment manifest is correct.\n\n");
+        sb.append("**You MUST NOT modify any files.** Only run build commands and inspect files.\n\n");
+
+        sb.append("## Step 1: Build Verification\n\n");
+        sb.append("Run the build command and report the result.\n\n");
+
+        switch (rt) {
+            case "java", "spring-boot", "spring" -> {
+                sb.append("```bash\n");
+                sb.append("if [ -f ./mvnw ]; then\n");
+                sb.append("  chmod +x ./mvnw && ./mvnw compile -q\n");
+                sb.append("else\n");
+                sb.append("  mvn compile -q\n");
+                sb.append("fi\n");
+                sb.append("```\n\n");
+                sb.append("If the build fails, report the full compiler error output.\n\n");
+            }
+            case "nodejs", "node" -> {
+                sb.append("```bash\n");
+                sb.append("npm install && npm run build\n");
+                sb.append("```\n\n");
+            }
+            case "python", "django", "flask" -> {
+                sb.append("```bash\n");
+                sb.append("python -m py_compile $(find . -name '*.py' -not -path '*/venv/*')\n");
+                sb.append("```\n\n");
+            }
+            case "go", "golang" -> {
+                sb.append("```bash\n");
+                sb.append("go build ./...\n");
+                sb.append("```\n\n");
+            }
+            default -> {
+                sb.append("Run the project's standard build/compile command.\n\n");
+            }
+        }
+
+        if (cfDeploy) {
+            sb.append("## Step 2: Manifest Validation\n\n");
+            sb.append("Check that `manifest.yml` exists and contains required entries:\n\n");
+            sb.append("```bash\n");
+            sb.append("cat manifest.yml\n");
+            sb.append("```\n\n");
+            sb.append("Verify the following are present:\n");
+            sb.append("- `applications:` top-level key\n");
+            sb.append("- `name:` for the application\n");
+            sb.append("- `buildpacks:` entry (e.g., `java_buildpack_offline` for Java apps)\n");
+            if ("java".equals(rt) || "spring-boot".equals(rt) || "spring".equals(rt)) {
+                sb.append("- `path:` pointing to the JAR location (e.g., `target/*.jar`)\n");
+            }
+            sb.append("\nIf `manifest.yml` is missing or incomplete, report exactly what is wrong.\n\n");
+        }
+
+        sb.append("## Output Format\n\n");
+        sb.append("Report results in this exact format:\n\n");
+        sb.append("```\n");
+        sb.append("BUILD: PASS or BUILD: FAIL\n");
+        sb.append("{compiler error details if FAIL}\n");
+        if (cfDeploy) {
+            sb.append("MANIFEST: PASS or MANIFEST: FAIL or MANIFEST: MISSING\n");
+            sb.append("{missing fields if FAIL}\n");
+        }
+        sb.append("```\n\n");
+        sb.append("Do NOT attempt to fix any issues. Only report them.\n");
+
+        return sb.toString();
+    }
+
     private static String formatDependencies(ProjectContext context) {
         var entries = context.dependencies().entrySet().stream()
             .map(e -> e.getKey() + ":" + e.getValue())
