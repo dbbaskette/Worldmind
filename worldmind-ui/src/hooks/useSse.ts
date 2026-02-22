@@ -7,12 +7,16 @@ import { WorldmindEvent } from '../api/types'
 // so refreshing on every one causes rapid re-renders that visually scramble the sidebar.
 const REFRESH_TRIGGERING_EVENTS = new Set([
   'mission.created',
+  'mission.completed',
   'task.started',
   'task.fulfilled',
   'task.failed',
   'quality_gate.denied',
   'quality_gate.granted',
   'wave.completed',
+  'wave.merged',
+  'deployer.success',
+  'deployer.failed',
 ])
 
 export function useSse(missionId: string | null, onRefresh?: () => void) {
@@ -39,6 +43,7 @@ export function useSse(missionId: string | null, onRefresh?: () => void) {
     // Event handlers for different event types
     const handlers = {
       'mission.created': addEvent,
+      'mission.completed': addEvent,
       'task.started': addEvent,
       'task.fulfilled': addEvent,
       'task.failed': addEvent,
@@ -49,6 +54,9 @@ export function useSse(missionId: string | null, onRefresh?: () => void) {
       'quality_gate.granted': addEvent,
       'wave.scheduled': addEvent,
       'wave.completed': addEvent,
+      'wave.merged': addEvent,
+      'deployer.success': addEvent,
+      'deployer.failed': addEvent,
     }
 
     sseConnection.connect(missionId, handlers)

@@ -126,7 +126,8 @@ public class MissionController {
                         request.projectPath(), request.gitRemoteUrl(), request.reasoningLevel(),
                         request.executionStrategy(), 
                         request.createCfDeployment() != null && request.createCfDeployment(),
-                        request.prdDocument());
+                        request.prdDocument(),
+                        request.skipPerTaskTests() != null && request.skipPerTaskTests());
                 if (result != null) {
                     missionStates.put(missionId, result);
                 }

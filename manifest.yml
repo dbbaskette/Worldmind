@@ -123,24 +123,23 @@ applications:
       GOOSE_MODEL: gpt-5-nano
 
   # --- Agent: Deployer (CF deployment) ---
-  # CF credentials are required by this agent to authenticate with the CF API
-  # when deploying applications. Tasks run via `cf run-task` will also inherit
-  # these env vars. The orchestrator may inject per-task overrides at runtime.
-  - name: ((agent-deployer-app))
-    docker:
-      image: ((agent-image-registry))/agent-deployer:latest
-      username: ((docker-username))
-    memory: 2G
-    disk_quota: 4G
-    instances: 0
-    health-check-type: process
-    no-route: true
-    env:
-      OPENAI_API_KEY: ((openai-api-key))
-      GOOSE_PROVIDER: openai
-      GOOSE_MODEL: gpt-5-nano
-      CF_API_URL: ((cf-api-url))
-      CF_USERNAME: ((cf-username))
-      CF_PASSWORD: ((cf-password))
-      CF_ORG: ((cf-org))
-      CF_SPACE: ((cf-space))
+  # DISABLED: image ghcr.io/dbbaskette/agent-deployer:latest does not exist yet.
+  # Uncomment once the image is built and pushed.
+  # - name: ((agent-deployer-app))
+  #   docker:
+  #     image: ((agent-image-registry))/agent-deployer:latest
+  #     username: ((docker-username))
+  #   memory: 2G
+  #   disk_quota: 4G
+  #   instances: 0
+  #   health-check-type: process
+  #   no-route: true
+  #   env:
+  #     OPENAI_API_KEY: ((openai-api-key))
+  #     GOOSE_PROVIDER: openai
+  #     GOOSE_MODEL: gpt-5-nano
+  #     CF_API_URL: ((cf-api-url))
+  #     CF_USERNAME: ((cf-username))
+  #     CF_PASSWORD: ((cf-password))
+  #     CF_ORG: ((cf-org))
+  #     CF_SPACE: ((cf-space))

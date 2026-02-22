@@ -13,6 +13,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * @param executionStrategy   SEQUENTIAL or PARALLEL; nullable — defaults to planner decision (typically PARALLEL)
  * @param createCfDeployment  if true, append a final task to create CF deployment artifacts (manifest.yml, etc.)
  * @param prdDocument         pre-written PRD document in markdown format; if provided, skips clarifying questions and spec generation
+ * @param skipPerTaskTests    if true, skip per-task TESTER agent; reviewer-only quality gate (saves ~1-2 min per task)
  */
 public record MissionRequest(
     String request,
@@ -22,5 +23,6 @@ public record MissionRequest(
     @JsonProperty("reasoning_level") String reasoningLevel,
     @JsonProperty("execution_strategy") String executionStrategy,
     @JsonProperty("create_cf_deployment") Boolean createCfDeployment,
-    @JsonProperty("prd_document") String prdDocument
+    @JsonProperty("prd_document") String prdDocument,
+    @JsonProperty("skip_per_task_tests") Boolean skipPerTaskTests
 ) {}

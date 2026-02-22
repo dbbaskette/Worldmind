@@ -112,20 +112,22 @@ public class ParallelDispatchNode {
                 }
 
                 var taskToDispatch = applyRetryContext(task, retryContext);
+                taskToDispatch = applySiblingOwnership(taskToDispatch, waveIds, taskMap);
 
+                final var finalTaskToDispatch = taskToDispatch;
                 futures.add(CompletableFuture.supplyAsync(() -> {
-                    MdcContext.setTask(missionId, taskToDispatch.id(),
-                            taskToDispatch.agent());
+                    MdcContext.setTask(missionId, finalTaskToDispatch.id(),
+                            finalTaskToDispatch.agent());
                     
                     // Acquire worktree for this task if enabled
                     Path effectiveProjectPath = Path.of(projectPath);
                     if (worktreesEnabled) {
-                        Path worktreePath = worktreeContext.acquireWorktree(missionId, taskToDispatch.id(), "main");
+                        Path worktreePath = worktreeContext.acquireWorktree(missionId, finalTaskToDispatch.id(), "main");
                         if (worktreePath != null) {
                             effectiveProjectPath = worktreePath;
-                            log.info("Using worktree {} for task {}", worktreePath, taskToDispatch.id());
+                            log.info("Using worktree {} for task {}", worktreePath, finalTaskToDispatch.id());
                         } else {
-                            log.warn("Could not acquire worktree for {} — using shared project path", taskToDispatch.id());
+                            log.warn("Could not acquire worktree for {} — using shared project path", finalTaskToDispatch.id());
                         }
                     }
                     
@@ -135,29 +137,51 @@ public class ParallelDispatchNode {
                         semaphore.acquire();
                         try {
                             log.info("Dispatching task {} [{}]: {}",
-                                    taskToDispatch.id(), taskToDispatch.agent(),
-                                    taskToDispatch.description());
+                                    finalTaskToDispatch.id(), finalTaskToDispatch.agent(),
+                                    finalTaskToDispatch.description());
 
                             eventBus.publish(new WorldmindEvent("task.started",
-                                    missionId, taskToDispatch.id(),
-                                    Map.of("agent", taskToDispatch.agent(),
-                                           "description", taskToDispatch.description()),
+                                    missionId, finalTaskToDispatch.id(),
+                                    Map.of("agent", finalTaskToDispatch.agent(),
+                                           "description", finalTaskToDispatch.description()),
                                     Instant.now()));
 
                             long startMs = System.currentTimeMillis();
-                            var result = bridge.executeTask(
-                                    taskToDispatch, projectContext, finalProjectPath, state.gitRemoteUrl(), state.runtimeTag(), state.reasoningLevel());
+
+                            // Heartbeat: publish task.progress every 30s while the agent runs
+                            var heartbeat = Executors.newSingleThreadScheduledExecutor(r -> {
+                                Thread t = new Thread(r, "heartbeat-" + finalTaskToDispatch.id());
+                                t.setDaemon(true);
+                                return t;
+                            });
+                            heartbeat.scheduleAtFixedRate(() -> {
+                                long elapsed = (System.currentTimeMillis() - startMs) / 1000;
+                                eventBus.publish(new WorldmindEvent("task.progress",
+                                        missionId, finalTaskToDispatch.id(),
+                                        Map.of("agent", finalTaskToDispatch.agent(),
+                                               "elapsedSeconds", elapsed,
+                                               "status", "RUNNING"),
+                                        Instant.now()));
+                            }, 30, 30, TimeUnit.SECONDS);
+
+                            AgentDispatcher.BridgeResult result;
+                            try {
+                                result = bridge.executeTask(
+                                        finalTaskToDispatch, projectContext, finalProjectPath, state.gitRemoteUrl(), state.runtimeTag(), state.reasoningLevel());
+                            } finally {
+                                heartbeat.shutdownNow();
+                            }
                             long elapsedMs = System.currentTimeMillis() - startMs;
                             
                             // Commit and push worktree changes if enabled and task succeeded
                             if (worktreesEnabled && result.task().status() != TaskStatus.FAILED) {
-                                boolean pushed = worktreeContext.commitAndPush(taskToDispatch.id());
+                                boolean pushed = worktreeContext.commitAndPush(finalTaskToDispatch.id());
                                 if (pushed) {
-                                    log.info("Committed and pushed changes for task {}", taskToDispatch.id());
+                                    log.info("Committed and pushed changes for task {}", finalTaskToDispatch.id());
                                 }
                             }
                             if (metrics != null) {
-                                metrics.recordTaskExecution(taskToDispatch.agent(), elapsedMs);
+                                metrics.recordTaskExecution(finalTaskToDispatch.agent(), elapsedMs);
                             }
 
                             eventBus.publish(new WorldmindEvent(
@@ -165,14 +189,14 @@ public class ParallelDispatchNode {
                                             ? "task.progress" : "task.fulfilled",
                                     missionId, task.id(),
                                     Map.of("status", result.task().status().name(),
-                                           "agent", taskToDispatch.agent()),
+                                           "agent", finalTaskToDispatch.agent()),
                                     Instant.now()));
 
                             if (result.sandboxInfo() != null) {
                                 eventBus.publish(new WorldmindEvent("sandbox.opened",
                                         missionId, task.id(),
                                         Map.of("containerId", result.sandboxInfo().containerId(),
-                                               "agent", taskToDispatch.agent()),
+                                               "agent", finalTaskToDispatch.agent()),
                                         Instant.now()));
                             }
 
@@ -236,6 +260,42 @@ public class ParallelDispatchNode {
             }
             return updates;
         }
+    }
+
+    /**
+     * When multiple tasks run in the same wave, injects sibling file ownership info
+     * so each agent knows which files belong to other concurrent tasks.
+     */
+    private Task applySiblingOwnership(Task task, List<String> waveIds, Map<String, Task> taskMap) {
+        if (waveIds.size() <= 1) return task;
+        if (!"CODER".equalsIgnoreCase(task.agent()) && !"REFACTORER".equalsIgnoreCase(task.agent())) return task;
+
+        var sb = new StringBuilder();
+        boolean hasSiblings = false;
+        for (String siblingId : waveIds) {
+            if (siblingId.equals(task.id())) continue;
+            Task sibling = taskMap.get(siblingId);
+            if (sibling == null || sibling.targetFiles() == null || sibling.targetFiles().isEmpty()) continue;
+            if (!hasSiblings) {
+                sb.append("\n\n## Other Tasks Running Concurrently (DO NOT TOUCH)\n\n");
+                sb.append("The following tasks are running in parallel with you. ");
+                sb.append("Their files are OFF-LIMITS — do NOT create, modify, or overwrite them:\n\n");
+                hasSiblings = true;
+            }
+            sb.append("- **").append(siblingId).append("** (").append(sibling.agent()).append("): ");
+            sb.append(String.join(", ", sibling.targetFiles().stream().map(f -> "`" + f + "`").toList()));
+            sb.append("\n");
+        }
+
+        if (!hasSiblings) return task;
+
+        String augmentedContext = (task.inputContext() != null ? task.inputContext() : "") + sb;
+        return new Task(
+                task.id(), task.agent(), task.description(),
+                augmentedContext, task.successCriteria(), task.dependencies(),
+                TaskStatus.PENDING, task.iteration(), task.maxIterations(),
+                task.onFailure(), task.targetFiles(), task.filesAffected(), task.elapsedMs()
+        );
     }
 
     private Task applyRetryContext(Task task, String retryContext) {

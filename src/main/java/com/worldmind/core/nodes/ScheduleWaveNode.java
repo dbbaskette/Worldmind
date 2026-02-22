@@ -1,5 +1,7 @@
 package com.worldmind.core.nodes;
 
+import com.worldmind.core.events.EventBus;
+import com.worldmind.core.events.WorldmindEvent;
 import com.worldmind.core.metrics.WorldmindMetrics;
 import com.worldmind.core.model.ExecutionStrategy;
 import com.worldmind.core.model.MissionStatus;
@@ -11,7 +13,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -27,23 +31,25 @@ public class ScheduleWaveNode {
     private final int maxParallel;
     private final int waveCooldownSeconds;
     private final WorldmindMetrics metrics;
+    private final EventBus eventBus;
 
     @Autowired
     public ScheduleWaveNode(TaskScheduler scheduler, SandboxProperties properties, 
-                           WorldmindMetrics metrics) {
-        this(scheduler, properties.getMaxParallel(), properties.getWaveCooldownSeconds(), metrics);
+                           WorldmindMetrics metrics, EventBus eventBus) {
+        this(scheduler, properties.getMaxParallel(), properties.getWaveCooldownSeconds(), metrics, eventBus);
     }
 
     ScheduleWaveNode(TaskScheduler scheduler, int maxParallel) {
-        this(scheduler, maxParallel, 0, null);
+        this(scheduler, maxParallel, 0, null, new EventBus());
     }
 
     ScheduleWaveNode(TaskScheduler scheduler, int maxParallel, int waveCooldownSeconds, 
-                    WorldmindMetrics metrics) {
+                    WorldmindMetrics metrics, EventBus eventBus) {
         this.scheduler = scheduler;
         this.maxParallel = maxParallel;
         this.waveCooldownSeconds = waveCooldownSeconds;
         this.metrics = metrics;
+        this.eventBus = eventBus;
     }
 
     public Map<String, Object> apply(WorldmindState state) {
@@ -83,6 +89,13 @@ public class ScheduleWaveNode {
             if (hasDeployer) {
                 log.info("Scheduling DEPLOYER wave for mission {}", state.missionId());
             }
+
+            eventBus.publish(new WorldmindEvent("wave.scheduled",
+                    state.missionId(), null,
+                    Map.of("waveNumber", nextWaveCount,
+                           "taskCount", waveIds.size(),
+                           "taskIds", List.copyOf(waveIds)),
+                    Instant.now()));
 
             // Record wave execution metrics
             if (metrics != null) {

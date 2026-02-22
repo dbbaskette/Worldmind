@@ -1,8 +1,29 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { TaskResponse, WorldmindEvent } from '../api/types'
 import { StatusBadge } from './StatusBadge'
 import { AGENT_ACCENT } from '../utils/constants'
 import { formatDuration } from '../utils/formatting'
+
+/* ── Live elapsed timer for running tasks ──────────────────────────── */
+
+function useLiveElapsed(events: WorldmindEvent[], status: string): string | null {
+  const startTime = useMemo(() => {
+    const started = events.find(e => e.eventType === 'task.started')
+    return started ? new Date(started.timestamp).getTime() : null
+  }, [events])
+
+  const [now, setNow] = useState(Date.now())
+
+  useEffect(() => {
+    if (status !== 'EXECUTING' && status !== 'VERIFYING') return
+    if (!startTime) return
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [startTime, status])
+
+  if (!startTime || (status !== 'EXECUTING' && status !== 'VERIFYING')) return null
+  return formatDuration(now - startTime)
+}
 
 /* ── Phase definitions ─────────────────────────────────────────────── */
 
@@ -393,6 +414,7 @@ interface TaskCardProps {
 export function TaskCard({ task, events, onRetry, index, total }: TaskCardProps) {
   const [expanded, setExpanded] = useState(false)
   const accent = AGENT_ACCENT[task.agent] || '#6B7280'
+  const liveElapsed = useLiveElapsed(events, task.status)
 
   const liveScore = useMemo(() => {
     if (task.review_score != null) return { score: task.review_score, summary: task.review_summary }
@@ -449,9 +471,14 @@ export function TaskCard({ task, events, onRetry, index, total }: TaskCardProps)
           ) : (
             <span className="font-mono">iter {task.iteration + 1}/{task.max_iterations}</span>
           )}
-          {task.elapsed_ms && (
+          {liveElapsed ? (
+            <span className="font-mono text-blue-400 flex items-center gap-1">
+              <span className="w-1 h-1 rounded-full bg-blue-400 animate-pulse" />
+              {liveElapsed}
+            </span>
+          ) : task.elapsed_ms ? (
             <span className="font-mono">{formatDuration(task.elapsed_ms)}</span>
-          )}
+          ) : null}
           {task.on_failure && (
             <span className="font-mono text-amber-400/70">on_fail:{task.on_failure.toLowerCase()}</span>
           )}

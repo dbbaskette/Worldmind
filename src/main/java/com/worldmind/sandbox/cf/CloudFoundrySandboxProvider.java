@@ -223,8 +223,13 @@ public class CloudFoundrySandboxProvider implements SandboxProvider {
                 "git clone %s /workspace && cd /workspace".formatted(gitRemoteUrl),
                 "git config user.name 'Worldmind Agent' && git config user.email 'agent@worldmind.local'",
                 branchSetup,
-                // Use task-specific directory (.worldmind-TASK-001/) so each task's logs don't conflict
-                "mkdir -p .worldmind-" + taskId + " && curl --retry 3 -fk '%s' > .worldmind-%s/instruction.md".formatted(instructionUrl, taskId),
+                // Remove any .worldmind-* dirs inherited from prior task branches so the agent
+                // doesn't discover stale code in them. Then create this task's own .worldmind- dir
+                // and add the pattern to .gitignore so it never gets committed.
+                "rm -rf .worldmind-*"
+                        + " && mkdir -p .worldmind-" + taskId
+                        + " && (grep -qxF '.worldmind-*' .gitignore 2>/dev/null || echo '.worldmind-*' >> .gitignore)"
+                        + " && curl --retry 3 -fk '%s' > .worldmind-%s/instruction.md".formatted(instructionUrl, taskId),
                 // Dump diagnostics to a file that gets committed to git for debugging.
                 // IMPORTANT: Exclude VCAP_SERVICES (contains credentials in JSON) and mask any API keys/tokens.
                 "{"
@@ -240,14 +245,12 @@ public class CloudFoundrySandboxProvider implements SandboxProvider {
                 // -i/--instructions loads the file and executes its commands.
                 // --no-session avoids persisting session state in CF ephemeral containers.
                 // --with-builtin developer loads file-writing tools alongside config.yaml.
-                // --with-builtin web_search enables web search for research-heavy tasks (CODER, RESEARCHER).
                 // Verify instruction file is non-empty before running — curl may have failed silently.
                 "INSTRUCTION_FILE=.worldmind-" + taskId + "/instruction.md"
                         + " && if [ ! -s \"$INSTRUCTION_FILE\" ]; then"
                         + " echo 'FATAL: instruction file is empty or missing' >> .worldmind-" + taskId + "/diagnostics.log;"
                         + " echo 'FATAL: instruction file is empty or missing'; exit 1; fi"
                         + " && GOOSE_DEBUG=true goose run --debug --no-session --with-builtin developer"
-                        + (("coder".equals(type) || "researcher".equals(type)) ? " --with-builtin web_search" : "")
                         + " -i .worldmind-" + taskId + "/instruction.md > .worldmind-" + taskId + "/goose-output.log 2>&1"
                         + "; GOOSE_RC=$?; echo \"GOOSE_EXIT_CODE=$GOOSE_RC\" >> .worldmind-" + taskId + "/diagnostics.log"
                         + "; cp -r $HOME/.local/state/goose/logs/ .worldmind-" + taskId + "/goose-logs 2>/dev/null"
@@ -391,9 +394,9 @@ public class CloudFoundrySandboxProvider implements SandboxProvider {
             // FETCH_HEAD, not origin/main, when the clone is single-branch.
             gitWorkspaceManager.runGit(tempDir, "fetch", "--depth", "1", "origin", "main:refs/remotes/origin/main");
             String diffOutput = gitWorkspaceManager.runGitOutput(tempDir, "diff", "--stat", "origin/main..HEAD");
-            // Filter out .worldmind/ internal files (diagnostics, logs) — only report project changes
+            // Filter out .worldmind internal files (diagnostics, logs) — only report project changes
             return gitWorkspaceManager.parseDiffStat(diffOutput).stream()
-                    .filter(f -> !f.path().startsWith(".worldmind/") && !f.path().startsWith(".worldmind\\"))
+                    .filter(f -> !f.path().startsWith(".worldmind"))
                     .toList();
         } catch (Exception e) {
             log.warn("Git-based change detection failed for {} (branch {}): {}", taskId, branchName, e.getMessage());

@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import { INTERACTION_MODES } from '../utils/constants'
 
 interface MissionFormProps {
-  onSubmit: (request: string, mode: string, projectPath?: string, gitRemoteUrl?: string, reasoningLevel?: string, executionStrategy?: string, createCfDeployment?: boolean, prdDocument?: string) => Promise<void>
+  onSubmit: (request: string, mode: string, projectPath?: string, gitRemoteUrl?: string, reasoningLevel?: string, executionStrategy?: string, createCfDeployment?: boolean, prdDocument?: string, skipPerTaskTests?: boolean) => Promise<void>
   submitting: boolean
   error: string | null
   showSettings?: boolean
@@ -31,6 +31,7 @@ export function MissionForm({ onSubmit, submitting, error, showSettings, onToggl
   const [reasoningLevel, setReasoningLevel] = useState('medium')
   const [executionStrategy, setExecutionStrategy] = useState('SEQUENTIAL')
   const [createCfDeployment, setCreateCfDeployment] = useState(false)
+  const [skipPerTaskTests, setSkipPerTaskTests] = useState(false)
   const [showOptions, setShowOptions] = useState(false)
   const [prdDocument, setPrdDocument] = useState('')
   const [prdFileName, setPrdFileName] = useState('')
@@ -61,7 +62,7 @@ export function MissionForm({ onSubmit, submitting, error, showSettings, onToggl
     e.preventDefault()
     // Either request text or PRD document is required
     if (request.trim() || prdDocument.trim()) {
-      await onSubmit(request, mode, projectPath || undefined, gitRemoteUrl || undefined, reasoningLevel, executionStrategy, createCfDeployment, prdDocument || undefined)
+      await onSubmit(request, mode, projectPath || undefined, gitRemoteUrl || undefined, reasoningLevel, executionStrategy, createCfDeployment, prdDocument || undefined, skipPerTaskTests)
       setRequest('')
       clearPrdDocument()
     }
@@ -283,20 +284,37 @@ export function MissionForm({ onSubmit, submitting, error, showSettings, onToggl
               </p>
             </div>
 
-            {/* CF Deployment Checkbox */}
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="createCfDeployment"
-                checked={createCfDeployment}
-                onChange={(e) => setCreateCfDeployment(e.target.checked)}
-                disabled={submitting}
-                className="w-4 h-4 rounded border-wm-border bg-wm-bg text-agent-coder focus:ring-agent-coder/50 focus:ring-offset-0"
-              />
-              <label htmlFor="createCfDeployment" className="text-xs text-wm_text-secondary cursor-pointer">
-                CF Deploy
-              </label>
-              <span className="text-[10px] text-wm_text-muted">Build and deploy the completed application to Cloud Foundry. Verifies the app starts successfully.</span>
+            {/* Checkboxes row */}
+            <div className="flex flex-wrap gap-x-6 gap-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="createCfDeployment"
+                  checked={createCfDeployment}
+                  onChange={(e) => setCreateCfDeployment(e.target.checked)}
+                  disabled={submitting}
+                  className="w-4 h-4 rounded border-wm-border bg-wm-bg text-agent-coder focus:ring-agent-coder/50 focus:ring-offset-0"
+                />
+                <label htmlFor="createCfDeployment" className="text-xs text-wm_text-secondary cursor-pointer">
+                  CF Deploy
+                </label>
+                <span className="text-[10px] text-wm_text-muted">Deploy to Cloud Foundry after build</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="skipPerTaskTests"
+                  checked={skipPerTaskTests}
+                  onChange={(e) => setSkipPerTaskTests(e.target.checked)}
+                  disabled={submitting}
+                  className="w-4 h-4 rounded border-wm-border bg-wm-bg text-agent-tester focus:ring-agent-tester/50 focus:ring-offset-0"
+                />
+                <label htmlFor="skipPerTaskTests" className="text-xs text-wm_text-secondary cursor-pointer">
+                  Skip Per-Task Tests
+                </label>
+                <span className="text-[10px] text-wm_text-muted">Skip TESTER agent per task — saves ~1-2 min each</span>
+              </div>
             </div>
 
             {/* Project Path & Git URL */}

@@ -84,18 +84,26 @@ public class MissionEngine {
                                      String projectPath, String gitRemoteUrl, String reasoningLevel,
                                      String executionStrategy, boolean createCfDeployment) {
         return runMission(missionId, request, mode, projectPath, gitRemoteUrl, reasoningLevel,
-                executionStrategy, createCfDeployment, null);
+                executionStrategy, createCfDeployment, null, false);
     }
 
     public WorldmindState runMission(String missionId, String request, InteractionMode mode,
                                      String projectPath, String gitRemoteUrl, String reasoningLevel,
                                      String executionStrategy, boolean createCfDeployment,
                                      String prdDocument) {
+        return runMission(missionId, request, mode, projectPath, gitRemoteUrl, reasoningLevel,
+                executionStrategy, createCfDeployment, prdDocument, false);
+    }
+
+    public WorldmindState runMission(String missionId, String request, InteractionMode mode,
+                                     String projectPath, String gitRemoteUrl, String reasoningLevel,
+                                     String executionStrategy, boolean createCfDeployment,
+                                     String prdDocument, boolean skipPerTaskTests) {
         MdcContext.setMission(missionId);
         try {
             boolean hasPrd = prdDocument != null && !prdDocument.isBlank();
-            log.info("Starting mission {} with mode {}, reasoning={}, strategy={}, cfDeploy={}, hasPRD={} — request: {}", 
-                    missionId, mode, reasoningLevel, executionStrategy, createCfDeployment, hasPrd, request);
+            log.info("Starting mission {} with mode {}, reasoning={}, strategy={}, cfDeploy={}, skipTests={}, hasPRD={} — request: {}", 
+                    missionId, mode, reasoningLevel, executionStrategy, createCfDeployment, skipPerTaskTests, hasPrd, request);
 
             eventBus.publish(new WorldmindEvent(
                     "mission.created", missionId, null,
@@ -106,7 +114,6 @@ public class MissionEngine {
             stateMap.put("missionId", missionId);
             stateMap.put("request", request);
             stateMap.put("interactionMode", mode.name());
-            // If PRD document is provided, skip directly to planning
             stateMap.put("status", hasPrd ? MissionStatus.PLANNING.name() : MissionStatus.CLASSIFYING.name());
             if (projectPath != null && !projectPath.isBlank()) {
                 stateMap.put("projectPath", projectPath);
@@ -117,15 +124,15 @@ public class MissionEngine {
             if (reasoningLevel != null && !reasoningLevel.isBlank()) {
                 stateMap.put("reasoningLevel", reasoningLevel);
             }
-            // If user specified an execution strategy, store it (will override planner's choice)
             if (executionStrategy != null && !executionStrategy.isBlank()) {
                 stateMap.put("userExecutionStrategy", executionStrategy.toUpperCase());
             }
-            // If user requested CF deployment artifacts
             if (createCfDeployment) {
                 stateMap.put("createCfDeployment", true);
             }
-            // If user provided a PRD document, store it and skip spec generation
+            if (skipPerTaskTests) {
+                stateMap.put("skipPerTaskTests", true);
+            }
             if (hasPrd) {
                 stateMap.put("prdDocument", prdDocument);
                 log.info("Mission {} using user-provided PRD document ({} chars), skipping spec generation",

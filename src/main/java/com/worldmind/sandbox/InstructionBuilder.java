@@ -83,6 +83,30 @@ public final class InstructionBuilder {
         sb.append("## Success Criteria\n\n");
         sb.append(task.successCriteria()).append("\n\n");
 
+        sb.append("## Workspace Layout\n\n");
+        sb.append("- Your working directory is `/workspace` (the project root).\n");
+        sb.append("- **ALL code MUST be created under `/workspace`** using standard project paths ");
+        sb.append("(e.g., `src/main/java/...`, `public/`, `pom.xml`, `package.json`).\n");
+        sb.append("- **NEVER put code in `.worldmind-*` directories.** Those are internal orchestration ");
+        sb.append("directories containing instruction files and logs — not part of the project. Ignore them entirely.\n");
+        sb.append("- If you see existing code in `.worldmind-*` directories, that is NOT the project code. ");
+        sb.append("Do not read, copy, or reference files from those directories.\n\n");
+
+        // File ownership — explicit boundaries for what this task may touch
+        if (task.targetFiles() != null && !task.targetFiles().isEmpty()) {
+            sb.append("## File Ownership (STRICT)\n\n");
+            sb.append("You are assigned the following files. You MUST create/modify ONLY these files:\n\n");
+            for (String f : task.targetFiles()) {
+                sb.append("- `").append(f).append("`\n");
+            }
+            sb.append("\n**RULES:**\n");
+            sb.append("- Do NOT create or modify any files outside this list.\n");
+            sb.append("- Other tasks own other files. If you touch them, you will cause merge conflicts and the mission will fail.\n");
+            sb.append("- If you need to READ another file for context (e.g., an interface you implement), that is fine — but do NOT write to it.\n");
+            sb.append("- If your task genuinely cannot be completed without modifying an unlisted file, ");
+            sb.append("document this in a comment in one of your owned files and proceed with your assigned files only.\n\n");
+        }
+
         sb.append("## Constraints\n\n");
         sb.append("- **NAMING**: Name things according to their function. App names, project names, ");
         sb.append("and config files should describe what the application does (e.g., `snake-game`, `todo-api`), ");
@@ -99,9 +123,8 @@ public final class InstructionBuilder {
         sb.append("- If you encounter an error, attempt to fix it before reporting failure\n\n");
 
         sb.append("## Available Tools\n\n");
-        sb.append("- **Web Search**: You have web search available. Use it to look up documentation, APIs, ");
-        sb.append("best practices, or examples when implementing unfamiliar technologies.\n");
-        sb.append("- **File Operations**: Read, write, and modify files in the workspace.\n\n");
+        sb.append("- **File Operations**: Read, write, and modify files in the workspace.\n");
+        sb.append("- **Shell**: Run shell commands (build, test, etc.).\n\n");
 
         sb.append("## Cloud Foundry Deployment\n\n");
         sb.append("If you create a `manifest.yml`:\n");
@@ -236,9 +259,8 @@ public final class InstructionBuilder {
         sb.append(task.successCriteria()).append("\n\n");
 
         sb.append("## Available Tools\n\n");
-        sb.append("- **Web Search**: You have web search available. Use it to research documentation, ");
-        sb.append("find best practices, look up error messages, or gather information about technologies.\n");
-        sb.append("- **File Operations**: Read files in the workspace (but do NOT write).\n\n");
+        sb.append("- **File Operations**: Read files in the workspace (but do NOT write).\n");
+        sb.append("- **Shell**: Run shell commands (grep, find, ls, etc.).\n\n");
 
         sb.append("## Constraints\n\n");
         sb.append("- READ-ONLY: Do NOT create, modify, or delete any files\n");
@@ -442,10 +464,14 @@ public final class InstructionBuilder {
     public static String withMcpTools(String instruction, String agentType, List<String> serverNames) {
         if (serverNames == null || serverNames.isEmpty()) return instruction;
         return instruction
-                + "\n\n## Tools\n\n"
-                + "You have MCP extension tools available for GitHub operations, code search, "
-                + "and other services. Use them whenever they can help — especially for git "
-                + "operations, reading repository files, or searching code.\n";
+                + "\n\n## MCP Tools\n\n"
+                + "You have MCP extension tools available:\n"
+                + "- **Web Search** (Brave): Search the web for documentation, APIs, examples, "
+                + "and best practices. Use this when you need to look up how a library works, "
+                + "find error solutions, or research unfamiliar technologies.\n"
+                + "- **GitHub**: Repository operations, code search, reading files from repos.\n"
+                + "\nUse these tools proactively — especially web search for any technology "
+                + "or API you are not fully confident about.\n";
     }
 
     private static String formatFileChanges(List<FileRecord> fileChanges) {

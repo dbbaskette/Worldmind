@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useMission } from '../hooks/useMission'
 import { useSse } from '../hooks/useSse'
 import { apiClient } from '../api/client'
+import { MissionResponse, WorldmindEvent } from '../api/types'
 import { StatusBadge } from './StatusBadge'
 import { TaskTimeline } from './TaskTimeline'
 import { TaskCard } from './TaskCard'
@@ -9,9 +10,87 @@ import { MetricsPanel } from './MetricsPanel'
 import { EventLog } from './EventLog'
 import { ApprovalPanel } from './ApprovalPanel'
 import { ClarifyingQuestionsPanel } from './ClarifyingQuestionsPanel'
+import { formatDuration } from '../utils/formatting'
 
 interface MissionDetailProps {
   missionId: string
+}
+
+function ExecutingActivityBanner({ mission, events }: { mission: MissionResponse; events: WorldmindEvent[] }) {
+  const isActive = mission.status === 'EXECUTING'
+  const missionStart = useMemo(() => {
+    const created = events.find(e => e.eventType === 'mission.created')
+    return created ? new Date(created.timestamp).getTime() : Date.now()
+  }, [events])
+
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => {
+    if (!isActive) return
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [isActive])
+
+  if (!isActive) return null
+
+  const tasks = mission.tasks
+  const running = tasks.filter(t => t.status === 'EXECUTING' || t.status === 'VERIFYING').length
+  const completed = tasks.filter(t => t.status === 'FULFILLED' || t.status === 'PASSED').length
+  const failed = tasks.filter(t => t.status === 'FAILED').length
+  const pending = tasks.length - running - completed - failed
+
+  const lastProgress = [...events].reverse().find(e => e.eventType === 'task.progress')
+  const lastEventTime = events.length > 0
+    ? new Date(events[events.length - 1].timestamp).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    : null
+
+  return (
+    <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-4 mb-5">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+          <span className="text-xs font-medium text-wm_text-secondary">Mission Running</span>
+        </div>
+        <span className="text-[11px] font-mono text-blue-400">{formatDuration(now - missionStart)}</span>
+      </div>
+
+      <div className="grid grid-cols-4 gap-3">
+        {running > 0 && (
+          <div className="text-center">
+            <div className="text-sm font-mono font-semibold text-blue-400">{running}</div>
+            <div className="text-[10px] text-wm_text-muted">running</div>
+          </div>
+        )}
+        {pending > 0 && (
+          <div className="text-center">
+            <div className="text-sm font-mono font-semibold text-wm_text-secondary">{pending}</div>
+            <div className="text-[10px] text-wm_text-muted">pending</div>
+          </div>
+        )}
+        {completed > 0 && (
+          <div className="text-center">
+            <div className="text-sm font-mono font-semibold text-emerald-400">{completed}</div>
+            <div className="text-[10px] text-wm_text-muted">done</div>
+          </div>
+        )}
+        {failed > 0 && (
+          <div className="text-center">
+            <div className="text-sm font-mono font-semibold text-red-400">{failed}</div>
+            <div className="text-[10px] text-wm_text-muted">failed</div>
+          </div>
+        )}
+      </div>
+
+      {(mission.wave_count > 0 || lastEventTime) && (
+        <div className="flex items-center gap-4 mt-3 pt-2 border-t border-blue-500/10 text-[10px] font-mono text-wm_text-muted">
+          {mission.wave_count > 0 && <span>wave {mission.wave_count}</span>}
+          {lastProgress && (
+            <span>heartbeat {lastProgress.payload?.elapsedSeconds}s</span>
+          )}
+          {lastEventTime && <span>last event {lastEventTime}</span>}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function ErrorPanel({ errors, status }: { errors: string[]; status: string }) {
@@ -180,6 +259,8 @@ export function MissionDetail({ missionId }: MissionDetailProps) {
           </div>
         </div>
       )}
+
+      <ExecutingActivityBanner mission={mission} events={events} />
 
       {mission.status === 'AWAITING_APPROVAL' && (
         <ApprovalPanel mission={mission} onRefresh={refresh} />

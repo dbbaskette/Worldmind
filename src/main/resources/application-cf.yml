@@ -3,24 +3,23 @@
 
 spring:
   ai:
+    openai:
+      enabled: true
+      api-key: ${OPENAI_API_KEY:}
+      chat:
+        options:
+          model: ${WORLDMIND_LLM_MODEL:gpt-5-nano}
+          temperature: 1
+          max-completion-tokens: 8192
     google:
       genai:
-        enabled: true
-        api-key: ${GOOGLE_API_KEY:}
-        chat:
-          options:
-            model: gemini-2.0-flash
-            temperature: 0.0
+        enabled: false
   autoconfigure:
     exclude:
       - org.springframework.ai.model.anthropic.autoconfigure.AnthropicChatAutoConfiguration
-      - org.springframework.ai.model.openai.autoconfigure.OpenAiChatAutoConfiguration
-      - org.springframework.ai.model.openai.autoconfigure.OpenAiAudioSpeechAutoConfiguration
-      - org.springframework.ai.model.openai.autoconfigure.OpenAiAudioTranscriptionAutoConfiguration
-      - org.springframework.ai.model.openai.autoconfigure.OpenAiEmbeddingAutoConfiguration
-      - org.springframework.ai.model.openai.autoconfigure.OpenAiImageAutoConfiguration
-      - org.springframework.ai.model.openai.autoconfigure.OpenAiModerationAutoConfiguration
-      - org.springframework.ai.model.openai.autoconfigure.OpenAiConnectionAutoConfiguration
+      - org.springframework.ai.model.google.genai.autoconfigure.chat.GoogleGenAiChatAutoConfiguration
+      - org.springframework.ai.model.google.genai.autoconfigure.embedding.GoogleGenAiTextEmbeddingAutoConfiguration
+      - org.springframework.ai.model.google.genai.autoconfigure.embedding.GoogleGenAiEmbeddingConnectionAutoConfiguration
 
 worldmind:
   goose:

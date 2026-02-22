@@ -30,6 +30,7 @@ export class SseConnection {
     // Register all event type listeners
     const eventTypes = [
       'mission.created',
+      'mission.completed',
       'task.started',
       'task.fulfilled',
       'task.progress',
@@ -39,7 +40,10 @@ export class SseConnection {
       'quality_gate.granted',
       'wave.scheduled',
       'wave.completed',
-      'task.phase'
+      'wave.merged',
+      'task.phase',
+      'deployer.success',
+      'deployer.failed',
     ]
 
     eventTypes.forEach(eventType => {

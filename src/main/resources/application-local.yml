@@ -15,7 +15,7 @@ spring:
         options:
           model: ${LOCAL_LLM_MODEL:qwen/qwen3-coder-30b}
           temperature: 0.0
-          max-tokens: 8192
+          max-completion-tokens: 8192
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration

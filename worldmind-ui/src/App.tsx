@@ -49,8 +49,8 @@ function App() {
     setUsername(null)
   }
 
-  const handleSubmit = async (request: string, mode: string, projectPath?: string, gitRemoteUrl?: string, reasoningLevel?: string, executionStrategy?: string, createCfDeployment?: boolean, prdDocument?: string) => {
-    await submitMission(request, mode, projectPath, gitRemoteUrl, reasoningLevel, executionStrategy, createCfDeployment, prdDocument)
+  const handleSubmit = async (request: string, mode: string, projectPath?: string, gitRemoteUrl?: string, reasoningLevel?: string, executionStrategy?: string, createCfDeployment?: boolean, prdDocument?: string, skipPerTaskTests?: boolean) => {
+    await submitMission(request, mode, projectPath, gitRemoteUrl, reasoningLevel, executionStrategy, createCfDeployment, prdDocument, skipPerTaskTests)
   }
 
   if (!authChecked) {

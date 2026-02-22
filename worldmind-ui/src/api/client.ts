@@ -11,7 +11,8 @@ class ApiClient {
     reasoningLevel?: string,
     executionStrategy?: string,
     createCfDeployment?: boolean,
-    prdDocument?: string
+    prdDocument?: string,
+    skipPerTaskTests?: boolean
   ): Promise<{ mission_id: string; status: string }> {
     const response = await fetch(`${API_BASE}/missions`, {
       method: 'POST',
@@ -24,7 +25,8 @@ class ApiClient {
         reasoning_level: reasoningLevel || 'medium',
         execution_strategy: executionStrategy || 'SEQUENTIAL',
         create_cf_deployment: createCfDeployment || false,
-        prd_document: prdDocument || ''
+        prd_document: prdDocument || '',
+        skip_per_task_tests: skipPerTaskTests || false
       })
     })
 

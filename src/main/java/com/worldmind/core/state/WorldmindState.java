@@ -42,6 +42,7 @@ public class WorldmindState extends AgentState {
         Map.entry("reasoningLevel",        Channels.base(() -> "medium")),
         Map.entry("userExecutionStrategy", Channels.base(() -> "")),  // User override for execution strategy
         Map.entry("createCfDeployment",   Channels.base(() -> false)),  // If true, append CF deployment task
+        Map.entry("skipPerTaskTests",     Channels.base(() -> false)),  // If true, skip per-task TESTER agent (saves ~1-2 min/task)
         Map.entry("clarifyingQuestions",  Channels.base((Reducer<ClarifyingQuestions>) null)),  // Questions for user
         Map.entry("clarifyingAnswers",    Channels.base(() -> "")),  // User's answers as JSON
         Map.entry("manifestCreatedByTask", Channels.base(() -> false)),  // True when a planned task targets manifest.yml
@@ -194,6 +195,10 @@ public class WorldmindState extends AgentState {
 
     public boolean createCfDeployment() {
         return this.<Boolean>value("createCfDeployment").orElse(false);
+    }
+
+    public boolean skipPerTaskTests() {
+        return this.<Boolean>value("skipPerTaskTests").orElse(false);
     }
 
     public boolean manifestCreatedByTask() {

@@ -12,14 +12,14 @@ spring:
         options:
           model: claude-sonnet-4-5-20250929
           temperature: 0.0
-          max-tokens: 8192
+          max-completion-tokens: 8192
     openai:
       enabled: false
       chat:
         options:
           model: ${WORLDMIND_LLM_MODEL:gpt-4o}
           temperature: 0.0
-          max-tokens: 8192
+          max-completion-tokens: 8192
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/worldmind}
     username: ${DB_USER:worldmind}

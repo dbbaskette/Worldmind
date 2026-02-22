@@ -39,6 +39,7 @@ export const AGENT_ACCENT: Record<string, string> = {
 // Event type colors for log entries
 export const EVENT_COLORS = {
   'mission.created': 'text-purple-400',
+  'mission.completed': 'text-emerald-400',
   'task.started': 'text-blue-400',
   'task.fulfilled': 'text-emerald-400',
   'task.failed': 'text-red-400',
@@ -49,8 +50,11 @@ export const EVENT_COLORS = {
   'quality_gate.granted': 'text-emerald-400',
   'wave.scheduled': 'text-cyan-400',
   'wave.completed': 'text-teal-400',
+  'wave.merged': 'text-teal-400',
   'deployer.phase': 'text-teal-400',
   'deployer.deployed': 'text-emerald-400',
+  'deployer.success': 'text-emerald-400',
+  'deployer.failed': 'text-red-400',
 } as const
 
 // Interaction modes

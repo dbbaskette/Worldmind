@@ -173,26 +173,31 @@ public class EvaluateWaveNode {
                     continue;
                 }
 
-                // Step 1: TESTER
-                eventBus.publish(new WorldmindEvent("task.phase",
-                        state.missionId(), id,
-                        Map.of("phase", "TESTER"), Instant.now()));
+                // Step 1: TESTER (skipped when skipPerTaskTests is enabled)
                 TestResult testResult;
-                try {
-                    var testerTask = createTesterTask(task, fileChanges);
-                    log.info("Dispatching TESTER for task {} ({} file changes)", id, fileChanges.size());
-                    var testerResult = bridge.executeTask(testerTask, projectContext, Path.of(projectPath), state.gitRemoteUrl(), state.runtimeTag(), state.reasoningLevel());
-                    sandboxInfos.add(testerResult.sandboxInfo());
-                    if (testerResult.task().status() == TaskStatus.FAILED) {
-                        log.warn("TESTER for {} failed ({}ms): {}", id,
-                                testerResult.task().elapsedMs(), testerResult.output());
+                if (state.skipPerTaskTests()) {
+                    log.info("Skipping per-task TESTER for {} (skipPerTaskTests=true)", id);
+                    testResult = new TestResult(id, true, 0, 0, "Per-task tests skipped by mission config", 0L);
+                } else {
+                    eventBus.publish(new WorldmindEvent("task.phase",
+                            state.missionId(), id,
+                            Map.of("phase", "TESTER"), Instant.now()));
+                    try {
+                        var testerTask = createTesterTask(task, fileChanges);
+                        log.info("Dispatching TESTER for task {} ({} file changes)", id, fileChanges.size());
+                        var testerResult = bridge.executeTask(testerTask, projectContext, Path.of(projectPath), state.gitRemoteUrl(), state.runtimeTag(), state.reasoningLevel());
+                        sandboxInfos.add(testerResult.sandboxInfo());
+                        if (testerResult.task().status() == TaskStatus.FAILED) {
+                            log.warn("TESTER for {} failed ({}ms): {}", id,
+                                    testerResult.task().elapsedMs(), testerResult.output());
+                        }
+                        testResult = quality_gateService.parseTestOutput(id, testerResult.output(),
+                                testerResult.task().elapsedMs() != null ? testerResult.task().elapsedMs() : 0L);
+                    } catch (Exception e) {
+                        log.error("TESTER dispatch failed for {}: {}", id, e.getMessage());
+                        testResult = new TestResult(id, false, 0, 0,
+                                "TESTER infrastructure error: " + e.getMessage(), 0L);
                     }
-                    testResult = quality_gateService.parseTestOutput(id, testerResult.output(),
-                            testerResult.task().elapsedMs() != null ? testerResult.task().elapsedMs() : 0L);
-                } catch (Exception e) {
-                    log.error("TESTER dispatch failed for {}: {}", id, e.getMessage());
-                    testResult = new TestResult(id, false, 0, 0,
-                            "TESTER infrastructure error: " + e.getMessage(), 0L);
                 }
 
                 // Step 2: REVIEWER
@@ -281,6 +286,14 @@ public class EvaluateWaveNode {
             if (retryContext != null) updates.put("retryContext", retryContext);
             if (deploymentUrl != null) updates.put("deploymentUrl", deploymentUrl);
             if (missionStatus != null) updates.put("status", missionStatus.name());
+
+            eventBus.publish(new WorldmindEvent("wave.completed",
+                    state.missionId(), null,
+                    Map.of("waveNumber", state.waveCount(),
+                           "completed", completedIds.size(),
+                           "failed", errors.size(),
+                           "retrying", retryingIds.size()),
+                    Instant.now()));
 
             return updates;
         } finally {
