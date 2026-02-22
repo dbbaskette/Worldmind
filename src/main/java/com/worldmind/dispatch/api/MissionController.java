@@ -548,6 +548,9 @@ public class MissionController {
         if (state.createCfDeployment()) {
             map.put("createCfDeployment", true);
         }
+        if (state.skipPerTaskTests()) {
+            map.put("skipPerTaskTests", true);
+        }
         return map;
     }
 
