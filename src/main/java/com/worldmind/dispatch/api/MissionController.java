@@ -136,7 +136,8 @@ public class MissionController {
                 log.error("Mission {} failed", missionId, e);
                 WorldmindState failedState = new WorldmindState(Map.of(
                         "missionId", missionId,
-                        "request", request.request(),
+                        "request", requestText,
+                        "interactionMode", mode.name(),
                         "status", MissionStatus.FAILED.name(),
                         "errors", List.of(e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName())
                 ));
@@ -301,12 +302,10 @@ public class MissionController {
                 log.info("Mission {} resumed and completed with status {}", missionId, finalState.status());
             } catch (Exception ex) {
                 log.error("Mission {} failed during async resume", missionId, ex);
-                var errorState = new WorldmindState(Map.of(
-                        "missionId", missionId,
-                        "status", MissionStatus.FAILED.name(),
-                        "error", ex.getMessage() != null ? ex.getMessage() : "Unknown error"
-                ));
-                missionStates.put(missionId, errorState);
+                var errorMap = new HashMap<>(stateMap);
+                errorMap.put("status", MissionStatus.FAILED.name());
+                errorMap.put("errors", List.of(ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName()));
+                missionStates.put(missionId, new WorldmindState(errorMap));
             }
         });
     }
@@ -544,6 +543,7 @@ public class MissionController {
         putIfPresent(map, "gitRemoteUrl", state.gitRemoteUrl());
         putIfPresent(map, "userExecutionStrategy", state.<String>value("userExecutionStrategy").orElse(null));
         putIfPresent(map, "reasoningLevel", state.<String>value("reasoningLevel").orElse(null));
+        putIfPresent(map, "prdDocument", state.prdDocument());
 
         if (state.createCfDeployment()) {
             map.put("createCfDeployment", true);

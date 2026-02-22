@@ -186,6 +186,9 @@ public class PlanMissionNode {
         // Plan generation uses structuredCall without MCP tools — the planner only
         // needs to structure tasks from the spec, not call external tools.
         MissionPlan plan = llmService.structuredCall(SYSTEM_PROMPT, userPrompt, MissionPlan.class);
+        if (plan == null) {
+            throw new IllegalStateException("LLM returned null plan for mission " + state.missionId());
+        }
 
         List<Task> tasks = convertToTasks(plan);
         tasks = ensureCoderTask(tasks, request);
@@ -211,9 +214,10 @@ public class PlanMissionNode {
         log.info("Planning strategy: userExecutionStrategy='{}', LLM suggested='{}'",
                 userStrategy, plan.executionStrategy());
 
+        String llmStrategy = plan.executionStrategy() != null ? plan.executionStrategy().toUpperCase() : "SEQUENTIAL";
         String effectiveStrategy = (userStrategy != null && !userStrategy.isBlank())
                 ? userStrategy
-                : plan.executionStrategy().toUpperCase();
+                : llmStrategy;
 
         log.info("Effective execution strategy: {} (user override: {})",
                 effectiveStrategy, userStrategy != null && !userStrategy.isBlank());
@@ -700,6 +704,10 @@ public class PlanMissionNode {
 
     private List<Task> convertToTasks(MissionPlan plan) {
         var tasks = new ArrayList<Task>();
+        if (plan.tasks() == null || plan.tasks().isEmpty()) {
+            log.warn("LLM returned a plan with no tasks — ensureCoderTask will add a fallback");
+            return tasks;
+        }
         for (int i = 0; i < plan.tasks().size(); i++) {
             var dp = plan.tasks().get(i);
             String id = String.format("TASK-%03d", i + 1);
