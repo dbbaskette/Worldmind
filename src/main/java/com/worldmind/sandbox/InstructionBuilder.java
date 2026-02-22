@@ -80,6 +80,8 @@ public final class InstructionBuilder {
             sb.append("\n");
         }
 
+        appendTechnologyGuidance(sb, context);
+
         sb.append("## Success Criteria\n\n");
         sb.append(task.successCriteria()).append("\n\n");
 
@@ -519,6 +521,35 @@ public final class InstructionBuilder {
                 sb.append("\n```\n");
             }
             sb.append("\n");
+        }
+    }
+
+    /**
+     * Appends technology-specific guidance when the project context indicates
+     * a framework with common pitfalls (e.g., Spring Boot 3.x Jakarta migration).
+     */
+    private static void appendTechnologyGuidance(StringBuilder sb, ProjectContext context) {
+        if (context == null) return;
+        String framework = context.framework() != null ? context.framework().toLowerCase() : "";
+        String language = context.language() != null ? context.language().toLowerCase() : "";
+
+        if (framework.contains("spring") || (language.contains("java") && framework.contains("boot"))) {
+            sb.append("## Technology Guidance — Spring Boot 3.x\n\n");
+            sb.append("Spring Boot 3.x uses **Jakarta EE 10**. This affects ALL Java EE imports:\n\n");
+            sb.append("| WRONG (javax) | CORRECT (jakarta) |\n");
+            sb.append("|---|---|\n");
+            sb.append("| `javax.persistence.*` | `jakarta.persistence.*` |\n");
+            sb.append("| `javax.validation.*` | `jakarta.validation.*` |\n");
+            sb.append("| `javax.servlet.*` | `jakarta.servlet.*` |\n");
+            sb.append("| `javax.annotation.*` | `jakarta.annotation.*` |\n\n");
+            sb.append("**NEVER use `javax.persistence` or any `javax.*` EE package.** ");
+            sb.append("Spring Boot 3.x will NOT compile with javax imports.\n\n");
+            sb.append("**Cloud Foundry manifest.yml** — if you create a manifest, you MUST include:\n");
+            sb.append("```yaml\n");
+            sb.append("  buildpacks:\n");
+            sb.append("  - java_buildpack_offline\n");
+            sb.append("```\n");
+            sb.append("Without `buildpacks`, CF cannot stage the application.\n\n");
         }
     }
 

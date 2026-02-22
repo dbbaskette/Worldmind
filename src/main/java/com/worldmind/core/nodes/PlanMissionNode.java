@@ -131,6 +131,13 @@ public class PlanMissionNode {
             - CODER: Add preference UI components to frontend
               targetFiles: ["frontend/components/PreferencesPanel.tsx"]
 
+            TECHNOLOGY-SPECIFIC RULES:
+            14. For Spring Boot 3.x projects: ALL Java EE imports MUST use `jakarta.*` (NOT `javax.*`).
+                Spring Boot 3 uses Jakarta EE 10. `javax.persistence`, `javax.validation`, etc. will NOT compile.
+                Include this in the inputContext for any CODER task that creates JPA entities, validation, or servlets.
+            15. For Cloud Foundry deployments: `manifest.yml` MUST include `buildpacks: - java_buildpack_offline`
+                for Java apps. Without the buildpack entry, CF staging will fail.
+            
             Respond with valid JSON matching the schema provided.
             """;
 
