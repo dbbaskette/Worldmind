@@ -42,9 +42,10 @@ public class QualityGateEvaluationService {
     private static final Pattern PYTEST_PASSED_PATTERN = Pattern.compile("(\\d+)\\s+passed");
     private static final Pattern PYTEST_FAILED_PATTERN = Pattern.compile("(\\d+)\\s+failed");
 
-    /** Specific test failure patterns (not generic "Error" which matches Goose session noise). */
+    /** Specific test failure patterns. Requires anchoring context to avoid false-positives on
+     *  Goose session noise (e.g. the word "test" appearing in agent commentary). */
     private static final Pattern BUILD_FAILURE_PATTERN =
-            Pattern.compile("(?i)(BUILD FAILURE|BUILD FAILED|COMPILATION ERROR|test.*failed|npm ERR!)");
+            Pattern.compile("(?i)(BUILD FAILURE|BUILD FAILED|COMPILATION ERROR|npm ERR!|Tests? run:.*Failures:\\s*[1-9])");
 
     /** Extract "Score: X/10" from raw Goose output before LLM parsing. */
     private static final Pattern SCORE_PATTERN =

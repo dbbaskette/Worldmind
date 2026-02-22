@@ -207,22 +207,32 @@ public final class InstructionBuilder {
 
         appendProjectContext(sb, context);
 
+        sb.append("## Review Scope (CRITICAL — READ THIS FIRST)\n\n");
+        sb.append("You are reviewing ONE task in a multi-task mission. Other tasks handle other parts.\n");
+        sb.append("**ONLY evaluate whether THIS task fulfilled ITS described objective.**\n\n");
+        sb.append("DO NOT penalize for:\n");
+        sb.append("- Missing tests (a separate TESTER task handles testing)\n");
+        sb.append("- Missing security config (another task may own that)\n");
+        sb.append("- Missing deployment files like manifest.yml (another task may own that)\n");
+        sb.append("- Missing configuration files (another task may own that)\n");
+        sb.append("- Missing features that are NOT in the task description above\n\n");
+        sb.append("DO evaluate:\n");
+        sb.append("- Does the code implement what the task description asks for?\n");
+        sb.append("- Is the code syntactically correct and complete (no truncated files, missing braces)?\n");
+        sb.append("- Are there bugs in the logic THIS task implemented?\n");
+        sb.append("- Basic code quality: naming, structure, obvious anti-patterns\n\n");
+
         sb.append("## Review Instructions\n\n");
-        sb.append("- Review each modified file for correctness, security, and code quality\n");
+        sb.append("- Review ONLY the modified files listed above\n");
         sb.append("- Check that the implementation matches the task objective\n");
-        sb.append("- Look for: bugs, security vulnerabilities, performance issues, code style problems\n\n");
-        sb.append("### FUNCTIONAL COMPLETENESS CHECK (CRITICAL)\n");
+        sb.append("- Look for: bugs, compilation errors, logic errors, obvious security issues in THIS code\n\n");
+        sb.append("### FUNCTIONAL COMPLETENESS CHECK\n");
         sb.append("- Does the code actually implement what was requested? Not just scaffolding.\n");
-        sb.append("- Would this work if deployed? Test it mentally — trace through the code.\n");
-        sb.append("- **FAIL (score <= 4) if core functionality is missing or broken.**\n\n");
-        sb.append("### Deployment Check\n");
-        sb.append("- If there's a `manifest.yml`, verify it matches the file structure:\n");
-        sb.append("  - Staticfile apps MUST have `Staticfile` config AND files in `public/` directory\n");
-        sb.append("  - Java apps MUST have JAR path matching where Maven/Gradle builds it\n");
-        sb.append("  - Node apps MUST have `package.json` with valid start script\n\n");
+        sb.append("- Is the file syntactically complete? (no missing closing braces, imports, etc.)\n");
+        sb.append("- **FAIL (score <= 4) if core functionality is missing, broken, or file is truncated.**\n\n");
         sb.append("- Provide a quality score from 1-10\n");
-        sb.append("- List specific issues found (including incomplete implementations and deployment mismatches)\n");
-        sb.append("- List improvement suggestions\n\n");
+        sb.append("- List at most 3 specific issues found (focus on the most critical)\n");
+        sb.append("- List at most 3 improvement suggestions\n\n");
 
         sb.append("## Output Format\n\n");
         sb.append("Provide your review as:\n");

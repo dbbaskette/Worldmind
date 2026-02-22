@@ -514,23 +514,32 @@ public class EvaluateWaveNode {
     /**
      * Appends reviewer review details to retry context so CODER knows what to fix.
      */
+    private static final int MAX_RETRY_ISSUES = 3;
+    private static final int MAX_RETRY_SUGGESTIONS = 3;
+
     private String enrichRetryContext(String baseContext, ReviewFeedback feedback) {
         var sb = new StringBuilder(baseContext);
         sb.append("\n\n## Review Feedback (score: ").append(feedback.score()).append("/10)\n\n");
+        sb.append("Focus on the most critical issues below. Do NOT try to address every suggestion — ");
+        sb.append("fix the core problems first and keep your changes minimal and correct.\n\n");
 
         if (feedback.summary() != null && !feedback.summary().isBlank()) {
             sb.append("**Summary:** ").append(feedback.summary()).append("\n\n");
         }
         if (feedback.issues() != null && !feedback.issues().isEmpty()) {
-            sb.append("**Issues to fix:**\n");
-            for (var issue : feedback.issues()) {
+            var issues = feedback.issues().size() > MAX_RETRY_ISSUES
+                    ? feedback.issues().subList(0, MAX_RETRY_ISSUES) : feedback.issues();
+            sb.append("**Top issues to fix:**\n");
+            for (var issue : issues) {
                 sb.append("- ").append(issue).append("\n");
             }
             sb.append("\n");
         }
         if (feedback.suggestions() != null && !feedback.suggestions().isEmpty()) {
-            sb.append("**Suggestions:**\n");
-            for (var suggestion : feedback.suggestions()) {
+            var suggestions = feedback.suggestions().size() > MAX_RETRY_SUGGESTIONS
+                    ? feedback.suggestions().subList(0, MAX_RETRY_SUGGESTIONS) : feedback.suggestions();
+            sb.append("**Suggestions (nice-to-have, not required):**\n");
+            for (var suggestion : suggestions) {
                 sb.append("- ").append(suggestion).append("\n");
             }
         }
